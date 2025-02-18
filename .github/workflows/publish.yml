@@ -42,7 +42,7 @@ jobs:
           cd docs
           npx antora antora-playbook.yml
       - name: Upload Artifacts
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
           path: docs/_public
       - name: Deploy docs to website
