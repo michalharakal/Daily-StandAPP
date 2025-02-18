@@ -2,3 +2,4 @@
 
 * xref:setup.adoc[]
 * xref:bios.adoc[]
+* xref:architecture.adoc[Architecture]
