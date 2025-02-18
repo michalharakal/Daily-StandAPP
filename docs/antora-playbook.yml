@@ -1,0 +1,52 @@
+site:
+  title: daily-standapp
+  url: https://michalharakal.github.io/Daily-StandAPP
+  start_page: daily-standapp::index.adoc
+  keys:
+    google_analytics: ''
+content:
+  sources:
+  - url: ../                 # The current folder is a git repo
+    branches: HEAD         # "HEAD" uses whichever branch is currently checked out
+    start_path: docs/src/docs
+    edit_url: 'https://github.com/michalharakal/Daily-StandAPP/{path}'
+
+ui:
+  bundle:
+    url: ./ui-bundle.zip
+    snapshot: false
+  supplemental_files:
+    - path: ui.yml
+      contents: |
+        static_files:
+        - .nojekyll
+    - path: .nojekyll
+
+runtime:
+  cache_dir: ./.cache/antora
+
+asciidoc:
+  attributes:
+    page-pagination: ''
+    stem: ''
+    icons: font
+    experimental: ''
+    idprefix: '@'
+    idseparator: '-@'
+    table-caption: false
+    example-caption: false
+    listing-caption: false
+    hide-uri-scheme: '@'
+    kroki-server-url: https://kroki.vshn.net/
+    kroki-fetch-diagram: ''
+    plantuml-server-url: 'https://www.plantuml.com/plantuml'
+  extensions:
+    - asciidoctor-kroki
+    - asciidoctor-plantuml
+
+output:
+  destinations:
+  - provider: fs
+    path: ./_public
+    clean: true
+

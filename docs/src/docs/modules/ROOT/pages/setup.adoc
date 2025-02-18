@@ -1,0 +1,14 @@
+= Set up an environment
+
+== Install the required software
+
+=== Entwicklungsumgebung
+
+* *Recommended*: Current version of Intellij IDEA
+* Current version of Android Studio
+* Koans plugin for Intellij IDEA
+
+== Kotlin
+
+Kotlin ist die hauptsprache, die in diesem Kurs verwendet wird. Kotlin ist bereits mit Android Studio oder in IntelliJ IDEA installiert.
+

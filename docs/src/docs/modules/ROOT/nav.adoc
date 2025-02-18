@@ -1,0 +1,4 @@
+.Workshop
+
+* xref:setup.adoc[]
+* xref:bios.adoc[]

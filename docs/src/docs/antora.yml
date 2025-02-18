@@ -1,0 +1,6 @@
+name: daily-standapp
+title: Dialy-StandAPP
+version:
+start_page: ROOT:index.adoc
+nav:
+- modules/ROOT/nav.adoc

@@ -1,0 +1,76 @@
+= Daily {docdir}
+
+== Modules
+
+....
+daily-standapp/
+├── build.gradle.kts         // Root Gradle file (if needed for common settings)
+├── settings.gradle.kts      // Include all modules here
+├── common/                  // Contains shared business logic
+│   ├── build.gradle.kts
+│   └── src/
+│       ├── commonMain/
+│       └── commonTest/
+├── domain/                  // Domain layer: business rules & use cases
+│   ├── build.gradle.kts
+│   └── src/
+│       ├── commonMain/
+│       └── commonTest/
+├── data/                    // Data layer: Git integration, repository implementations
+│   ├── build.gradle.kts
+│   └── src/
+│       ├── commonMain/
+│       └── commonTest/
+├── llm/                     // LLM integration module
+│   ├── build.gradle.kts
+│   └── src/
+│       ├── commonMain/
+│       └── commonTest/
+└── desktop/                 // Desktop-specific module (JVM) with Jetpack Compose UI
+    ├── build.gradle.kts
+    └── src/
+        ├── main/
+        │   └── kotlin/
+        └── test/
+....
+
+[mermaid]
+....
+graph LR
+    COMMON[Common Module]
+    DOMAIN[Domain Module]
+    DOMAIN --> COMMON
+
+    DATA[Data Module]
+    DATA --> COMMON
+
+    LLM[LLM Module]
+    LLM --> COMMON
+
+    DESKTOP[Desktop Module - Jetpack Compose]
+    DESKTOP --> DOMAIN
+    DESKTOP --> DATA
+    DESKTOP --> LLM
+....
+
+=== Data flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant U as User
+    participant UI as Desktop UI
+    participant D as Domain Layer
+    participant DA as Data Module
+    participant LLM as LLM Module
+
+    U->>UI: Select Git Repository
+    UI->>D: Request commit scan for selected repository
+    D->>DA: Scan Git repository and extract commits
+    DA-->>D: Return commit data
+    D->>LLM: Send commit data for summarization
+    LLM-->>D: Return summarized commit data
+    D->>UI: Provide summary and additional results
+    UI->>U: Render summary on screen
+
+----
