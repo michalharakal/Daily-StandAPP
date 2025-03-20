@@ -8,6 +8,22 @@ plugins {
     alias(libs.plugins.androidLibrary)
 }
 
+val osName: String = System.getProperty("os.name").toLowerCase()
+val osArch: String = System.getProperty("os.arch").toLowerCase()
+
+val detectedOs = when {
+    osName.contains("mac") -> "osx"
+    osName.contains("linux") -> "linux"
+    osName.contains("windows") -> "windows"
+    else -> throw GradleException("Unsupported OS: $osName")
+}
+
+val detectedArch = when (osArch) {
+    "x86_64", "amd64" -> "x86_64"
+    "aarch64", "arm64" -> "aarch_64"
+    else -> throw GradleException("Unsupported Arch: $osArch")
+}
+
 kotlin {
 
     androidTarget {
@@ -53,6 +69,13 @@ kotlin {
             implementation(libs.skainet.core)
             implementation(libs.skainet.io)
             implementation(libs.kotlinx.io.core)
+            implementation(libs.kotlinx.coroutines.core)
+        }
+        jvmMain.dependencies {
+            implementation("com.github.tjake:jlama-core:0.8.4") {
+                exclude("org.slf4j", "slf4j-log4j12")
+            }
+            implementation("com.github.tjake:jlama-native:0.8.4:$detectedOs-$detectedArch")
         }
     }
 }

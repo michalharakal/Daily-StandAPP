@@ -1,5 +1,5 @@
 package de.jug_da.standapp.llm
 
-actual fun summarize(text: String): String {
+actual fun getLLMSummarizer(): LLMSummarizer {
     TODO("Not yet implemented")
 }

@@ -1,3 +1,9 @@
 package de.jug_da.standapp.llm
 
-expect fun summarize(text: String): String
+interface LLMSummarizer {
+    suspend fun summarize(text: String): String
+    fun summarize(text: String, callback: (String) -> Unit): String
+}
+
+expect fun getLLMSummarizer(): LLMSummarizer
+
