@@ -30,3 +30,4 @@ dependencyResolutionManagement {
 }
 
 include(":composeApp", ":shared", ":data", ":domain", ":llm")
+include("StandAPP-cli")
