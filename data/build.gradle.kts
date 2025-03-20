@@ -67,6 +67,9 @@ kotlin {
                 implementation(libs.eclipse.jgit)
                 implementation(libs.slf4j.simple)
             }
+            jvmTest.dependencies {
+                implementation("org.junit.jupiter:junit-jupiter-api:5.12.1")
+            }
         }
     }
 
