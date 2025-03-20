@@ -66,8 +66,6 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.skainet.core)
-            implementation(libs.skainet.io)
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.coroutines.core)
         }
