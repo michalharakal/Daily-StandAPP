@@ -1,3 +1,5 @@
 package de.jug_da.data.git
 
-data class GitInfo(val commiter: String)
+import kotlinx.datetime.Instant
+
+data class GitInfo(val id: String, val authorName: String, val authorEmail: String, val whenDate: Instant, val message: String, )
