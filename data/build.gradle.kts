@@ -9,6 +9,7 @@ plugins {
 }
 
 kotlin {
+
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
@@ -19,7 +20,7 @@ kotlin {
     jvmToolchain(21)
 
     jvm {
-        // Target JDK 17 for JVM compilation
+        // Target JDK 21 for JVM compilation
         compilations.all {
             kotlinOptions.jvmTarget = "21"
             // Enable the incubating Vector API module for the compiler
@@ -28,15 +29,16 @@ kotlin {
         // (Optional) Use JDK 17 toolchain for compilation
         // java.toolchain.languageVersion.set(JavaLanguageVersion.of(17))
     }
-        listOf(
-            iosArm64(),
-            iosSimulatorArm64()
-        ).forEach { iosTarget ->
-            iosTarget.binaries.framework {
-                baseName = "SinusApproximatorKit"
-                isStatic = true
-            }
+
+    listOf(
+        iosArm64(),
+        iosSimulatorArm64()
+    ).forEach { iosTarget ->
+        iosTarget.binaries.framework {
+            baseName = "SinusApproximatorKit"
+            isStatic = true
         }
+    }
 
 
         @OptIn(ExperimentalWasmDsl::class)
