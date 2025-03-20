@@ -65,6 +65,9 @@ kotlin {
                 implementation("org.eclipse.jgit:org.eclipse.jgit:7.1.0.202411261347-r")
                 implementation("org.slf4j:slf4j-simple:2.0.16")
             }
+            jvmTest.dependencies {
+                implementation("org.junit.jupiter:junit-jupiter-api:5.12.1")
+            }
         }
     }
 
