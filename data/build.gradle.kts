@@ -59,17 +59,17 @@ kotlin {
         sourceSets {
             commonMain.dependencies {
                 implementation(libs.kotlinx.io.core)
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.2")
+                implementation(libs.kotlinx.datetime)
             }
             jvmMain.dependencies {
-                implementation("org.eclipse.jgit:org.eclipse.jgit:7.1.0.202411261347-r")
-                implementation("org.slf4j:slf4j-simple:2.0.16")
+                implementation(libs.eclipse.jgit)
+                implementation(libs.slf4j.simple)
             }
         }
     }
 
     android {
-        namespace = "sk.ai.net.client.shared"
+        namespace = "de.jug_da.data.git.android"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_11
