@@ -6,9 +6,7 @@
 
 * *Recommended*: Current version of Intellij IDEA
 * Current version of Android Studio
-* Koans plugin for Intellij IDEA
 
-== Kotlin
+=== LLM Modelle
 
-Kotlin ist die hauptsprache, die in diesem Kurs verwendet wird. Kotlin ist bereits mit Android Studio oder in IntelliJ IDEA installiert.
-
+include::local_models.adoc[]

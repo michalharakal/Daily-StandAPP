@@ -1,0 +1,66 @@
+
+*Introduction:* This guide will show you two beginner-friendly ways to download a large language model (LLM) to your local working folder. We cover: (1) using the Hugging Face Hub’s Command-Line Interface (CLI), and (2) using the *Jlama* project (a Java-based LLM engine). By the end, you’ll have the model files (weights, config, tokenizer, etc.) saved offline in a folder, ready for use. Let’s get started!
+
+== Method 1: Using Hugging Face CLI
+
+Hugging Face provides a CLI tool (`huggingface-cli`) as part of its `huggingface_hub` package. This lets you log in, search, and download models directly from the Hugging Face Hub via the terminal (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20,and%20how%20to%20use%20them[Command Line Interface (CLI)]). Follow these steps to set it up and download a model locally:
+
+. *Install the Hugging Face CLI tool* – You can install it via Python’s package manager. For example, run:
+ `bash
+   pip install -U "huggingface_hub[cli]"
+` +
+ This installs the latest Hugging Face Hub client along with CLI support (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=%3E%3E%3E%20pip%20install%20[Command Line Interface (CLI)]). After installation, confirm it’s working by running `huggingface-cli --help` in your terminal.
+
+. *Log in to Hugging Face (if needed)* – If you plan to download models that require authentication (e.g. large or gated models), log in first. Use the command:
+ `bash
+   huggingface-cli login
+` +
+ This will prompt you for an *access token* from your Hugging Face account (you can create one on the Hugging Face website under Settings). Paste your token and hit enter. A success message should appear once you’re logged in (https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#:~:text=huggingface[Command Line Interface (CLI)]). (Public models don’t strictly require login, but it’s good to log in to avoid any access issues.)
+
+. *Search and select a model* – Browse the Hugging Face model hub (visit *huggingface.co* in your browser) to find the model you want. You can use the website’s search to discover models (for example, search for “GPT-2” or “Llama 2”). Click the model you’re interested in and note the *model repository name* (usually in the format `"organization/model-name"` or `"username/model-name"`). For instance, the popular BERT base model has the repo name `bert-base-uncased`. Make sure you have this ID for the next step.
+
+. *Download the model files to your folder* – Use the CLI’s download command with the model’s repo ID. For example, to download the _bert-base-uncased_ model locally, run:
+ `bash
+   huggingface-cli download bert-base-uncased --local-dir .
+` +
+ Here, `--local-dir .` tells the CLI to save the files in the current directory (your working folder) instead of the default cache (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20recommended%20,dir%60%20option[Command Line Interface (CLI)]). If you omit `--local-dir`, the files will be saved in Hugging Face’s cache directory on your system, and the CLI will output the path. Using the `download` command with just the repo name will fetch *all files in the model repository* (config, weights, tokenizer, etc.) (https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#:~:text=Copied[Command Line Interface (CLI)]). You’ll see progress bars as it downloads each file.
+
+. *Verify the model files* – After the command completes, check your working directory (or the folder you specified) to see the model files. You should see files such as the model’s weight file (e.g. `pytorch_model.bin` or `model.safetensors`), a `config.json`, and tokenizer files (such as `tokenizer.json`, `vocab.txt`, or merges files, depending on the model). For example, a Hugging Face model repo typically includes files like *config.json*, *model.safetensors*, *tokenizer.json*, and *tokenizer_config.json* (https://huggingface.co/tjake/Llama-3.2-1B-Instruct-JQ4/tree/main#:~:text=[tjake/Llama-3.2-1B-Instruct-JQ4 at main]). Make sure these are present. You can list the files in your folder (using `ls` on Unix or checking in your file explorer) to confirm all necessary files downloaded. If they’re present, congrats – you have the model offline!
+
+_(If anything is missing or you encounter an error, double-check that the model ID is correct and that you were logged in (for gated models). The CLI will print the local path of the downloaded files on success (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=%3E%3E%3E%20huggingface,gpt2%2Fsnapshots%2F11c5a3d5811f50298f278a704980280950aedb10%2Fconfig.json[Command Line Interface (CLI)]).)_
+
+== Method 2: Using Jlama (Java LLM Engine)
+
+*What is Jlama?* Jlama is a modern LLM inference engine written in Java (https://github.com/tjake/Jlama#:~:text=Jlama%20is%20a%20modern%20LLM,co%2Ftjake[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]). It allows you to download and run many Hugging Face text-generation models within a Java environment. In other words, it’s a tool that lets you work with LLMs locally, optimized with Java’s vector APIs for performance. According to the author, _“Jlama is a Java-based inference engine for many text-to-text models on HuggingFace… intended to be used for integrating AI into Java apps.”_ (https://www.reddit.com/r/java/comments/1g8qwxt/jlama_llm_engine_for_java_20/#:~:text=Jlama%C2%A0is%20a%20java%20based%20inference,text%20models%20on%20huggingface[Jlama: LLM engine for Java 20+ : r/java]). Even if you’re not a Java developer, Jlama provides a simple CLI to fetch models, similar to the Hugging Face CLI.
+
+*Setup and download steps:* As a beginner, you can use Jlama’s CLI without writing any code. Ensure you have Java installed (Jlama requires a recent Java version – Java 21 is recommended for full support). Then follow these steps:
+
+. *Install Jbang (prerequisite for Jlama CLI)* – Jlama distributes its CLI via https://www.jbang.dev[Jbang], which is a tool to run Java applications easily. First, install Jbang on your system. On Linux/Mac, you can run:
+ `bash
+   curl -Ls https://sh.jbang.dev | bash -s - app setup
+` +
+ (Windows users can find an installer on the Jbang website.) This script installs Jbang on your PATH (https://github.com/tjake/Jlama#:~:text=,app%20setup[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]). _If you already have Jbang, you can skip this step._
+
+. *Install the Jlama CLI* – With Jbang ready, install Jlama by running:
+ `bash
+   jbang app install --force jlama@tjake
+` +
+ This command fetches the Jlama application from GitHub and installs the `jlama` CLI tool (you may be prompted to trust the source) (https://github.com/tjake/Jlama#:~:text=,app%20setup[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]). After this, you should have a `jlama` command available. You can test it by running `jlama version` or simply `jlama` to see the help message. The help should list various commands, including options to chat, run a REST API, download models, etc. (For reference, the Jlama CLI supports commands like `download` to get models, `list` to show local models, and others (https://github.com/tjake/Jlama#:~:text=Other%3A%20download%20%20%20,Display%20JLama%20version%20information[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]).)
+
+. *Download a model using Jlama* – Now you can download a model from Hugging Face using Jlama. By default, Jlama will download a model and store it in a local directory for you. To do this, use the `jlama download` command with the model’s *owner/name* format (just like the Hugging Face repo ID). For example:
+ `bash
+   jlama download tjake/Llama-3.2-1B-Instruct-JQ4
+` +
+ This will download the model files for the specified repository (in this example, a 1B-parameter Llama 3.2 model quantized in 4-bit, hosted by the Jlama author). You can replace the repo ID with any model you want. Jlama will automatically handle downloading all required files from Hugging Face (https://github.com/tjake/Jlama#:~:text=Other%3A%20download%20%20%20,Display%20JLama%20version%20information[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]). During this process, you’ll see it fetching the model weights and other files.
+
+*Note:* You may want to run this command in an empty “models” folder or a dedicated working directory. Jlama will save the model files into a directory (often named after the model) in the current location. For instance, if you run the above command, it might create a folder like `Llama-3.2-1B-Instruct-JQ4/` containing the downloaded files. (The Jlama library uses the current working directory by default, or you can configure it programmatically to use a custom path (https://github.com/tjake/Jlama#:~:text=public%20void%20sample,JQ4%22%3B%20String%20workingDirectory%20%3D%20%22.%2Fmodels[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]), but running the CLI in your desired folder is the simplest approach.)
+
+. *Confirm the model files are downloaded* – After `jlama download` finishes, verify that the model files are present. You can list the contents of the model’s folder to see files similar to what we discussed earlier (e.g. a `model.safetensors` file, `config.json`, `tokenizer.json`, etc., depending on the model). For example, the model we downloaded above would include those files (since Jlama focuses on safetensors format, you’ll see a `.safetensors` weights file). To double-check via Jlama, you can also run:
+ `bash
+   jlama list
+` +
+ This will output a list of models that Jlama has downloaded locally (https://github.com/tjake/Jlama#:~:text=Other%3A%20download%20%20%20,Display%20JLama%20version%20information[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]). Your newly downloaded model should appear in that list, confirming the download was successful. If it’s listed, you have the model saved on disk. (Jlama also provides a `jlama rm <model>` command to remove a model, and other utilities, as noted in the help output.)
+
+Now you have the LLM model files on your machine via both methods! 🎉 You can proceed to load these model files in your application or offline environment. The Hugging Face CLI method is convenient if you’re working in Python or any environment where Python is available, while Jlama is great for Java environments or if you want an all-in-one tool that also enables running the model (Jlama can even spin up a local API or chat interface for the model with commands like `jlama chat` or `jlama restapi`).
+
+*Relevant Links:* For more details, refer to the official Hugging Face documentation on the CL (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20,and%20how%20to%20use%20them[Command Line Interface (CLI)]) (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20recommended%20,dir%60%20option[Command Line Interface (CLI)])】 and the Jlama GitHub repository READM (https://github.com/tjake/Jlama#:~:text=%EF%B8%8F%E2%80%8D%E2%99%80%EF%B8%8F%20How%20to%20use%20as,with%20jbang[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java]) (https://github.com/tjake/Jlama#:~:text=Other%3A%20download%20%20%20,Display%20JLama%20version%20information[GitHub - tjake/Jlama: Jlama is a modern LLM inference engine for Java])】. Both sources provide additional usage examples and troubleshooting tips. With these tools, downloading and managing offline models becomes much easier – happy experimenting with your local LLMs!
