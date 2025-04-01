@@ -22,6 +22,22 @@
 | xref:local_models.adoc[]
 
 
+| *Sprint 2*: LLM in App
+|15 Minuten
+| xref:local_models.adoc[]
+
+| *Sprint 3*: git commits lesen
+|15 Minuten
+| xref:local_models.adoc[]
+
+| *Sprint 4*: Commit messages an LLM senden
+|15 Minuten
+| xref:local_models.adoc[]
+
+| *Sprint 5*: Prompts entwickeln
+|15 Minuten
+| xref:local_models.adoc[]
+
 |===
 
 
