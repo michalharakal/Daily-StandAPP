@@ -10,3 +10,8 @@
 === LLM Modelle
 
 include::local_models.adoc[]
+
+
+=== Sample Repository
+
+https://github.com/below/HelloSilicon
