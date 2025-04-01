@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Untitled :: daily-standapp</title>
+    <title>LLM modele :: daily-standapp</title>
     <link rel="canonical" href="https://michalharakal.github.io/Daily-StandAPP/daily-standapp/local_models.html">
     <meta name="generator" content="Antora 3.1.10">
     <link rel="stylesheet" href="../_/css/site.css">
@@ -66,16 +66,31 @@
 <ul class="nav-list">
   <li class="nav-item" data-depth="0">
     <button class="nav-item-toggle"></button>
-    <span class="nav-text">Workshop</span>
+    <span class="nav-text">Intro</span>
 <ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="agenda.html">Agenda</a>
+  </li>
   <li class="nav-item" data-depth="1">
     <a class="nav-link" href="setup.html">Set up an environment</a>
   </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="architecture.html">Architecture</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="0">
+    <button class="nav-item-toggle"></button>
+    <span class="nav-text">Workshop</span>
+<ul class="nav-list">
   <li class="nav-item" data-depth="1">
     <a class="nav-link" href="bios.html">Wer wir sind</a>
   </li>
   <li class="nav-item" data-depth="1">
     <a class="nav-link" href="architecture.html">Architecture</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="bios.html">Wer wir sind</a>
   </li>
 </ul>
   </li>
@@ -106,6 +121,10 @@
 <button class="nav-toggle"></button>
   <a href="index.html" class="home-link"></a>
 <nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Dialy-StandAPP</a></li>
+    <li><a href="local_models.html">LLM modele</a></li>
+  </ul>
 </nav>
   <div class="edit-this-page"><a href="https://github.com/michalharakal/Daily-StandAPP/docs/src/docs/modules/ROOT/pages/local_models.adoc">Edit this Page</a></div>
   </div>
@@ -114,48 +133,94 @@
   <div class="toc-menu"></div>
 </aside>
 <article class="doc">
-<div class="paragraph">
-<p><strong>Introduction:</strong> This guide will show you two beginner-friendly ways to download a large language model (LLM) to your local working folder. We cover: (1) using the Hugging Face Hub’s Command-Line Interface (CLI), and (2) using the <strong>Jlama</strong> project (a Java-based LLM engine). By the end, you’ll have the model files (weights, config, tokenizer, etc.) saved offline in a folder, ready for use. Let’s get started!</p>
-</div>
-<div class="sect1">
-<h2 id="method-1-using-hugging-face-cli"><a class="anchor" href="#method-1-using-hugging-face-cli"></a>Method 1: Using Hugging Face CLI</h2>
+<h1 class="page">LLM modele</h1>
+<div id="preamble">
 <div class="sectionbody">
 <div class="paragraph">
-<p>Hugging Face provides a CLI tool (<code>huggingface-cli</code>) as part of its <code>huggingface_hub</code> package. This lets you log in, search, and download models directly from the Hugging Face Hub via the terminal (<a href="https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20,and%20how%20to%20use%20them">Command Line Interface (CLI)</a>). Follow these steps to set it up and download a model locally:</p>
+<p>Wir laden zuerst ein Model herunter, um es offline betreiben zu können. Dies bietet mehrere Vorteile:
+* schnellerer Zugriff ohne Internetverbindung,
+* erhöhte Datensicherheit durch lokale Speicherung
+* Lauzeit in einer kontrollierten Umgebung</p>
 </div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="nutzung-des-hugging-face-cli"><a class="anchor" href="#nutzung-des-hugging-face-cli"></a>Nutzung des Hugging Face CLI</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Hugging Face bietet ein Kommandozeilen-Tool (<code>huggingface-cli</code>) im Paket <code>huggingface_hub</code>. Dieses erlaubt Login, Suche und Herunterladen von Modellen direkt vom Hugging Face Hub über das Terminal.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="schritte-zur-einrichtung"><a class="anchor" href="#schritte-zur-einrichtung"></a>Schritte zur Einrichtung</h2>
+<div class="sectionbody">
 <div class="olist arabic">
 <ol class="arabic">
 <li>
-<p><strong>Install the Hugging Face CLI tool</strong> – You can install it via Python’s package manager. For example, run:
- <code>bash
-   pip install -U "huggingface_hub[cli]"
-`<br>
- This installs the latest Hugging Face Hub client along with CLI support (<a href="https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=%3E%3E%3E%20pip%20install%20">Command Line Interface (CLI)</a>). After installation, confirm it’s working by running `huggingface-cli --help</code> in your terminal.</p>
+<p><strong>Virtuelle Python-Umgebung erstellen (empfohlen)</strong></p>
+<div class="paragraph">
+<p>Erstelle zuerst eine virtuelle Umgebung mit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">python -m venv hf_env
+source hf_env/bin/activate  # Linux/Mac
+hf_env\Scripts\activate    # Windows</code></pre>
+</div>
+</div>
 </li>
 <li>
-<p><strong>Log in to Hugging Face (if needed)</strong> – If you plan to download models that require authentication (e.g. large or gated models), log in first. Use the command:
- `bash
-   huggingface-cli login
-`<br>
- This will prompt you for an <strong>access token</strong> from your Hugging Face account (you can create one on the Hugging Face website under Settings). Paste your token and hit enter. A success message should appear once you’re logged in (<a href="https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#:~:text=huggingface">Command Line Interface (CLI)</a>). (Public models don’t strictly require login, but it’s good to log in to avoid any access issues.)</p>
+<p><strong>Installation</strong></p>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">pip install -U "huggingface_hub[cli]"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Bestätige die Installation mit:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">huggingface-cli --help</code></pre>
+</div>
+</div>
 </li>
 <li>
-<p><strong>Search and select a model</strong> – Browse the Hugging Face model hub (visit <strong>huggingface.co</strong> in your browser) to find the model you want. You can use the website’s search to discover models (for example, search for “GPT-2” or “Llama 2”). Click the model you’re interested in and note the <strong>model repository name</strong> (usually in the format <code>"organization/model-name"</code> or <code>"username/model-name"</code>). For instance, the popular BERT base model has the repo name <code>bert-base-uncased</code>. Make sure you have this ID for the next step.</p>
+<p><strong>Login (optional)</strong></p>
+<div class="paragraph">
+<p>Falls erforderlich (z.B. bei geschützten Modellen), melde dich an:</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">huggingface-cli login</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Gib hier deinen persönlichen Zugriffstoken (erstellbar auf der Hugging-Face-Website unter Einstellungen) ein.</p>
+</div>
 </li>
 <li>
-<p><strong>Download the model files to your folder</strong> – Use the CLI’s download command with the model’s repo ID. For example, to download the <em>bert-base-uncased</em> model locally, run:
- <code>bash
-   huggingface-cli download bert-base-uncased --local-dir .
-`<br>
- Here, `--local-dir .</code> tells the CLI to save the files in the current directory (your working folder) instead of the default cache (<a href="https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20recommended%20,dir%60%20option">Command Line Interface (CLI)</a>). If you omit <code>--local-dir</code>, the files will be saved in Hugging Face’s cache directory on your system, and the CLI will output the path. Using the <code>download</code> command with just the repo name will fetch <strong>all files in the model repository</strong> (config, weights, tokenizer, etc.) (<a href="https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#:~:text=Copied">Command Line Interface (CLI)</a>). You’ll see progress bars as it downloads each file.</p>
+<p><strong>Modell auswählen</strong></p>
+<div class="paragraph">
+<p>Suche auf <a href="https://huggingface.co">huggingface.co</a> nach dem gewünschten Modell. Merke dir den Repo-Namen (z.B. <code>bert-base-uncased</code>).</p>
+</div>
 </li>
 <li>
-<p><strong>Verify the model files</strong> – After the command completes, check your working directory (or the folder you specified) to see the model files. You should see files such as the model’s weight file (e.g. <code>pytorch_model.bin</code> or <code>model.safetensors</code>), a <code>config.json</code>, and tokenizer files (such as <code>tokenizer.json</code>, <code>vocab.txt</code>, or merges files, depending on the model). For example, a Hugging Face model repo typically includes files like <strong>config.json</strong>, <strong>model.safetensors</strong>, <strong>tokenizer.json</strong>, and <strong>tokenizer_config.json</strong> (<a href="https://huggingface.co/tjake/Llama-3.2-1B-Instruct-JQ4/tree/main#:~:text=">tjake/Llama-3.2-1B-Instruct-JQ4 at main</a>). Make sure these are present. You can list the files in your folder (using <code>ls</code> on Unix or checking in your file explorer) to confirm all necessary files downloaded. If they’re present, congrats – you have the model offline!</p>
+<p><strong>Modell herunterladen</strong></p>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">huggingface-cli download bert-base-uncased --local-dir .</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Mit <code>--local-dir .</code> werden die Dateien im aktuellen Verzeichnis gespeichert. Ohne Angabe erfolgt das Speichern im Hugging Face Cache-Verzeichnis.</p>
+</div>
 </li>
 </ol>
 </div>
 <div class="paragraph">
-<p><em>(If anything is missing or you encounter an error, double-check that the model ID is correct and that you were logged in (for gated models). The CLI will print the local path of the downloaded files on success (<a href="https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=%3E%3E%3E%20huggingface,gpt2%2Fsnapshots%2F11c5a3d5811f50298f278a704980280950aedb10%2Fconfig.json">Command Line Interface (CLI)</a>).)</em></p>
+<p>Bei Problemen überprüfe die Modell-ID und dein Login.</p>
 </div>
 </div>
 </div>
