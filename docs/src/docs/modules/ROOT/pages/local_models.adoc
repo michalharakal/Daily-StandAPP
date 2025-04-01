@@ -1,31 +1,38 @@
-== 🤔 JLama in cli
+== 🤔 JLama in der Kommandozeile
 
-Add LLM Inference directly to your Java application.
+Integriere LLM-Inferenz direkt in deine Java-Anwendung.
 
-== 🔬 Quick Start
+== 🔬 Schnellstart
 
-=== 🕵️‍♀️ How to use as a local client (with jbang!)
+=== 🕵️‍♀️ Nutzung als lokaler Client (mit jbang!)
 
-Jlama includes a command line tool that makes it easy to use.
+JLama enthält ein Kommandozeilen-Tool, das die Nutzung sehr einfach macht.
 
-The CLI can be run with https://www.jbang.dev/download/[jbang].
+Die CLI kann mit https://www.jbang.dev/download/[jbang] ausgeführt werden.
 
 [source,shell]
 ----
-#Install jbang (or https://www.jbang.dev/download/)
+# jbang installieren (oder https://www.jbang.dev/download/)
 curl -Ls https://sh.jbang.dev | bash -s - app setup
 
-#Install Jlama CLI (will ask if you trust the source)
+# Jlama CLI installieren (fragt ggf., ob du der Quelle vertraust)
 jbang app install --force jlama@tjake
 ----
 
-Now that you have jlama installed you can download a model from huggingface and chat with it.
-Note I have pre-quantized models available at https://hf.co/tjake
+NOTE: Wenn du Probleme hast, den Befehl `jlama` im Terminal auszuführen, stelle sicher, dass Jlama in `$HOME/.jbang/bin` installiert ist. Gegebenenfalls musst du die `PATH`-Variable ergänzen, damit sie auf den Ordner von Jbang verweist:
 
 [source,shell]
 ----
-# Run the openai chat api and UI on a model
+export PATH="$PATH:$HOME/.jbang/bin"
+----
+
+Nachdem du Jlama installiert hast, kannst du ein Modell von Huggingface herunterladen und damit chatten. Vorgefertigte quantisierte Modelle findest du unter https://hf.co/tjake.
+
+[source,shell]
+----
+# Starte die OpenAI Chat API und die UI mit einem Modell
 jlama restapi tjake/Llama-3.2-1B-Instruct-JQ4 --auto-download
 ----
 
-open browser to http://localhost:8080/
+Öffne anschließend deinen Browser unter http://localhost:8080/
+
