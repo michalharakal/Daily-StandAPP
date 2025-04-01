@@ -160,45 +160,61 @@
 </div>
 </div>
 <div class="sect1">
-<h2 id="jlama-in-cli"><a class="anchor" href="#jlama-in-cli"></a>🤔 JLama in cli</h2>
+<h2 id="jlama-in-der-kommandozeile"><a class="anchor" href="#jlama-in-der-kommandozeile"></a>🤔 JLama in der Kommandozeile</h2>
 <div class="sectionbody">
 <div class="paragraph">
-<p>Add LLM Inference directly to your Java application.</p>
+<p>Integriere LLM-Inferenz direkt in deine Java-Anwendung.</p>
 </div>
 </div>
 </div>
 <div class="sect1">
-<h2 id="quick-start"><a class="anchor" href="#quick-start"></a>🔬 Quick Start</h2>
+<h2 id="schnellstart"><a class="anchor" href="#schnellstart"></a>🔬 Schnellstart</h2>
 <div class="sectionbody">
 <div class="sect2">
-<h3 id="how-to-use-as-a-local-client-with-jbang"><a class="anchor" href="#how-to-use-as-a-local-client-with-jbang"></a>🕵️‍♀️ How to use as a local client (with jbang!)</h3>
+<h3 id="nutzung-als-lokaler-client-mit-jbang"><a class="anchor" href="#nutzung-als-lokaler-client-mit-jbang"></a>🕵️‍♀️ Nutzung als lokaler Client (mit jbang!)</h3>
 <div class="paragraph">
-<p>Jlama includes a command line tool that makes it easy to use.</p>
+<p>JLama enthält ein Kommandozeilen-Tool, das die Nutzung sehr einfach macht.</p>
 </div>
 <div class="paragraph">
-<p>The CLI can be run with <a href="https://www.jbang.dev/download/">jbang</a>.</p>
+<p>Die CLI kann mit <a href="https://www.jbang.dev/download/">jbang</a> ausgeführt werden.</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-shell hljs" data-lang="shell">#Install jbang (or https://www.jbang.dev/download/)
+<pre class="highlightjs highlight"><code class="language-shell hljs" data-lang="shell"># jbang installieren (oder https://www.jbang.dev/download/)
 curl -Ls https://sh.jbang.dev | bash -s - app setup
 
-#Install Jlama CLI (will ask if you trust the source)
+# Jlama CLI installieren (fragt ggf., ob du der Quelle vertraust)
 jbang app install --force jlama@tjake</code></pre>
 </div>
 </div>
-<div class="paragraph">
-<p>Now that you have jlama installed you can download a model from huggingface and chat with it.
-Note I have pre-quantized models available at <a href="https://hf.co/tjake" class="bare">hf.co/tjake</a></p>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+Wenn du Probleme hast, den Befehl <code>jlama</code> im Terminal auszuführen, stelle sicher, dass Jlama in <code>$HOME/.jbang/bin</code> installiert ist. Gegebenenfalls musst du die <code>PATH</code>-Variable ergänzen, damit sie auf den Ordner von Jbang verweist:
+</td>
+</tr>
+</table>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-shell hljs" data-lang="shell"># Run the openai chat api and UI on a model
+<pre class="highlightjs highlight"><code class="language-shell hljs" data-lang="shell">export PATH="$PATH:$HOME/.jbang/bin"</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>Nachdem du Jlama installiert hast, kannst du ein Modell von Huggingface herunterladen und damit chatten. Vorgefertigte quantisierte Modelle findest du unter <a href="https://hf.co/tjake" class="bare">hf.co/tjake</a>.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-shell hljs" data-lang="shell"># Starte die OpenAI Chat API und die UI mit einem Modell
 jlama restapi tjake/Llama-3.2-1B-Instruct-JQ4 --auto-download</code></pre>
 </div>
 </div>
 <div class="paragraph">
-<p>open browser to <a href="http://localhost:8080/" class="bare">localhost:8080/</a></p>
+<p>Öffne anschließend deinen Browser unter <a href="http://localhost:8080/" class="bare">localhost:8080/</a></p>
 </div>
 </div>
 <div class="sect2">
