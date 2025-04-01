@@ -21,5 +21,9 @@ class MockGitService : GitService {
         callback(mockData())
     }
 
-    private fun mockData(): List<GitInfo> = listOf()
+    private fun mockData(): List<GitInfo> = listOf(
+        GitInfo("refactor: remove unnecessary function declaration"),
+        GitInfo("fix typo in readme"),
+        GitInfo("Avoid using nonstandard assembly syntax for NEON")
+    )
 }
