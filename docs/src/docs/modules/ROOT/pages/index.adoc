@@ -1,17 +1,15 @@
-= Wir erstellen Daily-StandAPP: Eine Offline-First-App in Java, Kotlin oder als mobile Lösung mit eingebetteter KI
+= Daily-StandAPP
 
-In diesem praxisorientierten Workshop entwickeln die Teilnehmer/-innen Daily StandAPP, eine Offline-First-App, die agile Teams dabei unterstützt, ihre Daily Standups zu optimieren, indem sie die jüngsten Entwicklungsaktivitäten analysiert und zusammenfasst. Die App ermöglicht es den Benutzer/-innen, einen lokalen Git-Repository-Ordner auszuwählen, Commits automatisch zu erkennen und ein eingebettetes Sprachmodell (LLM) zur Erstellung klarer Zusammenfassungen der Änderungen zu verwenden. Am Ende des Workshops verfügen die Teilnehmenden über einen Prototypen, der vollständig offline funktioniert, um Datenschutz und die Sicherheit sensibler Informationen zu gewährleisten. Wir werden außerdem gemeinsam lernen, wie sich die Integration eines LLMs auf Mobilgeräten oder PCs so gestaltet, dass eine optimale Balance zwischen Rechenleistung, Speichereffizienz und Benutzerfreundlichkeit erreicht wird. Durch den Einsatz von optimierten Bibliotheken, Modellen und Plattformtools können sie die Herausforderungen ressourcenbeschränkter Umgebungen meistern und eine robuste, benutzerfreundliche App entwickeln, die lokale KI-Funktionalität sicher und effizient bereitstellt. Durch die Nutzung einer in Kotlin Multiplatform entwickelten KI-Bibliothek bleibt die Wahl der Programmiersprache und des Frontends flexibel, sodass Java, Kotlin oder Kotlin Multiplatform verwendet werden können. Wir unterstützen euch bei Java, Kotlin und Android/iOS. Aktuelle Informationen zum Workshop gibs hier: https://michalharakal.github.io/Daily-StandAPP
+== JavaLand community activity
+
+[link=https://meine.doag.org/events/javaland/2025/agenda/#agendaId.5382]
+image::csm_JavaLand_2025-Banner-3000x711px-Web_Hero-Mitte-01_0e6bad6822.jpg[]
 
 *Javaland 2025*
 
-Michal Harakal, Alexander von Below, Falk Sippach
-
-*Community activity workshop*
+xref:bios.adoc[]
 
 Michal Harakal, Alexander von Below, Falk Sippach
-
-https://meine.doag.org/events/javaland/2025/agenda/#agendaId.5382[Agenda]
-
 
 == Setup the environment
 

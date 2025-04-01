@@ -1,33 +1,63 @@
+= LLM modele
 
-*Introduction:* This guide will show you two beginner-friendly ways to download a large language model (LLM) to your local working folder. We cover: (1) using the Hugging Face Hub’s Command-Line Interface (CLI), and (2) using the *Jlama* project (a Java-based LLM engine). By the end, you’ll have the model files (weights, config, tokenizer, etc.) saved offline in a folder, ready for use. Let’s get started!
+Wir laden zuerst ein Model herunter, um es offline betreiben zu können. Dies bietet mehrere Vorteile:
+* schnellerer Zugriff ohne Internetverbindung,
+* erhöhte Datensicherheit durch lokale Speicherung
+* Lauzeit in einer kontrollierten Umgebung
 
-== Method 1: Using Hugging Face CLI
+== Nutzung des Hugging Face CLI
 
-Hugging Face provides a CLI tool (`huggingface-cli`) as part of its `huggingface_hub` package. This lets you log in, search, and download models directly from the Hugging Face Hub via the terminal (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20,and%20how%20to%20use%20them[Command Line Interface (CLI)]). Follow these steps to set it up and download a model locally:
+Hugging Face bietet ein Kommandozeilen-Tool (`huggingface-cli`) im Paket `huggingface_hub`. Dieses erlaubt Login, Suche und Herunterladen von Modellen direkt vom Hugging Face Hub über das Terminal.
 
-. *Install the Hugging Face CLI tool* – You can install it via Python’s package manager. For example, run:
- `bash
-   pip install -U "huggingface_hub[cli]"
-` +
- This installs the latest Hugging Face Hub client along with CLI support (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=%3E%3E%3E%20pip%20install%20[Command Line Interface (CLI)]). After installation, confirm it’s working by running `huggingface-cli --help` in your terminal.
+== Schritte zur Einrichtung
 
-. *Log in to Hugging Face (if needed)* – If you plan to download models that require authentication (e.g. large or gated models), log in first. Use the command:
- `bash
-   huggingface-cli login
-` +
- This will prompt you for an *access token* from your Hugging Face account (you can create one on the Hugging Face website under Settings). Paste your token and hit enter. A success message should appear once you’re logged in (https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#:~:text=huggingface[Command Line Interface (CLI)]). (Public models don’t strictly require login, but it’s good to log in to avoid any access issues.)
+. *Virtuelle Python-Umgebung erstellen (empfohlen)*
++
+Erstelle zuerst eine virtuelle Umgebung mit:
++
+[source,bash]
+----
+python -m venv hf_env
+source hf_env/bin/activate  # Linux/Mac
+hf_env\Scripts\activate    # Windows
+----
 
-. *Search and select a model* – Browse the Hugging Face model hub (visit *huggingface.co* in your browser) to find the model you want. You can use the website’s search to discover models (for example, search for “GPT-2” or “Llama 2”). Click the model you’re interested in and note the *model repository name* (usually in the format `"organization/model-name"` or `"username/model-name"`). For instance, the popular BERT base model has the repo name `bert-base-uncased`. Make sure you have this ID for the next step.
+. *Installation*
++
+[source,bash]
+----
+pip install -U "huggingface_hub[cli]"
+----
+Bestätige die Installation mit:
++
+[source,bash]
+----
+huggingface-cli --help
+----
 
-. *Download the model files to your folder* – Use the CLI’s download command with the model’s repo ID. For example, to download the _bert-base-uncased_ model locally, run:
- `bash
-   huggingface-cli download bert-base-uncased --local-dir .
-` +
- Here, `--local-dir .` tells the CLI to save the files in the current directory (your working folder) instead of the default cache (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=The%20recommended%20,dir%60%20option[Command Line Interface (CLI)]). If you omit `--local-dir`, the files will be saved in Hugging Face’s cache directory on your system, and the CLI will output the path. Using the `download` command with just the repo name will fetch *all files in the model repository* (config, weights, tokenizer, etc.) (https://huggingface.co/docs/huggingface_hub/main/en/guides/cli#:~:text=Copied[Command Line Interface (CLI)]). You’ll see progress bars as it downloads each file.
+. *Login (optional)*
++
+Falls erforderlich (z.B. bei geschützten Modellen), melde dich an:
++
+[source,bash]
+----
+huggingface-cli login
+----
+Gib hier deinen persönlichen Zugriffstoken (erstellbar auf der Hugging-Face-Website unter Einstellungen) ein.
 
-. *Verify the model files* – After the command completes, check your working directory (or the folder you specified) to see the model files. You should see files such as the model’s weight file (e.g. `pytorch_model.bin` or `model.safetensors`), a `config.json`, and tokenizer files (such as `tokenizer.json`, `vocab.txt`, or merges files, depending on the model). For example, a Hugging Face model repo typically includes files like *config.json*, *model.safetensors*, *tokenizer.json*, and *tokenizer_config.json* (https://huggingface.co/tjake/Llama-3.2-1B-Instruct-JQ4/tree/main#:~:text=[tjake/Llama-3.2-1B-Instruct-JQ4 at main]). Make sure these are present. You can list the files in your folder (using `ls` on Unix or checking in your file explorer) to confirm all necessary files downloaded. If they’re present, congrats – you have the model offline!
+. *Modell auswählen*
++
+Suche auf https://huggingface.co[huggingface.co] nach dem gewünschten Modell. Merke dir den Repo-Namen (z.B. `bert-base-uncased`).
 
-_(If anything is missing or you encounter an error, double-check that the model ID is correct and that you were logged in (for gated models). The CLI will print the local path of the downloaded files on success (https://huggingface.co/docs/huggingface_hub/en/guides/cli#:~:text=%3E%3E%3E%20huggingface,gpt2%2Fsnapshots%2F11c5a3d5811f50298f278a704980280950aedb10%2Fconfig.json[Command Line Interface (CLI)]).)_
+. *Modell herunterladen*
++
+[source,bash]
+----
+huggingface-cli download bert-base-uncased --local-dir .
+----
+Mit `--local-dir .` werden die Dateien im aktuellen Verzeichnis gespeichert. Ohne Angabe erfolgt das Speichern im Hugging Face Cache-Verzeichnis.
+
+Bei Problemen überprüfe die Modell-ID und dein Login.
 
 == Method 2: Using Jlama (Java LLM Engine)
 

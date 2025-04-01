@@ -1,0 +1,48 @@
+= Agenda
+
+
+|===
+|Thema | Länge | Link
+
+|Begrüßung
+|5 Minuten
+|
+
+|LLM Einführung
+|15 Minuten
+| xref:llms_intro.adoc[]
+
+| App Einführung
+| 5 Minuten
+| xref:llms_intro.adoc[]
+
+
+| *Sprint 1*: Jlama in shell
+|15 Minuten
+| xref:local_models.adoc[]
+
+
+|===
+
+
+1. Intro cca. 5 Minut - Sprecher Vorstellung
+1. QR code zur webpage
+2. teoretische intro
+1. matricen
+2. transformers (MPL)
+3. paralaization
+4. Java APP
+3. agiles developemnt
+1. 1 epic, mehre iterationen
+2. Teoretischer Teil
+1. Transformers for Dummy
+2. Matricez mutliplacation
+3. Vector API
+4. Panama
+3. 1. Iteration model herunter laden from shell, kann am anfang gestartet werden
+4. 2 . jlama projekt starten (cli, jlama model dependnecy, minimales projekt)
+5. 3. minimales jgit
+6. 4. prompts
+7. Daily-StandUp
+8. propmting
+9. retro

@@ -1,5 +1,13 @@
+
+.Intro
+
+* xref:agenda.adoc[]
+* xref:setup.adoc[]
+* xref:architecture.adoc[Architecture]
+
+
 .Workshop
 
-* xref:setup.adoc[]
 * xref:bios.adoc[]
 * xref:architecture.adoc[Architecture]
+* xref:bios.adoc[]
