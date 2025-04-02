@@ -1,13 +1,13 @@
-=== 👨‍💻 Verwendung in deinem Java-Projekt
+=== 👨‍💻 How to use in your Java project
 
-Der Hauptzweck von Jlama ist es, eine einfache Möglichkeit zu bieten, große Sprachmodelle in Java zu verwenden.
+Das Hauptziel von Jlama ist es, eine einfache Möglichkeit zu bieten, große Sprachmodelle in Java zu verwenden.
 
-Die einfachste Möglichkeit, Jlama in deine Anwendung einzubetten, ist mit der https://github.com/langchain4j/langchain4j-examples/tree/main/jlama-examples[Langchain4j-Integration].
+Die einfachste Möglichkeit, Jlama in deiner Anwendung einzubetten, ist es als eine maven dependency zu deklarieren.
 
-Wenn du Jlama ohne langchain4j einbinden möchtest, füge deinem Projekt die folgenden https://central.sonatype.com/artifact/com.github.tjake/jlama-core/[Maven]-Abhängigkeiten hinzu:
-
+.maven
 [source,xml]
 ----
+
 <dependency>
   <groupId>com.github.tjake</groupId>
   <artifactId>jlama-core</artifactId>
@@ -22,9 +22,31 @@ Wenn du Jlama ohne langchain4j einbinden möchtest, füge deinem Projekt die fol
   <classifier>${os.detected.name}-${os.detected.arch}</classifier>
   <version>${jlama.version}</version>
 </dependency>
+
 ----
 
-Jlama nutzt Preview-Funktionen von Java 21. Du kannst diese Funktionen global aktivieren mit:
+.build.gradle.kts
+[source, kotlin]
+----
+dependencies {
+    val jlamaVersion = "0.8.4"
+    implementation("com.github.tjake:jlama-core:$jlamaVersion")
+
+    val osName = System.getProperty("os.name").toLowerCase()
+    val osArch = System.getProperty("os.arch").toLowerCase()
+    val classifier = when {
+        osName.contains("linux") && osArch.contains("amd64") -> "linux-x86_64"
+        osName.contains("mac") && osArch.contains("x86_64") -> "macos-x86_64"
+        osName.contains("mac") && (osArch.contains("aarch64") || osArch.contains("arm64")) -> "macos-aarch_64"
+        osName.contains("windows") && osArch.contains("amd64") -> "windows-x86_64"
+        else -> throw GradleException("Unsupported OS or architecture: $osName-$osArch")
+    }
+
+    implementation("com.github.tjake:jlama-native:$jlamaVersion:$classifier")
+}
+----
+
+Jlama verwendet Java 21 Preview-Features. Aktiviere diese global mit.
 
 [source,shell]
 ----
@@ -33,11 +55,20 @@ export JDK_JAVA_OPTIONS="--add-modules jdk.incubator.vector --enable-preview"
 
 Oder aktiviere die Preview-Funktionen durch die Konfiguration der Maven-Compiler- und Failsafe-Plugins.
 
-Danach kannst du die Model-Klassen nutzen, um Modelle auszuführen:
+[source, kotlin]
+----
+tasks.withType {
+    options.compilerArgs.addAll(
+        listOf("--enable-preview", "--add-modules", "jdk.incubator.vector")
+    )
+}
+----
+
+Then you can use the Model classes to run models:
 
 [source,java]
 ----
-public void sample() throws IOException {
+ public void sample() throws IOException {
     String model = "tjake/TinyLlama-1.1B-Chat-v1.0-Jlama-Q4";
     String workingDirectory = "./models";
 
