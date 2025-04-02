@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Untitled :: daily-standapp</title>
+    <link rel="canonical" href="https://michalharakal.github.io/Daily-StandAPP/daily-standapp/git_messages.html">
+    <meta name="generator" content="Antora 3.1.10">
+    <link rel="stylesheet" href="../_/css/site.css">
+    <script>var uiRootPath = '../_'</script>
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://michalharakal.github.io/Daily-StandAPP">daily-standapp</a>
+      <button class="navbar-burger" data-target="topbar-nav">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="#">Home</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Products</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Product A</a>
+            <a class="navbar-item" href="#">Product B</a>
+            <a class="navbar-item" href="#">Product C</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Services</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Service A</a>
+            <a class="navbar-item" href="#">Service B</a>
+            <a class="navbar-item" href="#">Service C</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Resources</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Resource A</a>
+            <a class="navbar-item" href="#">Resource B</a>
+            <a class="navbar-item" href="#">Resource C</a>
+          </div>
+        </div>
+        <div class="navbar-item">
+          <span class="control">
+            <a class="button is-primary" href="#">Download</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="daily-standapp" data-version="">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <h3 class="title"><a href="index.html">Dialy-StandAPP</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+    <button class="nav-item-toggle"></button>
+    <span class="nav-text">Intro</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="agenda.html">Agenda</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="setup.html">Set up an environment</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="architecture.html">Architecture</a>
+  </li>
+</ul>
+  </li>
+  <li class="nav-item" data-depth="0">
+    <button class="nav-item-toggle"></button>
+    <span class="nav-text">Workshop</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="bios.html">Wer wir sind</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="architecture.html">Architecture</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="bios.html">Wer wir sind</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="nav-panel-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Dialy-StandAPP</span>
+    <span class="version">default</span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <a class="title" href="index.html">Dialy-StandAPP</a>
+      <ul class="versions">
+        <li class="version is-current is-latest">
+          <a href="index.html">default</a>
+        </li>
+      </ul>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="index.html" class="home-link"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+</nav>
+  <div class="edit-this-page"><a href="https://github.com/michalharakal/Daily-StandAPP/docs/src/docs/modules/ROOT/pages/git_messages.adoc">Edit this Page</a></div>
+  </div>
+  <div class="content">
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+<article class="doc">
+<div class="sect1">
+<h2 id="git-commit-messages-lesen"><a class="anchor" href="#git-commit-messages-lesen"></a>🤔 Git Commit Messages lesen</h2>
+<div class="sectionbody">
+<div class="paragraph">
+<p>Lies die Git Commit Messages aus, um sie später dem LLM zu übergeben. Wir nutzen dafür jGit.</p>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="schnellstart"><a class="anchor" href="#schnellstart"></a>🔬 Schnellstart</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="maven-dependencies"><a class="anchor" href="#maven-dependencies"></a>Maven Dependencies</h3>
+<div class="listingblock">
+<div class="title">maven</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="xml">        &lt;dependency&gt;
+            &lt;groupId&gt;org.slf4j&lt;/groupId&gt;
+            &lt;artifactId&gt;slf4j-simple&lt;/artifactId&gt;
+            &lt;version&gt;2.0.16&lt;/version&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.eclipse.jgit&lt;/groupId&gt;
+            &lt;artifactId&gt;org.eclipse.jgit&lt;/artifactId&gt;
+            &lt;version&gt;7.1.0.202411261347-r&lt;/version&gt;
+        &lt;/dependency&gt;</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="code"><a class="anchor" href="#code"></a>Code</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">️‍    public String getCommits() throws IOException, GitAPIException {
+        StringBuilder sb = new StringBuilder();
+
+        Git git = Git.open(new File("../repo"));
+        Iterable&lt;RevCommit&gt; commits = git.log().call();
+        for(RevCommit commit : commits) {
+            sb.append("Commit: " + commit.getName());
+            sb.append("\n");
+            sb.append("Autor: " + commit.getAuthorIdent().getName());
+            sb.append("\n");
+            sb.append("Datum: " + commit.getAuthorIdent().getWhen().toString());
+            sb.append("\n");
+            sb.append("Nachricht: " + commit.getFullMessage());
+            sb.append("\n");
+        }
+        return sb.toString();
+    }</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</article>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script src="../_/js/site.js"></script>
+<script async src="../_/js/vendor/highlight.js"></script>
+  </body>
+</html>
