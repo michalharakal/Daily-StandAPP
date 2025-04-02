@@ -168,7 +168,7 @@
     val classifier = when {
         osName.contains("linux") &amp;&amp; osArch.contains("amd64") -&gt; "linux-x86_64"
         osName.contains("mac") &amp;&amp; osArch.contains("x86_64") -&gt; "macos-x86_64"
-        osName.contains("mac") &amp;&amp; (osArch.contains("aarch64") || osArch.contains("arm64")) -&gt; "macos-aarch_64"
+        osName.contains("mac") &amp;&amp; (osArch.contains("aarch64") || osArch.contains("arm64")) -&gt; "osx-aarch_64"
         osName.contains("windows") &amp;&amp; osArch.contains("amd64") -&gt; "windows-x86_64"
         else -&gt; throw GradleException("Unsupported OS or architecture: $osName-$osArch")
     }
@@ -176,6 +176,18 @@
     implementation("com.github.tjake:jlama-native:$jlamaVersion:$classifier")
 }</code></pre>
 </div>
+</div>
+<div class="admonitionblock note">
+<table>
+<tr>
+<td class="icon">
+<i class="fa icon-note" title="Note"></i>
+</td>
+<td class="content">
+check vorhenadene Architekturen direkt in maven <a href="https://repo.maven.apache.org/maven2/com/github/tjake/jlama-native/0.8.4/">com/github/tjake/jlama-native/0.8.4</a>
+</td>
+</tr>
+</table>
 </div>
 <div class="paragraph">
 <p>Jlama verwendet Java 21 Preview-Features. Aktiviere diese global mit.</p>
