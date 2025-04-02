@@ -130,17 +130,15 @@
 </aside>
 <article class="doc">
 <div class="sect2">
-<h3 id="verwendung-in-deinem-java-projekt"><a class="anchor" href="#verwendung-in-deinem-java-projekt"></a>👨‍💻 Verwendung in deinem Java-Projekt</h3>
+<h3 id="how-to-use-in-your-java-project"><a class="anchor" href="#how-to-use-in-your-java-project"></a>👨‍💻 How to use in your Java project</h3>
 <div class="paragraph">
-<p>Der Hauptzweck von Jlama ist es, eine einfache Möglichkeit zu bieten, große Sprachmodelle in Java zu verwenden.</p>
+<p>Das Hauptziel von Jlama ist es, eine einfache Möglichkeit zu bieten, große Sprachmodelle in Java zu verwenden.</p>
 </div>
 <div class="paragraph">
-<p>Die einfachste Möglichkeit, Jlama in deine Anwendung einzubetten, ist mit der <a href="https://github.com/langchain4j/langchain4j-examples/tree/main/jlama-examples">Langchain4j-Integration</a>.</p>
-</div>
-<div class="paragraph">
-<p>Wenn du Jlama ohne langchain4j einbinden möchtest, füge deinem Projekt die folgenden <a href="https://central.sonatype.com/artifact/com.github.tjake/jlama-core/">Maven</a>-Abhängigkeiten hinzu:</p>
+<p>Die einfachste Möglichkeit, Jlama in deiner Anwendung einzubetten, ist es als eine maven dependency zu deklarieren.</p>
 </div>
 <div class="listingblock">
+<div class="title">maven</div>
 <div class="content">
 <pre class="highlightjs highlight"><code class="language-xml hljs" data-lang="xml">&lt;dependency&gt;
   &lt;groupId&gt;com.github.tjake&lt;/groupId&gt;
@@ -158,8 +156,29 @@
 &lt;/dependency&gt;</code></pre>
 </div>
 </div>
+<div class="listingblock">
+<div class="title">build.gradle.kts</div>
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-kotlin hljs" data-lang="kotlin">dependencies {
+    val jlamaVersion = "0.8.4"
+    implementation("com.github.tjake:jlama-core:$jlamaVersion")
+
+    val osName = System.getProperty("os.name").toLowerCase()
+    val osArch = System.getProperty("os.arch").toLowerCase()
+    val classifier = when {
+        osName.contains("linux") &amp;&amp; osArch.contains("amd64") -&gt; "linux-x86_64"
+        osName.contains("mac") &amp;&amp; osArch.contains("x86_64") -&gt; "macos-x86_64"
+        osName.contains("mac") &amp;&amp; (osArch.contains("aarch64") || osArch.contains("arm64")) -&gt; "macos-aarch_64"
+        osName.contains("windows") &amp;&amp; osArch.contains("amd64") -&gt; "windows-x86_64"
+        else -&gt; throw GradleException("Unsupported OS or architecture: $osName-$osArch")
+    }
+
+    implementation("com.github.tjake:jlama-native:$jlamaVersion:$classifier")
+}</code></pre>
+</div>
+</div>
 <div class="paragraph">
-<p>Jlama nutzt Preview-Funktionen von Java 21. Du kannst diese Funktionen global aktivieren mit:</p>
+<p>Jlama verwendet Java 21 Preview-Features. Aktiviere diese global mit.</p>
 </div>
 <div class="listingblock">
 <div class="content">
@@ -169,12 +188,21 @@
 <div class="paragraph">
 <p>Oder aktiviere die Preview-Funktionen durch die Konfiguration der Maven-Compiler- und Failsafe-Plugins.</p>
 </div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-kotlin hljs" data-lang="kotlin">tasks.withType {
+    options.compilerArgs.addAll(
+        listOf("--enable-preview", "--add-modules", "jdk.incubator.vector")
+    )
+}</code></pre>
+</div>
+</div>
 <div class="paragraph">
-<p>Danach kannst du die Model-Klassen nutzen, um Modelle auszuführen:</p>
+<p>Then you can use the Model classes to run models:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java">public void sample() throws IOException {
+<pre class="highlightjs highlight"><code class="language-java hljs" data-lang="java"> public void sample() throws IOException {
     String model = "tjake/TinyLlama-1.1B-Chat-v1.0-Jlama-Q4";
     String workingDirectory = "./models";
 
