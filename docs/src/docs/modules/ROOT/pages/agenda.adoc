@@ -32,7 +32,7 @@
 
 | *Sprint 4*: Commit messages an LLM senden
 |15 Minuten
-| xref:local_models.adoc[]
+| xref:git_messages.adoc[]
 
 | *Sprint 5*: Prompts entwickeln
 |15 Minuten

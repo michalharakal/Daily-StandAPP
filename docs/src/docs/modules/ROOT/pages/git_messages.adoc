@@ -1,0 +1,46 @@
+== 🤔 Git Commit Messages lesen
+
+Lies die Git Commit Messages aus, um sie später dem LLM zu übergeben. Wir nutzen dafür jGit.
+
+== 🔬 Schnellstart
+
+=== Maven Dependencies
+
+.maven
+[source,xml]
+----
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.16</version>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jgit</groupId>
+            <artifactId>org.eclipse.jgit</artifactId>
+            <version>7.1.0.202411261347-r</version>
+        </dependency>
+----
+
+=== Code
+
+[source,java]
+----
+️‍    public String getCommits() throws IOException, GitAPIException {
+        StringBuilder sb = new StringBuilder();
+
+        Git git = Git.open(new File("../repo"));
+        Iterable<RevCommit> commits = git.log().call();
+        for(RevCommit commit : commits) {
+            sb.append("Commit: " + commit.getName());
+            sb.append("\n");
+            sb.append("Autor: " + commit.getAuthorIdent().getName());
+            sb.append("\n");
+            sb.append("Datum: " + commit.getAuthorIdent().getWhen().toString());
+            sb.append("\n");
+            sb.append("Nachricht: " + commit.getFullMessage());
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+----
+
