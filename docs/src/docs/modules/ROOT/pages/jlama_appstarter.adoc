@@ -1,0 +1,146 @@
+=== 👨‍💻 Verwendung in deinem Java-Projekt
+
+Der Hauptzweck von Jlama ist es, eine einfache Möglichkeit zu bieten, große Sprachmodelle in Java zu verwenden.
+
+Die einfachste Möglichkeit, Jlama in deine Anwendung einzubetten, ist mit der https://github.com/langchain4j/langchain4j-examples/tree/main/jlama-examples[Langchain4j-Integration].
+
+Wenn du Jlama ohne langchain4j einbinden möchtest, füge deinem Projekt die folgenden https://central.sonatype.com/artifact/com.github.tjake/jlama-core/[Maven]-Abhängigkeiten hinzu:
+
+[source,xml]
+----
+<dependency>
+  <groupId>com.github.tjake</groupId>
+  <artifactId>jlama-core</artifactId>
+  <version>${jlama.version}</version>
+</dependency>
+
+<dependency>
+  <groupId>com.github.tjake</groupId>
+  <artifactId>jlama-native</artifactId>
+  <!-- unterstützt linux-x86_64, macos-x86_64/aarch_64, windows-x86_64
+       Verwende https://github.com/trustin/os-maven-plugin zur Erkennung von OS und Architektur -->
+  <classifier>${os.detected.name}-${os.detected.arch}</classifier>
+  <version>${jlama.version}</version>
+</dependency>
+----
+
+Jlama nutzt Preview-Funktionen von Java 21. Du kannst diese Funktionen global aktivieren mit:
+
+[source,shell]
+----
+export JDK_JAVA_OPTIONS="--add-modules jdk.incubator.vector --enable-preview"
+----
+
+Oder aktiviere die Preview-Funktionen durch die Konfiguration der Maven-Compiler- und Failsafe-Plugins.
+
+Danach kannst du die Model-Klassen nutzen, um Modelle auszuführen:
+
+[source,java]
+----
+public void sample() throws IOException {
+    String model = "tjake/TinyLlama-1.1B-Chat-v1.0-Jlama-Q4";
+    String workingDirectory = "./models";
+
+    String prompt = "Was ist die beste Jahreszeit, um Avocados zu pflanzen?";
+
+    // Lädt das Modell herunter oder gibt den lokalen Pfad zurück, falls bereits vorhanden
+    File localModelPath = new Downloader(workingDirectory, model).huggingFaceModel();
+
+    // Lädt das quantisierte Modell und definiert den Einsatz quantisierten Speichers
+    AbstractModel m = ModelSupport.loadModel(localModelPath, DType.F32, DType.I8);
+
+    PromptContext ctx;
+    // Prüft, ob das Modell Chat-Prompting unterstützt und erstellt den Prompt im erwarteten Format
+    if (m.promptSupport().isPresent()) {
+        ctx = m.promptSupport()
+                .get()
+                .builder()
+                .addSystemMessage("Du bist ein hilfreicher Chatbot, der kurze Antworten schreibt.")
+                .addUserMessage(prompt)
+                .build();
+    } else {
+        ctx = PromptContext.of(prompt);
+    }
+
+    System.out.println("Prompt: " + ctx.getPrompt() + "\n");
+    // Generiert eine Antwort zum Prompt und gibt sie aus
+    // Die API erlaubt Streaming- oder Nicht-Streaming-Antworten
+    // Antwort wird mit Temperatur 0,7 und maximal 256 Token erzeugt
+    Generator.Response r = m.generate(UUID.randomUUID(), ctx, 0.0f, 256, (s, f) -> {});
+    System.out.println(r.responseText);
+}
+----
+
+Alternativ kannst du auch die *Builder API* verwenden:
+
+[source,java]
+----
+public void sample() throws IOException {
+    String model = "tjake/Llama-3.2-1B-Instruct-JQ4";
+    String workingDirectory = "./models";
+
+    String prompt = "Was ist die beste Jahreszeit, um Avocados zu pflanzen?";
+
+    File localModelPath = new Downloader(workingDirectory, model).huggingFaceModel();
+
+    AbstractModel m = ModelSupport.loadModel(localModelPath, DType.F32, DType.I8);
+
+    PromptContext ctx;
+    if (m.promptSupport().isPresent()) {
+        ctx = m.promptSupport()
+                .get()
+                .builder()
+                .addSystemMessage("Du bist ein hilfreicher Chatbot, der kurze Antworten schreibt.")
+                .addUserMessage(prompt)
+                .build();
+    } else {
+        ctx = PromptContext.of(prompt);
+    }
+
+    System.out.println("Prompt: " + ctx.getPrompt() + "\n");
+    Generator.Response r = m.generateBuilder()
+            .session(UUID.randomUUID()) // Standardmäßig UUID.randomUUID()
+            .promptContext(ctx) // erforderlich, oder prompt(String text)
+            .ntokens(256) // Standardmäßig 256
+            .temperature(0.0f) // Standardmäßig 0.0f
+            .onTokenWithTimings((s, aFloat) -> {}) // Standardmäßig (s, aFloat) -> {}
+            .generate();
+
+    System.out.println(r.responseText);
+}
+----
+
+Du kannst promptSupport vereinfachen mit:
+
+[source,java]
+----
+public void sample() throws IOException {
+    String model = "tjake/Llama-3.2-1B-Instruct-JQ4";
+    String workingDirectory = "./models";
+
+    String prompt = "Was ist die beste Jahreszeit, um Avocados zu pflanzen?";
+
+    File localModelPath = new Downloader(workingDirectory, model).huggingFaceModel();
+
+    AbstractModel m = ModelSupport.loadModel(localModelPath, DType.F32, DType.I8);
+
+    var systemPrompt = "Du bist ein hilfreicher Chatbot, der kurze Antworten schreibt.";
+
+    PromptContext ctx = m.prompt()
+                        .addUserMessage(prompt)
+                        .addSystemMessage(systemPrompt)
+                        .build(); // Die build-Methode erstellt ein PromptContext; wenn das Modell dies nicht unterstützt, wird ein einfaches PromptContext-Objekt erstellt
+
+    System.out.println("Prompt: " + ctx.getPrompt() + "\n");
+    Generator.Response r = m.generateBuilder()
+            .session(UUID.randomUUID()) // Standardmäßig UUID.randomUUID()
+            .promptContext(ctx)
+            .ntokens(256)
+            .temperature(0.0f)
+            .onTokenWithTimings((s, aFloat) -> {})
+            .generate();
+
+    System.out.println(r.responseText);
+}
+----
+

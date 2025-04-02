@@ -36,3 +36,5 @@ jlama restapi tjake/TinyLlama-1.1B-Chat-v1.0-Jlama-Q4 --auto-download
 
 Öffne anschließend deinen Browser unter http://localhost:8080/
 
+WARNING: Wenn due ein Rechner mit Apple Silicon nutzt (z.B. Macbook Pro M1) stelle sicher, dass deine JVM nicht über Rosseta läuft, aber direkt als ARM (z.B: ARM64 JDK).
+https://github.com/tjake/Jlama/issues/68[Siehe Jlama issue für Details]

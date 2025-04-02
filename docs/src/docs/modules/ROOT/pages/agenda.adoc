@@ -24,7 +24,7 @@
 
 | *Sprint 2*: LLM in App
 |15 Minuten
-| xref:local_models.adoc[]
+| xref:jlama_appstarter.adoc[]
 
 | *Sprint 3*: git commits lesen
 |15 Minuten
