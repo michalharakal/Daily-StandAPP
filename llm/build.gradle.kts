@@ -5,7 +5,6 @@ import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidLibrary)
 }
 
 val osName: String = System.getProperty("os.name").toLowerCase()
@@ -26,40 +25,17 @@ val detectedArch = when (osArch) {
 
 kotlin {
 
-    androidTarget {
-        @OptIn(ExperimentalKotlinGradlePluginApi::class)
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
-    }
-
-
-    jvm()
-
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "SinusApproximatorKit"
-            isStatic = true
-        }
-    }
-
-
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs {
-        browser {
-            val rootDirPath = project.rootDir.path
-            val projectDirPath = project.projectDir.path
-            commonWebpackConfig {
-                devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
-                    static = (static ?: mutableListOf()).apply {
-                        // Serve sources to debug inside browser
-                        add(rootDirPath)
-                        add(projectDirPath)
-                    }
-                }
+    jvmToolchain(21)  // Use JDK 17 toolchain for compilation (if using Java 17 features)
+    jvm {
+        compilations.all {
+            kotlinOptions {
+                // Target Java 17 bytecode (required for JDK 17 features)
+                jvmTarget = "21"
+                // Add JVM arguments: enable preview features and add incubator modules
+                freeCompilerArgs += listOf(
+                    "-Xadd-modules=jdk.incubator.vector"
+                    // Note: Kotlin has no direct --enable-preview flag, see below
+                )
             }
         }
     }
@@ -77,16 +53,3 @@ kotlin {
         }
     }
 }
-
-android {
-    namespace = "sk.ai.net.client.shared"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-    }
-}
-
