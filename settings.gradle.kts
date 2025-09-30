@@ -29,12 +29,12 @@ dependencyResolutionManagement {
     }
 }
 
-include(":composeApp", ":shared", ":data", ":domain", ":llm")
+include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server")
 include("StandAPP-cli")
 
 check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
     """
-    Impulsee core requires JDK 21+ but it is currently using JDK ${JavaVersion.current()}.
+    Daily-StandApp requires JDK 21+ but it is currently using JDK ${JavaVersion.current()}.
     Java Home: [${System.getProperty("java.home")}]
     https://developer.android.com/build/jdks#jdk-config-in-studio
     """.trimIndent()
