@@ -2,6 +2,7 @@ package de.jug_da.standapp.mcp.transport
 
 import de.jug_da.standapp.mcp.methods.*
 import de.jug_da.standapp.mcp.protocol.*
+import de.jug_da.standapp.mcp.protocol.ValidationResult
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -13,7 +14,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
-import java.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -25,7 +26,7 @@ class KtorWebSocketTransport(
     private val port: Int = 8080,
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
-    private var server: ApplicationEngine? = null
+    private var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>? = null
     private val connections = ConcurrentHashMap<String, WebSocketSession>()
     private val connectionIdCounter = AtomicLong(0)
     private val requestHandlers = createRequestHandlers()
@@ -57,8 +58,8 @@ class KtorWebSocketTransport(
      */
     private fun Application.configureWebSockets() {
         install(WebSockets) {
-            pingPeriod = Duration.ofSeconds(30)
-            timeout = Duration.ofSeconds(60)
+            pingPeriod = 30.seconds
+            timeout = 60.seconds
             maxFrameSize = Long.MAX_VALUE
             masking = false
         }
@@ -217,12 +218,12 @@ class KtorWebSocketTransport(
     /**
      * Create request handlers map
      */
-    private fun createRequestHandlers(): Map<String, (MCPRequest) -> MCPResponse> {
+    private fun createRequestHandlers(): Map<String, suspend (MCPRequest) -> MCPResponse> {
         return mapOf(
-            InitializeMethod.METHOD_NAME to InitializeMethod::handle,
-            ToolsListMethod.METHOD_NAME to ToolsListMethod::handle,
-            ToolsCallMethod.METHOD_NAME to ToolsCallMethod::handle,
-            PingMethod.METHOD_NAME to PingMethod::handle
+            InitializeMethod.METHOD_NAME to { request -> InitializeMethod.handle(request) },
+            ToolsListMethod.METHOD_NAME to { request -> ToolsListMethod.handle(request) },
+            ToolsCallMethod.METHOD_NAME to { request -> ToolsCallMethod.handle(request) },
+            PingMethod.METHOD_NAME to { request -> PingMethod.handle(request) }
         )
     }
     

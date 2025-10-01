@@ -53,7 +53,7 @@ object ToolsCallMethod {
         return try {
             // Parse tool call parameters
             val params = request.params?.let { paramsJson ->
-                MCPSerializers.json.decodeFromJsonElement<ToolCallParams>(paramsJson)
+                MCPSerializers.json.decodeFromJsonElement(ToolCallParams.serializer(), paramsJson)
             } ?: return MCPResponse(
                 id = request.id,
                 error = MCPError.invalidParams("Missing tool call parameters")

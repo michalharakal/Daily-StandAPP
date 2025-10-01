@@ -10,3 +10,11 @@ actual fun commitsByAuthorAndPeriod(
 ): List<GitInfo> {
     TODO("Not yet implemented")
 }
+
+actual fun getAllCommitsInPeriod(
+    repoDir: String,
+    start: Instant,
+    end: Instant
+): List<GitInfo> {
+    TODO("Not yet implemented")
+}

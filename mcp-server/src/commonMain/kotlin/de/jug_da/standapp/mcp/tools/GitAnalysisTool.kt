@@ -220,7 +220,7 @@ class GitAnalysisTool : MCPTool {
             }
             
             appendLine()
-            appendLine("🔗 Repository: $repositoryPath") // Remove actual path in real implementation for security
+            appendLine("🔗 Repository: [Repository analysis completed]")
         }
     }
     

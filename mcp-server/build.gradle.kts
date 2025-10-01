@@ -24,6 +24,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
             implementation(project(":llm"))
             implementation(project(":data"))
@@ -61,5 +62,7 @@ tasks.named<Jar>("jvmJar") {
             if (file.isDirectory) file else zipTree(file)
         }
     })
-    archiveBaseName.set("mcp-server-fat")
+    archiveBaseName.set("mcp-server")
+    // Exclude signature files to avoid security exceptions
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }

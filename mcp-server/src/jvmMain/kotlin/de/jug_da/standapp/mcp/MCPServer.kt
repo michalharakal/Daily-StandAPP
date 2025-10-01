@@ -1,5 +1,6 @@
 package de.jug_da.standapp.mcp
 
+import de.jug_da.standapp.mcp.config.*
 import de.jug_da.standapp.mcp.transport.KtorWebSocketTransport
 import kotlinx.coroutines.*
 
@@ -8,8 +9,7 @@ import kotlinx.coroutines.*
  * Integrates all components to provide a complete Model Context Protocol server
  */
 class MCPServer(
-    private val host: String = "0.0.0.0",
-    private val port: Int = 8080
+    private val config: MCPServerConfig
 ) {
     private var transport: KtorWebSocketTransport? = null
     private val serverScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -18,17 +18,28 @@ class MCPServer(
      * Start the MCP server
      */
     fun start() {
-        println("Starting Daily Stand App MCP Server...")
-        println("Protocol Version: 2024-11-05")
-        println("Available Tools: git_analysis, standup_summary, health_check")
-        println("")
+        if (config.logging.enableConsoleLogging) {
+            println("Starting Daily Stand App MCP Server...")
+            println("Protocol Version: 2024-11-05")
+            println("Available Tools: git_analysis, standup_summary, health_check")
+            println("Configuration: ${if (config.logging.level == LogLevel.DEBUG) "Debug mode enabled" else "Production mode"}")
+            println("")
+        }
         
-        transport = KtorWebSocketTransport(host, port, serverScope)
+        transport = KtorWebSocketTransport(config.server.host, config.server.port, serverScope)
         transport?.start()
         
-        println("Server is ready for connections!")
-        println("WebSocket endpoint: ws://$host:$port/mcp")
-        println("Use Ctrl+C to stop the server")
+        if (config.logging.enableConsoleLogging) {
+            println("Server is ready for connections!")
+            println("WebSocket endpoint: ws://${config.server.host}:${config.server.port}/mcp")
+            if (config.server.enableSsl) {
+                println("SSL/TLS: Enabled")
+            }
+            if (config.performance.enableMetrics) {
+                println("Metrics endpoint: http://${config.server.host}:${config.performance.metricsPort}/metrics")
+            }
+            println("Use Ctrl+C to stop the server")
+        }
     }
     
     /**
@@ -50,10 +61,13 @@ class MCPServer(
         
         return ServerStatus(
             isRunning = transport != null,
-            host = host,
-            port = port,
+            host = config.server.host,
+            port = config.server.port,
             connectionCount = connectionCount,
-            activeConnections = activeConnections.toList()
+            activeConnections = activeConnections.toList(),
+            sslEnabled = config.server.enableSsl,
+            metricsEnabled = config.performance.enableMetrics,
+            metricsPort = config.performance.metricsPort
         )
     }
 }
@@ -66,86 +80,191 @@ data class ServerStatus(
     val host: String,
     val port: Int,
     val connectionCount: Int,
-    val activeConnections: List<String>
+    val activeConnections: List<String>,
+    val sslEnabled: Boolean = false,
+    val metricsEnabled: Boolean = false,
+    val metricsPort: Int = 9090
 )
 
 /**
  * Main application entry point
  */
 fun main(args: Array<String>) {
-    // Parse command line arguments
-    var host = "0.0.0.0"
-    var port = 8080
+    val parser = CommandLineParser()
     
-    args.forEachIndexed { index, arg ->
-        when (arg) {
-            "--host", "-h" -> {
-                if (index + 1 < args.size) {
-                    host = args[index + 1]
-                }
+    try {
+        // Parse command line arguments
+        val parsedArgs = parser.parse(args)
+        
+        // Handle special commands first
+        when {
+            parsedArgs.showHelp -> {
+                parser.printHelp()
+                return
             }
-            "--port", "-p" -> {
-                if (index + 1 < args.size) {
-                    port = args[index + 1].toIntOrNull() ?: 8080
-                }
+            
+            parsedArgs.showVersion -> {
+                parser.printVersion()
+                return
             }
-            "--help" -> {
-                printUsage()
+            
+            parsedArgs.generateConfig != null -> {
+                parser.generateSampleConfig(parsedArgs.generateConfig)
+                return
+            }
+            
+            parsedArgs.validateConfig -> {
+                validateConfigurationAndExit(parsedArgs.configFile, parsedArgs.toConfigMap())
                 return
             }
         }
-    }
-    
-    val server = MCPServer(host, port)
-    
-    // Add shutdown hook for graceful shutdown
-    Runtime.getRuntime().addShutdownHook(Thread {
-        server.stop()
-    })
-    
-    try {
+        
+        // Load configuration with proper precedence
+        val configLoader = ConfigLoader()
+        val config = configLoader.loadConfiguration(
+            configFile = parsedArgs.configFile,
+            commandLineArgs = parsedArgs.toConfigMap()
+        )
+        
+        // Additional validation for runtime requirements
+        validateRuntimeRequirements(config)
+        
+        // Create and start server
+        val server = MCPServer(config)
+        
+        // Add shutdown hook for graceful shutdown
+        Runtime.getRuntime().addShutdownHook(Thread {
+            if (config.logging.enableConsoleLogging) {
+                println("\nReceived shutdown signal...")
+            }
+            server.stop()
+        })
+        
+        // Start the server
         server.start()
+        
+        // Handle daemon mode
+        if (parsedArgs.daemonMode) {
+            if (config.logging.enableConsoleLogging) {
+                println("Running in daemon mode...")
+            }
+            // In a real implementation, you would detach from the terminal here
+        }
         
         // Keep the server running
         runBlocking {
             while (true) {
                 delay(1000)
+                
+                // Optional: periodic health checks or maintenance tasks
+                if (config.performance.healthCheckInterval > 0) {
+                    // Perform health checks every N seconds
+                }
             }
         }
+        
+    } catch (e: ArgumentException) {
+        System.err.println("Argument error: ${e.message}")
+        System.err.println("Use --help for usage information")
+        kotlin.system.exitProcess(1)
+        
+    } catch (e: ConfigurationException) {
+        System.err.println("Configuration error: ${e.message}")
+        kotlin.system.exitProcess(2)
+        
     } catch (e: Exception) {
-        println("Server error: ${e.message}")
-        server.stop()
+        System.err.println("Server error: ${e.message}")
+        if (System.getenv("MCP_DEBUG") == "true") {
+            e.printStackTrace()
+        }
+        kotlin.system.exitProcess(3)
     }
 }
 
 /**
- * Print command line usage information
+ * Validate configuration file and exit
  */
-private fun printUsage() {
-    println("""
-        Daily Stand App MCP Server
+private fun validateConfigurationAndExit(configFile: String?, commandLineArgs: Map<String, String>) {
+    try {
+        val configLoader = ConfigLoader()
+        val config = configLoader.loadConfiguration(
+            configFile = configFile,
+            commandLineArgs = commandLineArgs
+        )
         
-        Usage: java -jar mcp-server.jar [options]
-        
-        Options:
-          --host, -h <host>    Server host address (default: 0.0.0.0)
-          --port, -p <port>    Server port number (default: 8080)
-          --help               Show this help message
-        
-        Example:
-          java -jar mcp-server.jar --host localhost --port 9090
-        
-        WebSocket endpoint will be available at: ws://<host>:<port>/mcp
-        
-        Supported MCP methods:
-          - initialize: Initialize the MCP session
-          - tools/list: List available tools
-          - tools/call: Execute a tool
-          - ping: Health check
-          
-        Available tools:
-          - git_analysis: Analyze Git repository commits
-          - standup_summary: Generate AI-powered standup summaries
-          - health_check: Check server health and status
-    """.trimIndent())
+        val validationErrors = MCPServerConfig.validate(config)
+        if (validationErrors.isEmpty()) {
+            println("✓ Configuration is valid")
+            kotlin.system.exitProcess(0)
+        } else {
+            System.err.println("✗ Configuration validation failed:")
+            validationErrors.forEach { error ->
+                System.err.println("  - $error")
+            }
+            kotlin.system.exitProcess(1)
+        }
+    } catch (e: Exception) {
+        System.err.println("✗ Failed to load configuration: ${e.message}")
+        kotlin.system.exitProcess(1)
+    }
+}
+
+/**
+ * Validate runtime requirements
+ */
+private fun validateRuntimeRequirements(config: MCPServerConfig) {
+    val errors = mutableListOf<String>()
+    
+    // Check if LLM model file exists if specified
+    if (config.llm.modelPath.isNotEmpty()) {
+        val modelFile = java.io.File(config.llm.modelPath)
+        if (!modelFile.exists()) {
+            errors.add("LLM model file not found: ${config.llm.modelPath}")
+        }
+    }
+    
+    // Check Git repositories
+    config.git.repositories.forEach { repo ->
+        val repoDir = java.io.File(repo.path)
+        if (!repoDir.exists()) {
+            errors.add("Git repository not found: ${repo.path}")
+        } else if (!java.io.File(repoDir, ".git").exists()) {
+            errors.add("Directory is not a Git repository: ${repo.path}")
+        }
+    }
+    
+    // Check if log directory is writable if file logging is enabled
+    if (config.logging.enableFileLogging) {
+        val logFile = java.io.File(config.logging.logFilePath)
+        val logDir = logFile.parentFile ?: java.io.File(".")
+        if (!logDir.exists() && !logDir.mkdirs()) {
+            errors.add("Cannot create log directory: ${logDir.absolutePath}")
+        } else if (!logDir.canWrite()) {
+            errors.add("Log directory is not writable: ${logDir.absolutePath}")
+        }
+    }
+    
+    // Check port availability (basic check)
+    if (isPortInUse(config.server.host, config.server.port)) {
+        errors.add("Port ${config.server.port} is already in use on ${config.server.host}")
+    }
+    
+    if (config.performance.enableMetrics && isPortInUse(config.server.host, config.performance.metricsPort)) {
+        errors.add("Metrics port ${config.performance.metricsPort} is already in use on ${config.server.host}")
+    }
+    
+    if (errors.isNotEmpty()) {
+        throw ConfigurationException("Runtime validation failed: ${errors.joinToString(", ")}")
+    }
+}
+
+/**
+ * Check if a port is in use (basic implementation)
+ */
+private fun isPortInUse(host: String, port: Int): Boolean {
+    return try {
+        java.net.Socket(host, port).use { true }
+    } catch (e: Exception) {
+        false
+    }
 }

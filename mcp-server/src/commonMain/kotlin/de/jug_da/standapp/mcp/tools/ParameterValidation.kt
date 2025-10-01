@@ -120,7 +120,7 @@ object ParameterValidator {
                 }
             }
             "integer" -> {
-                if (value !is JsonPrimitive || (!value.isString && !value.longOrNull?.let { true } ?: false)) {
+                if (value !is JsonPrimitive || (!value.isString && value.longOrNull == null)) {
                     try {
                         value.jsonPrimitive.int
                     } catch (e: Exception) {

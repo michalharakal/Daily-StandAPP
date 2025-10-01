@@ -105,7 +105,7 @@ data class PromptsCapability(
  */
 @Serializable
 data class LoggingCapability(
-    // No specific fields defined in MCP spec yet
+    val level: String? = null // Optional logging level support
 )
 
 /**
@@ -131,7 +131,7 @@ object InitializeMethod {
         return try {
             // Parse initialize parameters
             val params = request.params?.let { paramsJson ->
-                MCPSerializers.json.decodeFromJsonElement<InitializeParams>(paramsJson)
+                MCPSerializers.json.decodeFromJsonElement(InitializeParams.serializer(), paramsJson)
             } ?: return MCPResponse(
                 id = request.id,
                 error = MCPError.invalidParams("Missing initialize parameters")

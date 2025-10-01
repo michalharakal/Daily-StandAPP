@@ -52,6 +52,10 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.io.core)
         }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
+
     }
 }
 
