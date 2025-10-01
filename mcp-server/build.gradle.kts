@@ -25,19 +25,13 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+            implementation(libs.ktor.server.cio)
             implementation(project(":llm"))
             implementation(project(":data"))
             implementation(project(":domain"))
         }
         
         jvmMain.dependencies {
-            implementation("io.ktor:ktor-server-core-jvm:3.0.1")
-            implementation("io.ktor:ktor-server-netty-jvm:3.0.1")
-            implementation("io.ktor:ktor-server-websockets-jvm:3.0.1")
-            implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:3.0.1")
-            implementation("io.ktor:ktor-server-content-negotiation-jvm:3.0.1")
-            implementation("io.ktor:ktor-server-cors-jvm:3.0.1")
         }
         
         commonTest.dependencies {
@@ -45,8 +39,6 @@ kotlin {
         }
         
         jvmTest.dependencies {
-            implementation("org.junit.jupiter:junit-jupiter-api:5.12.1")
-            implementation("io.ktor:ktor-server-test-host-jvm:3.0.1")
         }
     }
 }
