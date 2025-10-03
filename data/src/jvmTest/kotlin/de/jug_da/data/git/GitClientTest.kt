@@ -1,7 +1,8 @@
+@file:OptIn(ExperimentalTime::class)
+
 package de.jug_da.data.git
 
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
+import kotlin.time.Instant
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.PersonIdent
 import kotlin.io.path.createTempDirectory
@@ -10,6 +11,8 @@ import kotlin.test.assertEquals
 import java.io.File
 import java.util.TimeZone
 import java.util.Date
+import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
 
 class GitClientTest {
 

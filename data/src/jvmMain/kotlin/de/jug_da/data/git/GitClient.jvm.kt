@@ -1,12 +1,16 @@
+@file:OptIn(ExperimentalTime::class)
+
 package de.jug_da.data.git
 
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
-import kotlinx.datetime.toKotlinInstant
+import kotlin.time.Instant
 import org.eclipse.jgit.api.Git
 import java.io.File
 import java.util.Date
+import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
+import kotlin.time.toKotlinInstant
 
+@OptIn(ExperimentalTime::class)
 actual fun commitsByAuthorAndPeriod(
     repoDir: String,
     author: String,
@@ -28,7 +32,7 @@ actual fun commitsByAuthorAndPeriod(
                     id = commit.id.name,
                     authorName = commit.authorIdent.name,
                     authorEmail = commit.authorIdent.emailAddress,
-                    whenDate = commit.authorIdent.`when`.toInstant().toKotlinInstant(),
+                    whenDate = commit.authorIdent.whenAsInstant.toKotlinInstant(),
                     message = commit.fullMessage.trim()
                 )
             }

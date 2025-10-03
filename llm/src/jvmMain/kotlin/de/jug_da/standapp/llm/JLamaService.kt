@@ -36,6 +36,31 @@ class JLamaService private constructor(private val m: AbstractModel) : LLMServic
         return r.responseText
     }
 
+    fun generateStream(
+        prompt: String,
+        maxTokens: Int,
+        temperature: Float,
+        topP: Float,
+        onToken: (String) -> Unit
+    ) {
+        val truncatedPrompt = prompt.take(200) // Limit prompt size
+        
+        val ctx = if (m.promptSupport().isPresent) {
+            m.promptSupport()
+                .get()
+                .builder()
+                .addSystemMessage("You are a helpful chatbot who writes short responses.")
+                .addUserMessage(truncatedPrompt)
+                .build();
+        } else {
+            PromptContext.of(truncatedPrompt);
+        }
+        
+        m.generate(UUID.randomUUID(), ctx, temperature, maxTokens, BiConsumer { token: String?, _: Float? ->
+            token?.let { onToken(it) }
+        })
+    }
+
     companion object {
         fun create(
             modelPath: String,

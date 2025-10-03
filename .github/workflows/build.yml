@@ -1,4 +1,4 @@
-name: Arc UI Build
+name: DailyStandAPP
 on:
   push:
     branches:

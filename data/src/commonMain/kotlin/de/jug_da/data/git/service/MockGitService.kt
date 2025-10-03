@@ -1,6 +1,9 @@
+@file:OptIn(ExperimentalTime::class)
+
 package de.jug_da.data.git.service
 
-import kotlinx.datetime.Instant
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class MockGitService : GitService {
     override suspend fun commitsByAuthorAndPeriod(
