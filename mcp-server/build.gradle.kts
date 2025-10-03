@@ -25,7 +25,10 @@ kotlin {
         commonMain.dependencies {
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.datetime)
+            implementation(libs.mcp.kotlin.server)
             implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.sse)
+
             implementation(project(":llm"))
             implementation(project(":data"))
             implementation(project(":domain"))
