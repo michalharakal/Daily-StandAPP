@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalTime::class)
+
 package de.jug_da.standapp.mcp
 
 import de.jug_da.data.git.*
@@ -11,10 +13,11 @@ import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.io.asSink
 import kotlinx.io.buffered
 import kotlinx.serialization.json.*
+import kotlin.time.ExperimentalTime
 
 // Main function to run the MCP server
 fun `run mcp server`() {

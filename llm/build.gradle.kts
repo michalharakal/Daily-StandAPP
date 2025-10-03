@@ -2,13 +2,14 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
+import java.util.Locale
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
 }
 
-val osName: String = System.getProperty("os.name").toLowerCase()
-val osArch: String = System.getProperty("os.arch").toLowerCase()
+val osName: String = System.getProperty("os.name").lowercase()
+val osArch: String = System.getProperty("os.arch").lowercase()
 
 val detectedOs = when {
     osName.contains("mac") -> "osx"
@@ -27,23 +28,34 @@ kotlin {
 
     jvmToolchain(21)  // Use JDK 17 toolchain for compilation (if using Java 17 features)
     jvm {
-        compilations.all {
-            kotlinOptions {
-                // Target Java 17 bytecode (required for JDK 17 features)
-                jvmTarget = "21"
-                // Add JVM arguments: enable preview features and add incubator modules
-                freeCompilerArgs += listOf(
-                    "-Xadd-modules=jdk.incubator.vector"
-                    // Note: Kotlin has no direct --enable-preview flag, see below
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_21)
+            freeCompilerArgs.addAll(
+                listOf(
+                    "-Xjvm-default=all",
+                    "-Xjdk-release=21",
                 )
-            }
+            )
+        }
+        testRuns["test"].executionTask.configure {
+            useJUnitPlatform()
+            jvmArgs = listOf("--add-modules", "jdk.incubator.vector")
         }
     }
+
+    macosX64()
+    macosArm64()
 
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.io.core)
             implementation(libs.kotlinx.coroutines.core)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
+
         }
         jvmMain.dependencies {
             implementation("com.github.tjake:jlama-core:0.8.4") {
@@ -52,4 +64,8 @@ kotlin {
             implementation("com.github.tjake:jlama-native:0.8.4:$detectedOs-$detectedArch")
         }
     }
+}
+
+tasks.withType<Test> {
+    systemProperty("test.mode", "true")
 }
