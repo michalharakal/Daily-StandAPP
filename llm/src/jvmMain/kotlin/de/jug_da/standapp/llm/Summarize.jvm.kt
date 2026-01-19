@@ -7,10 +7,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
 
-actual fun getLLMSummarizer(): LLMSummarizer = if (System.getProperty("test.mode") == "true") {
-    MockJvmLLMSummarizer()
-} else {
-    JvmLLMSummarizer(512)
+actual fun getLLMSummarizer(): LLMSummarizer = when {
+    System.getProperty("test.mode") == "true" -> MockJvmLLMSummarizer()
+    LLMEngineConfig.getEngineType() == LLMEngineType.SKAINET -> {
+        val config = LLMEngineConfig.getSkainetConfig()
+        SkainetLLMSummarizer(SkainetKLlamaService.create(config))
+    }
+    else -> JvmLLMSummarizer(512)
 }
 
 class JvmLLMSummarizer(maxSeqLen: Int) : LLMSummarizer {

@@ -57,11 +57,22 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
 
         }
-        jvmMain.dependencies {
-            implementation("com.github.tjake:jlama-core:0.8.4") {
-                exclude("org.slf4j", "slf4j-log4j12")
+        jvmMain {
+            kotlin.srcDir("src/jvmMain/kotlin-skainet")
+            dependencies {
+                implementation("com.github.tjake:jlama-core:0.8.4") {
+                    exclude("org.slf4j", "slf4j-log4j12")
+                }
+                implementation("com.github.tjake:jlama-native:0.8.4:$detectedOs-$detectedArch")
+
+                // skainet dependencies
+                implementation(libs.skainet.apps.kllama)
+                implementation(libs.skainet.lang.core)
+                implementation(libs.skainet.lang.models)
+                implementation(libs.skainet.backend.cpu)
+                implementation(libs.skainet.io.core)
+                implementation(libs.skainet.io.gguf)
             }
-            implementation("com.github.tjake:jlama-native:0.8.4:$detectedOs-$detectedArch")
         }
     }
 }
