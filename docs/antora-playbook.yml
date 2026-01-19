@@ -1,0 +1,29 @@
+site:
+  title: DailyStandApp Documentation
+  url: https://jug-da.github.io/DailyStandApp-MCP
+  start_page: dailystandapp:architecture:index.adoc
+
+content:
+  sources:
+    - url: ..
+      start_path: docs
+      branches: HEAD
+
+antora:
+  extensions:
+    - ./lib/mermaid-extension.js
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+
+asciidoc:
+  attributes:
+    experimental: ''
+    idprefix: ''
+    idseparator: '-'
+    page-pagination: ''
+
+output:
+  dir: ./build/site

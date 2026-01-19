@@ -1,0 +1,180 @@
+= 6. Runtime View
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 6.1 MCP Tool Call: Get Commits by Author
+
+This scenario shows how an AI assistant retrieves commits for a specific author.
+
+[mermaid]
+----
+sequenceDiagram
+    participant Client as MCP Client<br/>(Claude)
+    participant Transport as StdioTransport
+    participant Server as MCP Server
+    participant Handler as Tool Handler
+    participant Git as GitClient
+    participant Repo as Git Repository
+
+    Client->>Transport: tools/call<br/>{tool: "get_commits_by_author"}
+    Transport->>Server: dispatch request
+    Server->>Handler: invoke tool
+
+    Handler->>Handler: parse arguments<br/>(repoDir, author, dates)
+    Handler->>Handler: parse ISO dates to Instant
+
+    Handler->>Git: commitsByAuthorAndPeriod()
+    Git->>Repo: Git.open(repoDir)
+    Git->>Repo: git.log().call()
+    Repo-->>Git: RevCommit[]
+
+    Git->>Git: filter by author & dates
+    Git->>Git: map to GitInfo
+
+    Git-->>Handler: List<GitInfo>
+
+    Handler->>Handler: format as text
+    Handler-->>Server: CallToolResult
+    Server-->>Transport: JSON response
+    Transport-->>Client: tool result
+----
+
+== 6.2 LLM Summarization Flow
+
+This scenario shows the complete flow from commit fetching to AI summarization.
+
+[mermaid]
+----
+sequenceDiagram
+    participant User
+    participant App as Application
+    participant Git as GitClient
+    participant LLM as LLMSummarizer
+    participant Engine as SkainetKLlamaService
+    participant Model as GGUF Model
+
+    User->>App: Request standup summary
+    App->>Git: getAllCommitsInPeriod()
+    Git-->>App: List<GitInfo>
+
+    App->>App: Format commits as prompt
+    App->>LLM: summarize(promptText)
+
+    LLM->>Engine: generate(prompt, maxTokens, temp)
+
+    Note over Engine: Thread-safe via Mutex
+
+    Engine->>Engine: tokenizer.encode(prompt)
+    Engine->>Engine: runtime.reset()
+
+    loop Token Generation
+        Engine->>Model: forward pass
+        Model-->>Engine: logits
+        Engine->>Engine: sample token
+        Engine->>Engine: tokenizer.decode(token)
+    end
+
+    Engine-->>LLM: generated text
+    LLM-->>App: summary
+    App-->>User: Standup summary
+----
+
+== 6.3 SKaiNET kllama Initialization
+
+Shows the initialization sequence for the SKaiNET kllama service.
+
+[mermaid]
+----
+sequenceDiagram
+    participant Factory as SkainetKLlamaService.create()
+    participant Ctx as DirectCpuExecutionContext
+    participant Ingest as LlamaIngestion
+    participant FS as FileSystem
+    participant Tok as GGUFTokenizer
+    participant Cache as KvCache
+    participant Runtime as LlamaRuntime
+
+    Factory->>Ctx: new DirectCpuExecutionContext()
+    Note over Ctx: CPU backend with Vector API
+
+    Factory->>Ingest: new LlamaIngestion(ctx)
+    Factory->>FS: source(modelPath)
+    Factory->>Ingest: load(source)
+    Ingest-->>Factory: weights
+
+    Factory->>FS: source(modelPath)
+    Factory->>Tok: fromSource(source)
+    Tok-->>Factory: tokenizer
+
+    Factory->>Cache: createOptimalKvCache()
+    Note over Cache: Off-heap memory<br/>nLayers, seqLen, kvDim
+    Cache-->>Factory: kvCache
+
+    Factory->>Runtime: new LlamaRuntime()
+    Note over Runtime: ctx, weights, kvCache<br/>ropeFreqBase, eps
+
+    Factory-->>Factory: SkainetKLlamaService instance
+----
+
+== 6.4 MCP Server Startup
+
+[mermaid]
+----
+sequenceDiagram
+    participant JVM as JVM Process
+    participant Main as MCPServer.main()
+    participant Setup as run mcp server()
+    participant Server as MCP Server
+    participant Transport as StdioServerTransport
+    participant Stdin as System.in
+    participant Stdout as System.out
+
+    JVM->>Main: start
+    Main->>Setup: invoke
+
+    Setup->>Server: new Server(Implementation, Options)
+    Note over Server: name: "standapp-git"<br/>version: "1.0.0"
+
+    Setup->>Server: addTool("get_commits_by_author", ...)
+    Setup->>Server: addTool("get_all_commits", ...)
+
+    Setup->>Stdin: asInput()
+    Setup->>Stdout: asSink().buffered()
+    Setup->>Transport: new StdioServerTransport(in, out)
+
+    Setup->>Server: connect(transport)
+    Server-->>Setup: session
+
+    Setup->>Transport: onClose { done.complete() }
+
+    Note over Setup: runBlocking { done.join() }
+    Note over Setup: Server running...<br/>waiting for requests
+----
+
+== 6.5 Error Handling Flow
+
+[mermaid]
+----
+sequenceDiagram
+    participant Client as MCP Client
+    participant Handler as Tool Handler
+    participant Git as GitClient
+
+    Client->>Handler: get_commits_by_author<br/>{repoDir: "/invalid/path"}
+
+    Handler->>Git: commitsByAuthorAndPeriod()
+
+    Git->>Git: Git.open(File(repoDir))
+    Note over Git: Exception: Not a git repository
+
+    Git-->>Handler: emptyList()
+
+    alt Missing parameters
+        Handler-->>Client: "All parameters required"
+    else Invalid dates
+        Handler-->>Client: "Error processing request: ..."
+    else No commits found
+        Handler-->>Client: "No commits found for author '...' in the specified period."
+    end
+----

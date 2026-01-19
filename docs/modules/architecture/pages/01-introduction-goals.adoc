@@ -1,0 +1,119 @@
+= 1. Introduction and Goals
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 1.1 Requirements Overview
+
+DailyStandApp is designed to streamline the daily standup process for software development teams by:
+
+* *Automated commit retrieval*: Fetching git commits from local repositories for a specified time period
+* *AI-powered summarization*: Using local LLM inference to generate concise, standup-ready summaries
+* *Multiple access methods*: Supporting CLI, desktop UI, and MCP protocol for AI assistant integration
+
+=== Key Functional Requirements
+
+[cols="1,3,1"]
+|===
+|ID |Requirement |Priority
+
+|FR-01
+|Fetch commits by author and date range from git repositories
+|High
+
+|FR-02
+|Fetch all commits in a date range regardless of author
+|High
+
+|FR-03
+|Summarize commits using local AI model
+|High
+
+|FR-04
+|Expose functionality via MCP protocol for AI assistants
+|High
+
+|FR-05
+|Provide command-line interface for scripting
+|Medium
+
+|FR-06
+|Provide desktop GUI for interactive use
+|Medium
+|===
+
+=== Use Case Diagram
+
+[mermaid]
+----
+graph LR
+    DEV((Developer))
+    AI((AI Assistant))
+
+    subgraph "DailyStandApp"
+        UC1[Get My Commits]
+        UC2[Get Team Commits]
+        UC3[Generate Standup Summary]
+        UC4[Configure AI Engine]
+    end
+
+    DEV --> UC1
+    DEV --> UC2
+    DEV --> UC3
+    DEV --> UC4
+    AI --> UC1
+    AI --> UC2
+    AI --> UC3
+----
+
+== 1.2 Quality Goals
+
+[cols="1,2,3"]
+|===
+|Priority |Quality Goal |Motivation
+
+|1
+|*Privacy (Critical)*
+|**Zero data leaves the machine.** Git commits contain sensitive information - code changes, project names, author details. All AI processing runs locally via SKaiNET kllama. No cloud APIs, no telemetry, no external services for core functionality.
+
+|2
+|*Offline Operation*
+|Works completely offline after initial model download. No internet required for daily use.
+
+|3
+|*Performance*
+|Fast commit retrieval and reasonable LLM inference times using SIMD acceleration via Java Vector API.
+
+|4
+|*Portability*
+|Works across macOS, Linux, and Windows via Kotlin Multiplatform. No cloud dependencies.
+
+|5
+|*Extensibility*
+|Pluggable LLM architecture via `LLMService` interface. Currently implemented with SKaiNET kllama, but extensible for future local backends.
+|===
+
+IMPORTANT: Privacy is non-negotiable. The embedded AI engine (SKaiNET kllama) exists specifically to ensure commit data never leaves the developer's machine. Cloud-based AI services are explicitly excluded from this architecture.
+
+== 1.3 Stakeholders
+
+[cols="1,2,3"]
+|===
+|Role |Contact |Expectations
+
+|*Developer*
+|End user
+|Quick standup preparation, privacy, offline operation
+
+|*Team Lead*
+|End user
+|Team-wide commit visibility, clear summaries
+
+|*AI Assistant*
+|MCP client (e.g., Claude)
+|Reliable tool calls, structured responses
+
+|*JUG Darmstadt*
+|Project maintainer
+|Clean architecture, maintainable codebase
+|===

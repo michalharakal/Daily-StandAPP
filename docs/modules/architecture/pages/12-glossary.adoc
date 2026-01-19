@@ -1,0 +1,169 @@
+= 12. Glossary
+:toc: left
+:toclevels: 3
+:icons: font
+
+== Domain Terms
+
+[cols="1,3"]
+|===
+|Term |Definition
+
+|*Daily Standup*
+|A short daily meeting where team members share what they worked on, what they plan to work on, and any blockers. Also called "daily scrum" or "standup meeting".
+
+|*Commit*
+|A snapshot of changes in a git repository, including author, timestamp, and message describing the changes.
+
+|*Commit Summary*
+|An AI-generated concise description of multiple commits, suitable for presenting at a standup meeting.
+
+|*Author*
+|The person who created a git commit, identified by name and email address.
+|===
+
+== Technical Terms
+
+[cols="1,3"]
+|===
+|Term |Definition
+
+|*GGUF*
+|GPT-Generated Unified Format - A binary format for storing quantized large language model weights. Successor to GGML format.
+
+|*Quantization*
+|Technique to reduce model size and memory usage by using lower-precision numbers (e.g., 4-bit integers instead of 32-bit floats).
+
+|*K-Quants*
+|Advanced quantization methods (Q4_K_M, Q5_K_M, etc.) that use mixed precision for better quality/size tradeoff.
+
+|*KV-Cache*
+|Key-Value cache used during LLM inference to store computed attention values, avoiding redundant calculations.
+
+|*Token*
+|A unit of text processed by an LLM. Typically a word, part of a word, or punctuation mark.
+
+|*Vector API*
+|Java API (JEP 338) for expressing vector computations that compile to optimal SIMD instructions on supported CPUs.
+
+|*SIMD*
+|Single Instruction, Multiple Data - CPU capability to perform the same operation on multiple data points simultaneously.
+
+|*AVX-512*
+|Advanced Vector Extensions with 512-bit registers - Intel CPU feature for high-performance vector operations.
+|===
+
+== Protocol & Framework Terms
+
+[cols="1,3"]
+|===
+|Term |Definition
+
+|*MCP*
+|Model Context Protocol - A standard protocol for AI assistants to interact with external tools and data sources.
+
+|*MCP Server*
+|A service that implements MCP to expose tools (functions) that AI assistants can call.
+
+|*MCP Client*
+|An AI assistant (like Claude) that connects to MCP servers to use their tools.
+
+|*Tool*
+|In MCP context, a function exposed by a server that clients can invoke with structured parameters.
+
+|*Stdio Transport*
+|Communication channel using standard input/output streams, typically for process-to-process communication.
+
+|*JSON-RPC*
+|Remote Procedure Call protocol using JSON for message encoding. Used by MCP.
+|===
+
+== Kotlin/JVM Terms
+
+[cols="1,3"]
+|===
+|Term |Definition
+
+|*Kotlin Multiplatform*
+|Kotlin feature allowing code to be compiled for multiple platforms (JVM, JS, Native) from shared sources.
+
+|*Expect/Actual*
+|Kotlin Multiplatform mechanism where `expect` declares a platform-agnostic API and `actual` provides platform-specific implementation.
+
+|*Source Set*
+|In Kotlin Multiplatform, a directory containing source code for a specific platform (e.g., `jvmMain`, `commonMain`).
+
+|*Coroutine*
+|Kotlin's concurrency primitive for asynchronous programming without callbacks.
+
+|*Flow*
+|Kotlin's cold asynchronous stream type for emitting multiple values over time.
+
+|*Mutex*
+|Mutual exclusion primitive in Kotlin coroutines for protecting shared state.
+
+|*Fat JAR*
+|A JAR file containing all dependencies bundled together for standalone execution.
+|===
+
+== Library & Tool Terms
+
+[cols="1,3"]
+|===
+|Term |Definition
+
+|*SKaiNET*
+|Kotlin-first AI/ML framework providing tensor operations and model inference capabilities.
+
+|*kllama*
+|SKaiNET's LLaMA model implementation for local inference in pure Kotlin.
+
+|*JGit*
+|Eclipse Foundation's pure Java implementation of Git.
+
+|*Compose Multiplatform*
+|JetBrains' declarative UI framework based on Jetpack Compose, supporting desktop, web, and mobile.
+
+|*Antora*
+|Documentation site generator designed for creating documentation portals from AsciiDoc content.
+
+|*Arc42*
+|Template for documenting software and system architectures, providing a standardized structure.
+|===
+
+== Abbreviations
+
+[cols="1,3"]
+|===
+|Abbreviation |Expansion
+
+|*LLM*
+|Large Language Model
+
+|*API*
+|Application Programming Interface
+
+|*SDK*
+|Software Development Kit
+
+|*JDK*
+|Java Development Kit
+
+|*JVM*
+|Java Virtual Machine
+
+|*CLI*
+|Command Line Interface
+
+|*UI*
+|User Interface
+
+|*I/O*
+|Input/Output
+
+|*RAM*
+|Random Access Memory
+
+|*CPU*
+|Central Processing Unit
+|===

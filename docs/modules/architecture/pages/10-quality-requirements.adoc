@@ -1,0 +1,200 @@
+= 10. Quality Requirements
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 10.1 Quality Tree
+
+[mermaid]
+----
+graph TB
+    QUALITY[Quality]
+
+    QUALITY --> PRIVACY[Privacy]
+    QUALITY --> PERFORMANCE[Performance]
+    QUALITY --> PORTABILITY[Portability]
+    QUALITY --> USABILITY[Usability]
+    QUALITY --> MAINTAINABILITY[Maintainability]
+
+    PRIVACY --> P1[Local Execution]
+    PRIVACY --> P2[No Cloud Calls]
+
+    PERFORMANCE --> PERF1[Fast Commit Retrieval]
+    PERFORMANCE --> PERF2[Reasonable Inference Time]
+    PERFORMANCE --> PERF3[SIMD Acceleration]
+
+    PORTABILITY --> PORT1[Cross-Platform]
+    PORTABILITY --> PORT2[No Native Dependencies]
+
+    USABILITY --> USE1[Simple CLI]
+    USABILITY --> USE2[MCP Integration]
+
+    MAINTAINABILITY --> MAIN1[Clean Modules]
+    MAINTAINABILITY --> MAIN2[Type Safety]
+
+    style PRIVACY fill:#c8e6c9
+    style PERFORMANCE fill:#fff3e0
+    style PORTABILITY fill:#e3f2fd
+    style USABILITY fill:#f3e5f5
+    style MAINTAINABILITY fill:#fce4ec
+----
+
+== 10.2 Quality Scenarios
+
+=== 10.2.1 Privacy Scenarios
+
+[cols="1,3,2,2"]
+|===
+|ID |Scenario |Response |Measure
+
+|QS-P1
+|Developer requests commit summary for a private repository
+|All processing happens locally, no data transmitted
+|Zero network calls for AI features
+
+|QS-P2
+|AI assistant queries commit history
+|Data flows only between local MCP server and client
+|Stdio transport, no network sockets
+|===
+
+=== 10.2.2 Performance Scenarios
+
+[cols="1,3,2,2"]
+|===
+|ID |Scenario |Response |Measure
+
+|QS-PERF1
+|Fetch commits from repository with 10,000 commits
+|Returns filtered results within acceptable time
+|< 5 seconds for date-filtered query
+
+|QS-PERF2
+|Generate summary for 20 commits
+|LLM produces coherent summary
+|< 60 seconds on modern CPU (7B model)
+
+|QS-PERF3
+|First token generation
+|Prompt processing completes
+|Time to first token < 10 seconds
+|===
+
+=== 10.2.3 Portability Scenarios
+
+[cols="1,3,2,2"]
+|===
+|ID |Scenario |Response |Measure
+
+|QS-PORT1
+|Run MCP server on macOS, Linux, Windows
+|Server starts and responds to tool calls
+|Same JAR works on all platforms
+
+|QS-PORT2
+|Use with different JDK 21+ distributions
+|Application runs correctly
+|Tested on OpenJDK, Temurin, GraalVM
+|===
+
+=== 10.2.4 Usability Scenarios
+
+[cols="1,3,2,2"]
+|===
+|ID |Scenario |Response |Measure
+
+|QS-USE1
+|Configure MCP server for Claude
+|Add JSON config, server connects
+|< 5 minutes setup time
+
+|QS-USE2
+|Query commits via AI assistant
+|Natural language request returns formatted results
+|Single tool call completes request
+|===
+
+== 10.3 Quality Requirements Table
+
+[cols="1,1,2,3"]
+|===
+|Quality |Priority |Requirement |Verification
+
+|*Privacy*
+|1
+|No data leaves local machine
+|Code review, network traffic analysis
+
+|*Performance*
+|2
+|Commit retrieval < 5s
+|Benchmark tests with large repos
+
+|*Portability*
+|2
+|Works on JDK 21+ any OS
+|CI builds on multiple platforms
+
+|*Reliability*
+|3
+|Graceful error handling
+|Unit tests for error cases
+
+|*Maintainability*
+|3
+|Modular codebase
+|Dependency analysis, module boundaries
+|===
+
+== 10.4 Performance Characteristics
+
+=== LLM Inference Performance
+
+[mermaid]
+----
+graph LR
+    subgraph "Factors Affecting Performance"
+        MODEL[Model Size<br/>7B, 13B, etc.]
+        QUANT[Quantization<br/>Q4, Q5, Q8]
+        SEQ[Sequence Length]
+        CPU[CPU Features<br/>AVX2/AVX-512]
+    end
+
+    subgraph "Performance Impact"
+        TOKENS[Tokens/Second]
+        MEMORY[Memory Usage]
+        LATENCY[First Token Latency]
+    end
+
+    MODEL --> TOKENS
+    MODEL --> MEMORY
+    QUANT --> TOKENS
+    QUANT --> MEMORY
+    SEQ --> MEMORY
+    SEQ --> LATENCY
+    CPU --> TOKENS
+----
+
+=== Expected Performance Ranges
+
+[cols="1,2,2,2"]
+|===
+|Configuration |Tokens/sec |Memory |First Token
+
+|7B Q4_K_M
+|10-20 tok/s
+|~6GB
+|5-10s
+
+|7B Q5_K_M
+|8-15 tok/s
+|~7GB
+|5-10s
+
+|13B Q4_K_M
+|5-10 tok/s
+|~10GB
+|10-20s
+|===
+
+_Performance varies significantly based on CPU capabilities (AVX-512 >> AVX2 >> SSE)_

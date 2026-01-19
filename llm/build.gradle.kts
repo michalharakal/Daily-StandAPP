@@ -1,32 +1,13 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
-import java.util.Locale
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
 }
 
-val osName: String = System.getProperty("os.name").lowercase()
-val osArch: String = System.getProperty("os.arch").lowercase()
-
-val detectedOs = when {
-    osName.contains("mac") -> "osx"
-    osName.contains("linux") -> "linux"
-    osName.contains("windows") -> "windows"
-    else -> throw GradleException("Unsupported OS: $osName")
-}
-
-val detectedArch = when (osArch) {
-    "x86_64", "amd64" -> "x86_64"
-    "aarch64", "arm64" -> "aarch_64"
-    else -> throw GradleException("Unsupported Arch: $osArch")
-}
-
 kotlin {
 
-    jvmToolchain(21)  // Use JDK 17 toolchain for compilation (if using Java 17 features)
+    jvmToolchain(21)
     jvm {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
@@ -55,17 +36,11 @@ kotlin {
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-
         }
         jvmMain {
             kotlin.srcDir("src/jvmMain/kotlin-skainet")
             dependencies {
-                implementation("com.github.tjake:jlama-core:0.8.4") {
-                    exclude("org.slf4j", "slf4j-log4j12")
-                }
-                implementation("com.github.tjake:jlama-native:0.8.4:$detectedOs-$detectedArch")
-
-                // skainet dependencies
+                // SKaiNET kllama - pure Kotlin LLM inference
                 implementation(libs.skainet.apps.kllama)
                 implementation(libs.skainet.lang.core)
                 implementation(libs.skainet.lang.models)

@@ -1,0 +1,170 @@
+= 3. Context and Scope
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 3.1 Business Context
+
+The system interacts with developers, AI assistants, and local resources (git repositories, LLM models).
+
+[mermaid]
+----
+graph TB
+    subgraph "Users"
+        DEV[👤 Developer]
+        AI[🤖 AI Assistant<br/>Claude, etc.]
+    end
+
+    subgraph "DailyStandApp System"
+        APP[DailyStandApp]
+    end
+
+    subgraph "Local Resources"
+        GIT[(Git Repositories)]
+        MODEL[(GGUF Models)]
+    end
+
+    DEV -->|"CLI / Desktop UI"| APP
+    AI -->|"MCP Protocol"| APP
+    APP -->|"Read commits"| GIT
+    APP -->|"Load weights"| MODEL
+    APP -->|"Summaries"| DEV
+    APP -->|"Tool results"| AI
+
+    style DEV fill:#e3f2fd
+    style AI fill:#f3e5f5
+    style APP fill:#fff3e0
+    style GIT fill:#e8f5e9
+    style MODEL fill:#fce4ec
+----
+
+=== External Interfaces
+
+[cols="1,2,3"]
+|===
+|Interface |Partner |Description
+
+|*CLI*
+|Developer
+|Command-line interface for scripted use
+
+|*Desktop UI*
+|Developer
+|Compose Multiplatform GUI
+
+|*MCP Protocol*
+|AI Assistant
+|Model Context Protocol over stdio transport
+
+|*File System*
+|Git Repository
+|JGit library reads local `.git` directories
+
+|*File System*
+|GGUF Model
+|SKaiNET loads quantized model files
+|===
+
+== 3.2 Technical Context
+
+[mermaid]
+----
+flowchart LR
+    subgraph "Client Layer"
+        CLAUDE[Claude Desktop]
+        TERMINAL[Terminal]
+        DESKTOP[Desktop App]
+    end
+
+    subgraph "DailyStandApp"
+        subgraph "Entry Points"
+            MCP[MCP Server<br/>stdio]
+            CLI[CLI<br/>args]
+            UI[Compose UI]
+        end
+
+        subgraph "Core"
+            LLM[LLM Module]
+            DATA[Data Module]
+        end
+    end
+
+    subgraph "Infrastructure"
+        GIT[(Git Repo<br/>JGit)]
+        GGUF[(Model<br/>GGUF)]
+    end
+
+    CLAUDE -->|"JSON-RPC/stdio"| MCP
+    TERMINAL -->|"args"| CLI
+    DESKTOP -->|"events"| UI
+
+    MCP --> LLM
+    MCP --> DATA
+    CLI --> LLM
+    CLI --> DATA
+    UI --> LLM
+    UI --> DATA
+
+    DATA -->|"org.eclipse.jgit"| GIT
+    LLM -->|"SKaiNET kllama"| GGUF
+----
+
+=== Communication Channels
+
+[cols="1,1,2,2"]
+|===
+|Channel |Protocol |Technology |Data Format
+
+|MCP Server
+|JSON-RPC 2.0
+|MCP Kotlin SDK + Stdio
+|JSON with tool schemas
+
+|CLI
+|Process Args
+|JVM Main
+|Text output
+
+|Desktop UI
+|In-process
+|Compose Multiplatform
+|Kotlin data classes
+
+|Git Access
+|File System
+|Eclipse JGit
+|Git objects
+
+|Model Loading
+|File System
+|SKaiNET I/O
+|GGUF binary format
+|===
+
+== 3.3 Data Flow Overview
+
+[mermaid]
+----
+flowchart TD
+    subgraph "Input"
+        REQ[Request<br/>repo, dates, author]
+    end
+
+    subgraph "Processing"
+        FETCH[Fetch Commits<br/>JGit]
+        FORMAT[Format for LLM]
+        INFER[LLM Inference<br/>kllama]
+    end
+
+    subgraph "Output"
+        SUMMARY[Standup Summary]
+    end
+
+    REQ --> FETCH
+    FETCH --> FORMAT
+    FORMAT --> INFER
+    INFER --> SUMMARY
+
+    style REQ fill:#e3f2fd
+    style SUMMARY fill:#c8e6c9
+----

@@ -1,10 +1,5 @@
 package de.jug_da.standapp.llm
 
-enum class LLMEngineType {
-    JLAMA,
-    SKAINET
-}
-
 data class SkainetConfig(
     val modelPath: String,
     val maxSeqLen: Int = 2048,
@@ -14,15 +9,13 @@ data class SkainetConfig(
 )
 
 object LLMEngineConfig {
-    fun getEngineType(): LLMEngineType {
-        val engine = System.getProperty("llm.engine", "jlama")
-        return if (engine == "skainet") LLMEngineType.SKAINET else LLMEngineType.JLAMA
-    }
-
     fun getSkainetConfig(): SkainetConfig {
         return SkainetConfig(
-            modelPath = System.getProperty("llm.skainet.model", "./models/model.gguf"),
-            maxSeqLen = System.getProperty("llm.max.seq.len", "2048").toInt()
+            modelPath = System.getProperty("llm.model", "./models/model.gguf"),
+            maxSeqLen = System.getProperty("llm.max.seq.len", "2048").toInt(),
+            defaultTemperature = System.getProperty("llm.temperature", "0.8").toFloat(),
+            ropeFreqBase = System.getProperty("llm.rope.freq.base", "10000").toFloat(),
+            eps = System.getProperty("llm.eps", "1e-5").toFloat()
         )
     }
 }

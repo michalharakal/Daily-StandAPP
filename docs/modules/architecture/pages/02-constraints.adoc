@@ -1,0 +1,100 @@
+= 2. Constraints
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 2.1 Technical Constraints
+
+[cols="1,3"]
+|===
+|Constraint |Description
+
+|*TC-01: JDK 21+*
+|Required for Java Vector API (incubator module) which provides SIMD acceleration for tensor operations in the LLM engine.
+
+|*TC-02: Kotlin Multiplatform*
+|The project uses Kotlin Multiplatform for cross-platform support. Platform-specific implementations use expect/actual pattern.
+
+|*TC-03: Local Execution Only*
+|All LLM inference must happen locally. No cloud API calls for AI functionality.
+
+|*TC-04: GGUF Model Format*
+|SKaiNET kllama requires models in GGUF format with quantization (Q4, Q5, Q8, K-quants).
+
+|*TC-05: Git Repository Access*
+|Only supports local git repositories accessible via file system.
+
+|*TC-06: MCP over Stdio*
+|MCP server uses stdio transport for communication with AI assistants.
+|===
+
+=== JVM Configuration Requirements
+
+[source,bash]
+----
+# Required JVM flags for Vector API
+java --add-modules jdk.incubator.vector \
+     --enable-preview \
+     -jar mcp-server-jvm.jar
+----
+
+== 2.2 Organizational Constraints
+
+[cols="1,3"]
+|===
+|Constraint |Description
+
+|*OC-01: Open Source*
+|Project is developed as open source for the Java community (JUG Darmstadt).
+
+|*OC-02: Gradle Build*
+|Must use Gradle with Kotlin DSL for build configuration.
+
+|*OC-03: Version Catalog*
+|Dependencies managed via `gradle/libs.versions.toml` and `skainet.versions.toml`.
+|===
+
+== 2.3 Conventions
+
+[cols="1,3"]
+|===
+|Convention |Description
+
+|*Package Structure*
+|`de.jug_da.standapp.*` for application code, `de.jug_da.data.*` for data layer.
+
+|*Module Naming*
+|Lowercase with hyphens for Gradle modules (e.g., `mcp-server`).
+
+|*Multiplatform Sources*
+|`commonMain` for shared code, `jvmMain` for JVM-specific, platform-specific directories for others.
+
+|*Arc42 Documentation*
+|Architecture documented using arc42 template in Antora format.
+|===
+
+== 2.4 Platform Support Matrix
+
+[mermaid]
+----
+graph TB
+    subgraph "Full Support"
+        JVM[JVM/Desktop<br/>✅ Git + LLM]
+    end
+
+    subgraph "Partial Support"
+        MACOS[macOS Native<br/>⚠️ LLM only]
+    end
+
+    subgraph "Stub Only"
+        ANDROID[Android<br/>❌ Stubs]
+        WASM[WasmJS<br/>❌ Stubs]
+        NATIVE[Other Native<br/>❌ Stubs]
+    end
+
+    style JVM fill:#c8e6c9
+    style MACOS fill:#fff9c4
+    style ANDROID fill:#ffcdd2
+    style WASM fill:#ffcdd2
+    style NATIVE fill:#ffcdd2
+----

@@ -1,0 +1,179 @@
+= 11. Risks and Technical Debt
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 11.1 Technical Risks
+
+[cols="1,2,2,2,1"]
+|===
+|ID |Risk |Impact |Mitigation |Priority
+
+|TR-01
+|*JDK 21+ Requirement*
+Java Vector API is incubator module, may change
+|Breaking changes in future JDK versions
+|Abstract SIMD operations, monitor JDK roadmap
+|Medium
+
+|TR-02
+|*Model Compatibility*
+GGUF format evolves, new quantization methods
+|Models may not load correctly
+|Pin tested model versions, version detection
+|Medium
+
+|TR-03
+|*MCP Protocol Changes*
+MCP is relatively new, spec may evolve
+|Integration breaks with Claude updates
+|Use official SDK, monitor protocol changes
+|Low
+
+|TR-04
+|*Performance on Low-End Hardware*
+LLM inference is CPU-intensive
+|Unusable on older machines
+|Document requirements, provide lightweight mode
+|Low
+
+|TR-05
+|*Large Model Downloads*
+Models are 4-8GB
+|Poor first-run experience
+|Provide download scripts, progress indicators
+|Low
+|===
+
+== 11.2 Technical Debt
+
+=== Current Technical Debt
+
+[mermaid]
+----
+graph TB
+    subgraph "High Priority"
+        TD1[CLI Not Implemented<br/>Stub only]
+        TD2[ComposeApp Incomplete<br/>Basic UI]
+    end
+
+    subgraph "Medium Priority"
+        TD3[No Summarization Tool<br/>MCP missing standup_summary]
+        TD4[Platform Stubs<br/>Android, Wasm, Native]
+    end
+
+    subgraph "Low Priority"
+        TD5[No Structured Logging]
+        TD6[No Metrics/Telemetry]
+        TD7[Limited Error Messages]
+    end
+
+    style TD1 fill:#ffcdd2
+    style TD2 fill:#ffcdd2
+    style TD3 fill:#fff9c4
+    style TD4 fill:#fff9c4
+----
+
+=== Debt Details
+
+[cols="1,2,2,2"]
+|===
+|ID |Debt Item |Current State |Remediation
+
+|TD-01
+|*CLI Implementation*
+|`Main.java` prints "Hello, World!"
+|Implement argument parsing, wire to GitClient and LLMSummarizer
+
+|TD-02
+|*ComposeApp UI*
+|Basic "Click me!" button
+|Build proper UI with repository selection, date pickers, summary display
+
+|TD-03
+|*MCP standup_summary Tool*
+|Not implemented
+|Add tool combining commits + LLM summarization
+
+|TD-04
+|*Platform Implementations*
+|Return empty lists
+|Implement or clearly document as unsupported
+
+|TD-05
+|*Logging*
+|Minimal, inconsistent
+|Add SLF4J throughout with configurable levels
+
+|TD-06
+|*Error Handling*
+|Silent failures in GitClient
+|Add proper error propagation and user-friendly messages
+|===
+
+== 11.3 Risk Matrix
+
+[mermaid]
+----
+quadrantChart
+    title Risk Assessment Matrix
+    x-axis Low Impact --> High Impact
+    y-axis Low Probability --> High Probability
+    quadrant-1 Monitor
+    quadrant-2 Mitigate
+    quadrant-3 Accept
+    quadrant-4 Address
+
+    JDK Changes: [0.6, 0.3]
+    Model Compat: [0.5, 0.4]
+    MCP Changes: [0.4, 0.2]
+    Performance: [0.7, 0.3]
+    Downloads: [0.3, 0.6]
+----
+
+== 11.4 Improvement Roadmap
+
+=== Short Term (Next Release)
+
+* [ ] Implement `standup_summary` MCP tool
+* [ ] Add streaming support to MCP responses
+* [ ] Improve error messages
+
+=== Medium Term
+
+* [ ] Complete CLI implementation
+* [ ] Build functional ComposeApp UI
+* [ ] Add integration tests
+
+=== Long Term
+
+* [ ] Native platform support (beyond stubs)
+* [ ] HTTP transport option for MCP
+* [ ] Model management UI
+
+== 11.5 Dependencies Risk
+
+[cols="1,2,1,2"]
+|===
+|Dependency |Version |Risk Level |Notes
+
+|SKaiNET
+|0.8.3
+|Medium
+|Active development, API may change
+
+|MCP Kotlin SDK
+|0.7.2
+|Medium
+|New library, expect updates
+
+|Eclipse JGit
+|7.1.0
+|Low
+|Mature, stable API
+
+|Kotlin
+|2.2.20
+|Low
+|Stable releases, good compatibility
+|===

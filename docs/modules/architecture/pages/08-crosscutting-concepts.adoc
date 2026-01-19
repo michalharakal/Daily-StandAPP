@@ -1,0 +1,250 @@
+= 8. Crosscutting Concepts
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 8.1 Kotlin Multiplatform Architecture
+
+=== Expect/Actual Pattern
+
+The project uses Kotlin's expect/actual mechanism for platform-specific implementations.
+
+[mermaid]
+----
+graph TB
+    subgraph "commonMain"
+        EXPECT[expect fun<br/>Platform-agnostic API]
+    end
+
+    subgraph "jvmMain"
+        ACTUAL_JVM[actual fun<br/>JVM Implementation]
+    end
+
+    subgraph "nativeMain"
+        ACTUAL_NATIVE[actual fun<br/>Native Stub]
+    end
+
+    subgraph "wasmJsMain"
+        ACTUAL_WASM[actual fun<br/>Wasm Stub]
+    end
+
+    EXPECT --> ACTUAL_JVM
+    EXPECT --> ACTUAL_NATIVE
+    EXPECT --> ACTUAL_WASM
+
+    style EXPECT fill:#e3f2fd
+    style ACTUAL_JVM fill:#c8e6c9
+    style ACTUAL_NATIVE fill:#ffcdd2
+    style ACTUAL_WASM fill:#ffcdd2
+----
+
+=== Source Set Structure
+
+[source,text]
+----
+module/src/
+├── commonMain/kotlin/    # Shared interfaces and models
+├── commonTest/kotlin/    # Shared tests
+├── jvmMain/kotlin/       # JVM implementations
+├── jvmMain/kotlin-skainet/  # SKaiNET-specific JVM code
+├── nativeMain/kotlin/    # Native implementations (stubs)
+├── androidMain/kotlin/   # Android implementations (stubs)
+└── wasmJsMain/kotlin/    # WebAssembly implementations (stubs)
+----
+
+== 8.2 Dependency Injection
+
+The project uses factory functions instead of a DI framework for simplicity.
+
+[source,kotlin]
+----
+// Factory function pattern
+object LLMEngineConfig {
+    fun getSkainetConfig(): SkainetConfig {
+        return SkainetConfig(
+            modelPath = System.getProperty("llm.model", "./models/model.gguf"),
+            maxSeqLen = System.getProperty("llm.max.seq.len", "2048").toInt()
+        )
+    }
+}
+
+// Conditional instantiation
+actual fun getLLMSummarizer(): LLMSummarizer = when {
+    System.getProperty("test.mode") == "true" ->
+        MockJvmLLMSummarizer()
+    else ->
+        SkainetLLMSummarizer(SkainetKLlamaService.create(config))
+}
+----
+
+== 8.3 Concurrency Model
+
+[mermaid]
+----
+graph TB
+    subgraph "Kotlin Coroutines"
+        SUSPEND[suspend fun]
+        FLOW[Flow<T>]
+        MUTEX[Mutex]
+    end
+
+    subgraph "LLM Service"
+        GENERATE["generate()"]
+        STREAM["generateStream()"]
+        LOCK[Thread Safety]
+    end
+
+    SUSPEND --> GENERATE
+    FLOW --> STREAM
+    MUTEX --> LOCK
+
+    style SUSPEND fill:#e8f5e9
+    style FLOW fill:#e8f5e9
+    style MUTEX fill:#fff3e0
+----
+
+=== Thread Safety in SkainetKLlamaService
+
+[source,kotlin]
+----
+class SkainetKLlamaService {
+    private val mutex = Mutex()  // Coroutine-safe lock
+
+    override suspend fun generate(...): String = mutex.withLock {
+        runtime.reset()  // Reset state before each generation
+        // ... inference logic
+    }
+}
+----
+
+== 8.4 Configuration Management
+
+=== System Properties
+
+[cols="1,2,2"]
+|===
+|Property |Default |Description
+
+|`llm.model`
+|`./models/model.gguf`
+|Path to GGUF model file
+
+|`llm.temperature`
+|`0.8`
+|Sampling temperature for generation
+
+|`llm.max.seq.len`
+|`2048`
+|Maximum sequence length for inference
+
+|`test.mode`
+|`false`
+|Enable mock implementations for testing
+|===
+
+=== Configuration Flow
+
+[mermaid]
+----
+flowchart LR
+    ENV[Environment / CLI Args]
+    PROPS[System Properties]
+    CONFIG[LLMEngineConfig]
+    FACTORY[Factory Function]
+    IMPL[Implementation]
+
+    ENV --> PROPS
+    PROPS --> CONFIG
+    CONFIG --> FACTORY
+    FACTORY --> IMPL
+----
+
+== 8.5 Error Handling
+
+=== Strategy
+
+[cols="1,2"]
+|===
+|Layer |Approach
+
+|*Data Layer (Git)*
+|Return empty list on error, log exception
+
+|*LLM Layer*
+|Propagate exceptions, let caller handle
+
+|*MCP Server*
+|Return error message in CallToolResult
+|===
+
+=== Example: Git Error Handling
+
+[source,kotlin]
+----
+actual fun commitsByAuthorAndPeriod(...): List<GitInfo> {
+    return try {
+        val git = Git.open(File(repoDir))
+        git.use { /* ... */ }
+    } catch (e: Exception) {
+        emptyList()  // Graceful degradation
+    }
+}
+----
+
+== 8.6 Logging and Observability
+
+Currently minimal logging. Future considerations:
+
+[cols="1,2"]
+|===
+|Aspect |Approach
+
+|*Logging*
+|SLF4J with simple backend (excluded from some modules)
+
+|*Metrics*
+|Not yet implemented
+
+|*Tracing*
+|MCP protocol provides request/response correlation
+|===
+
+== 8.7 Testing Strategy
+
+[mermaid]
+----
+graph TB
+    subgraph "Test Types"
+        UNIT[Unit Tests]
+        INTEGRATION[Integration Tests]
+    end
+
+    subgraph "Test Infrastructure"
+        MOCK[MockJvmLLMSummarizer]
+        KOTEST[Kotest Framework]
+        COROUTINES[kotlinx-coroutines-test]
+    end
+
+    UNIT --> MOCK
+    UNIT --> KOTEST
+    INTEGRATION --> COROUTINES
+
+    style MOCK fill:#fff3e0
+    style KOTEST fill:#e8f5e9
+----
+
+=== Test Mode
+
+[source,kotlin]
+----
+// Enable test mode via system property
+tasks.withType<Test> {
+    systemProperty("test.mode", "true")
+}
+
+// Mock implementation returns predictable results
+class MockJvmLLMSummarizer : LLMSummarizer {
+    override suspend fun summarize(text: String): String =
+        "Mock summary of: ${text.take(50)}..."
+}
+----

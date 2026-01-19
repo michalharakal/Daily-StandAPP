@@ -1,0 +1,236 @@
+= 9. Architecture Decisions
+:toc: left
+:toclevels: 3
+:icons: font
+
+== ADR-001: Privacy-First Architecture (Foundational)
+
+=== Status
+Accepted (Non-negotiable)
+
+=== Context
+Git commits contain highly sensitive information:
+
+* Code changes revealing proprietary algorithms
+* Commit messages referencing security issues, customer names, internal projects
+* Author information (PII)
+* Project structure and business logic
+
+Many developers and enterprises cannot send this data to cloud services.
+
+=== Decision
+**All AI processing must run locally. No data leaves the machine.**
+
+This is the foundational architectural constraint that drives all other decisions.
+
+=== Consequences
+* (+) Complete privacy - zero external data transmission
+* (+) Compliant with enterprise security policies
+* (+) Works offline
+* (+) No vendor lock-in or API costs
+* (-) Requires local compute resources
+* (-) Model download needed for first use
+
+---
+
+== ADR-002: Kotlin Multiplatform for Cross-Platform Support
+
+=== Status
+Accepted
+
+=== Context
+The application needs to run on multiple platforms (desktop, potentially mobile) while sharing business logic.
+
+=== Decision
+Use Kotlin Multiplatform with expect/actual pattern for platform-specific implementations.
+
+=== Consequences
+* (+) Single codebase for shared logic
+* (+) Type-safe platform abstraction
+* (+) Native performance on each platform
+* (-) Some platforms have stub implementations only
+* (-) Build complexity with multiple source sets
+
+[mermaid]
+----
+graph LR
+    COMMON[Common Code<br/>~80%] --> JVM[JVM<br/>Full]
+    COMMON --> NATIVE[Native<br/>Partial]
+    COMMON --> WASM[Wasm<br/>Stub]
+----
+
+== ADR-003: Pluggable LLM Architecture with SKaiNET kllama
+
+=== Status
+Accepted
+
+=== Context
+Need local LLM inference without cloud dependencies. Options considered:
+* llama.cpp (C++ with JNI bindings)
+* JLama (Pure Java)
+* SKaiNET kllama (Pure Kotlin)
+
+=== Decision
+Define `LLMService` interface for pluggable LLM backends. Use SKaiNET kllama as the current implementation.
+
+=== Rationale
+* Pluggable architecture allows future backend additions
+* Pure Kotlin - no native dependencies to manage
+* SIMD acceleration via Java Vector API
+* Same language as the rest of the project
+* Active development and support
+
+=== Consequences
+* (+) Extensible - new backends can be added by implementing `LLMService`
+* (+) No native library management with SKaiNET
+* (+) Full Kotlin integration
+* (+) Works on any JDK 21+ platform
+* (-) Requires JDK 21+ for Vector API
+
+[mermaid]
+----
+graph LR
+    IFACE[LLMService<br/>interface] --> SKAINET[SkainetKLlamaService<br/>current]
+    IFACE -.-> FUTURE[Future Backends<br/>extensible]
+
+    style SKAINET fill:#c8e6c9
+    style FUTURE fill:#f5f5f5,stroke-dasharray: 5 5
+----
+
+== ADR-004: MCP Protocol for AI Assistant Integration
+
+=== Status
+Accepted
+
+=== Context
+Need to integrate with AI assistants like Claude for intelligent standup preparation.
+
+=== Decision
+Implement Model Context Protocol (MCP) server using the official Kotlin SDK.
+
+=== Rationale
+* Standard protocol supported by Anthropic
+* Structured tool definitions
+* JSON-RPC over stdio is simple and secure
+* No network exposure required
+
+=== Consequences
+* (+) Direct integration with Claude Desktop
+* (+) Standardized tool schema definitions
+* (+) Secure - no network ports opened
+* (-) Limited to stdio transport currently
+* (-) Requires Claude Desktop configuration
+
+[mermaid]
+----
+graph LR
+    CLAUDE[Claude Desktop] -->|"stdio"| MCP[MCP Server]
+    MCP -->|"tool call"| TOOLS[Git Tools]
+    TOOLS -->|"result"| MCP
+    MCP -->|"response"| CLAUDE
+----
+
+== ADR-005: Eclipse JGit for Git Operations
+
+=== Status
+Accepted
+
+=== Context
+Need to read git commit history from local repositories.
+
+=== Decision
+Use Eclipse JGit library for all git operations.
+
+=== Rationale
+* Pure Java - no native git installation required
+* Mature and well-tested
+* Full git protocol support
+* Apache 2.0 license
+
+=== Consequences
+* (+) No external dependencies
+* (+) Cross-platform consistency
+* (+) Programmatic access to all git data
+* (-) JVM-only (hence stubs on other platforms)
+* (-) Large library size
+
+== ADR-006: Gradle Version Catalogs for Dependency Management
+
+=== Status
+Accepted
+
+=== Context
+Managing dependencies across multiple modules and platforms.
+
+=== Decision
+Use Gradle Version Catalogs (`libs.versions.toml` and `skainet.versions.toml`).
+
+=== Consequences
+* (+) Centralized version management
+* (+) Type-safe dependency references
+* (+) Easy to update versions
+* (-) Two catalog files to maintain
+
+== ADR-007: Fat JAR for MCP Server Deployment
+
+=== Status
+Accepted
+
+=== Context
+MCP server needs simple deployment for end users.
+
+=== Decision
+Build fat JAR with all dependencies bundled.
+
+=== Configuration
+[source,kotlin]
+----
+tasks.named<Jar>("jvmJar") {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes["Main-Class"] = "de.jug_da.standapp.mcp.MCPServerKt"
+    }
+    from({
+        configurations.getByName("jvmRuntimeClasspath").map { file ->
+            if (file.isDirectory) file else zipTree(file)
+        }
+    })
+}
+----
+
+=== Consequences
+* (+) Single file deployment
+* (+) No classpath management
+* (-) Larger file size (~50MB+)
+* (-) Duplicate class handling required
+
+== ADR-008: System Properties for Configuration
+
+=== Status
+Accepted
+
+=== Context
+Need runtime configuration for LLM engine selection and model paths.
+
+=== Decision
+Use Java system properties for all configuration.
+
+=== Rationale
+* Simple and well-understood
+* Can be set via command line, environment, or programmatically
+* No additional configuration framework needed
+
+=== Properties
+[source,bash]
+----
+-Dllm.engine=skainet
+-Dllm.skainet.model=/path/to/model.gguf
+-Dllm.max.seq.len=2048
+-Dtest.mode=true
+----
+
+=== Consequences
+* (+) Zero dependencies
+* (+) Easy command-line configuration
+* (-) No validation at startup
+* (-) No structured configuration file

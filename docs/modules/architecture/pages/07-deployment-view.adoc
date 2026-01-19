@@ -1,0 +1,195 @@
+= 7. Deployment View
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 7.1 Infrastructure Overview
+
+[mermaid]
+----
+graph TB
+    subgraph "Developer Machine"
+        subgraph "JVM Runtime (JDK 21+)"
+            MCP[mcp-server-jvm.jar]
+            CLI[StandAPP-cli]
+            DESKTOP[Desktop App]
+        end
+
+        subgraph "File System"
+            REPOS[(Git Repositories)]
+            MODELS[(GGUF Models<br/>~4GB)]
+        end
+
+        subgraph "AI Assistant"
+            CLAUDE[Claude Desktop]
+        end
+    end
+
+    CLAUDE -->|"stdio"| MCP
+    MCP --> REPOS
+    MCP --> MODELS
+    CLI --> REPOS
+    CLI --> MODELS
+    DESKTOP --> REPOS
+    DESKTOP --> MODELS
+
+    style MCP fill:#c8e6c9
+    style CLI fill:#bbdefb
+    style DESKTOP fill:#bbdefb
+    style REPOS fill:#fff9c4
+    style MODELS fill:#fce4ec
+----
+
+== 7.2 Deployment Artifacts
+
+[cols="1,2,2,2"]
+|===
+|Artifact |Type |Build Command |Output
+
+|`mcp-server-jvm.jar`
+|Fat JAR
+|`./gradlew :mcp-server:jvmJar`
+|`mcp-server/build/libs/mcp-server-jvm.jar`
+
+|Desktop App
+|Native Bundle
+|`./gradlew :composeApp:packageDmg`
+|DMG (macOS), MSI (Windows), DEB (Linux)
+
+|CLI
+|JAR
+|`./gradlew :StandAPP-cli:jar`
+|`StandAPP-cli/build/libs/*.jar`
+|===
+
+== 7.3 MCP Server Deployment
+
+=== Claude Desktop Configuration
+
+Add to Claude Desktop's MCP configuration (`claude_desktop_config.json`):
+
+[source,json]
+----
+{
+  "mcpServers": {
+    "standapp-git": {
+      "command": "java",
+      "args": [
+        "--add-modules", "jdk.incubator.vector",
+        "-Dllm.model=/path/to/model.gguf",
+        "-jar",
+        "/path/to/mcp-server-jvm.jar"
+      ]
+    }
+  }
+}
+----
+
+=== JVM Requirements
+
+[mermaid]
+----
+graph LR
+    subgraph "JVM Configuration"
+        JDK[JDK 21+]
+        VECTOR[--add-modules<br/>jdk.incubator.vector]
+        PREVIEW[--enable-preview]
+    end
+
+    subgraph "System Properties"
+        MODEL[-Dllm.model=...]
+        SEQLEN[-Dllm.max.seq.len=2048]
+        TEMP[-Dllm.temperature=0.8]
+    end
+
+    JDK --> VECTOR
+    VECTOR --> PREVIEW
+
+    style JDK fill:#e8f5e9
+    style VECTOR fill:#fff3e0
+----
+
+== 7.4 Model Deployment
+
+=== GGUF Model Requirements
+
+[cols="1,2,3"]
+|===
+|Aspect |Requirement |Notes
+
+|Format
+|GGUF
+|Quantized models (Q4_K_M, Q5_K_M recommended)
+
+|Size
+|~4GB for 7B models
+|Smaller quantizations use less RAM
+
+|Location
+|Local file system
+|Configure via `llm.skainet.model` property
+
+|Compatibility
+|LLaMA architecture
+|Tested with Mistral, LLaMA 2/3
+|===
+
+=== Recommended Models
+
+[source,bash]
+----
+# Download example (using huggingface-cli or manual download)
+# Mistral 7B Instruct - Q4_K_M quantization
+wget https://huggingface.co/.../mistral-7b-instruct-v0.3.Q4_K_M.gguf
+
+# Set model path
+java -Dllm.skainet.model=./models/mistral-7b-instruct-v0.3.Q4_K_M.gguf \
+     --add-modules jdk.incubator.vector \
+     -jar mcp-server-jvm.jar
+----
+
+== 7.5 Deployment Diagram
+
+[mermaid]
+----
+graph TB
+    subgraph WORKSTATION["Developer Workstation"]
+        subgraph JVM["JVM 21+"]
+            MCP_JAR[mcp-server-jvm.jar]
+        end
+        CLAUDE[Claude Desktop]
+        GIT[(Git Repos)]
+        MODELS[(GGUF Models)]
+    end
+
+    CLAUDE -->|stdio| MCP_JAR
+    MCP_JAR -->|JGit| GIT
+    MCP_JAR -->|SKaiNET| MODELS
+
+    style MCP_JAR fill:#c8e6c9
+    style CLAUDE fill:#e3f2fd
+    style GIT fill:#fff9c4
+    style MODELS fill:#fce4ec
+----
+
+== 7.6 Resource Requirements
+
+[cols="1,2"]
+|===
+|Resource |Minimum Requirement
+
+|*JDK*
+|JDK 21 or later (for Vector API)
+
+|*RAM*
+|8GB minimum, 16GB recommended for 7B models
+
+|*Disk*
+|4-8GB for model files
+
+|*CPU*
+|Modern CPU with AVX2/AVX-512 for SIMD acceleration
+
+|*OS*
+|macOS, Linux, Windows (JVM supported platforms)
+|===

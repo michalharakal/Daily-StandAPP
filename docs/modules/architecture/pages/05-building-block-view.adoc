@@ -1,0 +1,300 @@
+= 5. Building Block View
+:toc: left
+:toclevels: 3
+:icons: font
+
+== 5.1 System Overview (Level 1)
+
+[mermaid]
+----
+graph TB
+    subgraph "DailyStandApp System"
+        subgraph "Presentation"
+            COMPOSE[composeApp]
+            CLI[StandAPP-cli]
+            MCPS[mcp-server]
+        end
+
+        subgraph "Core Modules"
+            LLM[llm]
+            DATA[data]
+            DOMAIN[domain]
+            SHARED[shared]
+        end
+    end
+
+    COMPOSE --> LLM
+    COMPOSE --> DATA
+    CLI --> LLM
+    CLI --> DATA
+    MCPS --> LLM
+    MCPS --> DATA
+    MCPS --> DOMAIN
+
+    LLM --> DOMAIN
+    DATA --> DOMAIN
+
+    style COMPOSE fill:#bbdefb
+    style CLI fill:#bbdefb
+    style MCPS fill:#bbdefb
+    style LLM fill:#c8e6c9
+    style DATA fill:#c8e6c9
+    style DOMAIN fill:#fff9c4
+    style SHARED fill:#f5f5f5
+----
+
+=== Module Overview
+
+[cols="1,2,3"]
+|===
+|Module |Responsibility |Key Technologies
+
+|`composeApp`
+|Desktop UI for interactive use
+|Compose Multiplatform, Lifecycle ViewModel
+
+|`StandAPP-cli`
+|Command-line interface
+|JVM, Args parsing
+
+|`mcp-server`
+|MCP protocol server for AI assistants
+|MCP Kotlin SDK, Ktor, Stdio transport
+
+|`llm`
+|LLM inference abstraction and implementations
+|SKaiNET kllama, Coroutines
+
+|`data`
+|Git repository access
+|Eclipse JGit
+
+|`domain`
+|Shared domain models
+|Kotlin data classes
+
+|`shared`
+|Shared utilities
+|Kotlin Multiplatform
+|===
+
+== 5.2 Module: llm (Level 2)
+
+The LLM module provides AI inference capabilities with a pluggable architecture. Currently implemented with SKaiNET kllama.
+
+[mermaid]
+----
+graph TB
+    subgraph "llm module"
+        subgraph "commonMain"
+            IFACE[LLMSummarizer<br/>interface]
+            EXPECT[expect fun<br/>getLLMSummarizer]
+        end
+
+        subgraph "jvmMain"
+            ACTUAL[actual fun<br/>getLLMSummarizer]
+            CONFIG[LLMEngineConfig]
+            MOCK[MockJvmLLMSummarizer]
+            SERVICE[LLMService<br/>interface - pluggable]
+        end
+
+        subgraph "jvmMain/kotlin-skainet"
+            SKAINET[SkainetKLlamaService]
+            SKSUM[SkainetLLMSummarizer]
+        end
+
+        FUTURE[Future Backends...]
+    end
+
+    EXPECT --> ACTUAL
+    ACTUAL --> CONFIG
+    CONFIG --> SKSUM
+    CONFIG -->|"test"| MOCK
+
+    SKSUM --> SKAINET
+    SKAINET --> SERVICE
+    FUTURE -.-> SERVICE
+
+    style IFACE fill:#e1f5fe
+    style SERVICE fill:#fff9c4
+    style SKAINET fill:#fff3e0
+    style SKSUM fill:#c8e6c9
+    style FUTURE fill:#f5f5f5,stroke-dasharray: 5 5
+----
+
+=== Key Classes
+
+[cols="1,3"]
+|===
+|Class |Description
+
+|`LLMSummarizer`
+|Common interface: `summarize(text): String`, `summarizeStream(text): Flow<String>`
+
+|`LLMService`
+|JVM interface for pluggable backends: `generate(prompt, maxTokens, temperature, topP): String`
+
+|`SkainetKLlamaService`
+|SKaiNET kllama implementation with GGUF model loading, KV-cache, streaming
+
+|`SkainetLLMSummarizer`
+|Production summarizer wrapping SkainetKLlamaService
+
+|`LLMEngineConfig`
+|Configuration via system properties (`llm.model`, `llm.max.seq.len`)
+
+|`SkainetConfig`
+|Data class for SKaiNET settings (modelPath, maxSeqLen, temperature, etc.)
+|===
+
+NOTE: The `LLMService` interface enables future backend implementations. New backends can be added by implementing this interface.
+
+== 5.3 Module: data (Level 2)
+
+The data module provides git repository access using expect/actual pattern.
+
+[mermaid]
+----
+graph TB
+    subgraph "data module"
+        subgraph "commonMain"
+            GITCLIENT[GitClient.kt<br/>expect functions]
+            GITINFO[GitInfo<br/>data class]
+        end
+
+        subgraph "jvmMain"
+            JVMIMPL[GitClient.jvm.kt<br/>actual functions]
+            JGIT[Eclipse JGit]
+        end
+
+        subgraph "Other Platforms"
+            STUBS[Stub implementations<br/>return emptyList]
+        end
+    end
+
+    GITCLIENT --> JVMIMPL
+    GITCLIENT --> STUBS
+    JVMIMPL --> JGIT
+    JVMIMPL --> GITINFO
+
+    style GITINFO fill:#fff9c4
+    style JVMIMPL fill:#c8e6c9
+    style STUBS fill:#ffcdd2
+----
+
+=== Functions
+
+[source,kotlin]
+----
+// commonMain - expect declarations
+expect fun commitsByAuthorAndPeriod(
+    repoDir: String,
+    author: String,
+    start: Instant,
+    end: Instant
+): List<GitInfo>
+
+expect fun getAllCommitsInPeriod(
+    repoDir: String,
+    start: Instant,
+    end: Instant
+): List<GitInfo>
+
+// Domain model
+data class GitInfo(
+    val id: String,
+    val authorName: String,
+    val authorEmail: String,
+    val whenDate: Instant,
+    val message: String
+)
+----
+
+== 5.4 Module: mcp-server (Level 2)
+
+The MCP server exposes git functionality to AI assistants via the Model Context Protocol.
+
+[mermaid]
+----
+graph TB
+    subgraph "mcp-server module"
+        subgraph "Entry Point"
+            MAIN[MCPServer.kt<br/>main]
+            SETUP[standapp-server.kt<br/>run mcp server]
+        end
+
+        subgraph "Tools"
+            TOOL1[get_commits_by_author]
+            TOOL2[get_all_commits]
+            SCHEMA[SchemaUtils]
+        end
+
+        subgraph "Transport"
+            STDIO[StdioServerTransport]
+            MCP[MCP Server SDK]
+        end
+    end
+
+    subgraph "Dependencies"
+        DATA[data module]
+        LLM[llm module]
+    end
+
+    MAIN --> SETUP
+    SETUP --> TOOL1
+    SETUP --> TOOL2
+    TOOL1 --> DATA
+    TOOL2 --> DATA
+    TOOL1 --> SCHEMA
+    TOOL2 --> SCHEMA
+    SETUP --> STDIO
+    STDIO --> MCP
+
+    style TOOL1 fill:#c8e6c9
+    style TOOL2 fill:#c8e6c9
+----
+
+=== MCP Tools
+
+[cols="1,2,3"]
+|===
+|Tool |Parameters |Description
+
+|`get_commits_by_author`
+|repoDir, author, startDate, endDate
+|Fetch commits by specific author within date range
+
+|`get_all_commits`
+|repoDir, startDate, endDate
+|Fetch all commits within date range
+|===
+
+== 5.5 Component Interaction
+
+[mermaid]
+----
+flowchart LR
+    subgraph "External"
+        CLIENT[MCP Client]
+    end
+
+    subgraph "mcp-server"
+        TRANSPORT[Stdio Transport]
+        SERVER[MCP Server]
+        TOOLS[Tool Handlers]
+    end
+
+    subgraph "data"
+        GITCLIENT[GitClient]
+    end
+
+    subgraph "llm"
+        SUMMARIZER[LLMSummarizer]
+    end
+
+    CLIENT <-->|"JSON-RPC"| TRANSPORT
+    TRANSPORT <--> SERVER
+    SERVER --> TOOLS
+    TOOLS --> GITCLIENT
+    TOOLS -.->|"future"| SUMMARIZER
+----

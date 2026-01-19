@@ -1,0 +1,6 @@
+name: dailystandapp
+title: DailyStandApp Documentation
+version: '1.0'
+start_page: architecture:index.adoc
+nav:
+  - modules/architecture/nav.adoc
