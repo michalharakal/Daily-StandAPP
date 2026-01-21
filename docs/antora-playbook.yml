@@ -1,6 +1,6 @@
 site:
   title: daily-standapp
-  url: https://michalharakal.github.io/dAily-StandAPP
+  url: https://github.com/michalharakal/Daily-StandAPP
   start_page: daily-standapp::index.adoc
   keys:
     google_analytics: ''
@@ -9,7 +9,7 @@ content:
   - url: ../                 # The current folder is a git repo
     branches: HEAD         # "HEAD" uses whichever branch is currently checked out
     start_path: docs/src/docs
-    edit_url: 'https://github.com/michalharakal/dAily-StandAPP/{path}'
+    edit_url: 'https://github.com/michalharakal/Daily-StandAPP/{path}'
 
 ui:
   bundle:
