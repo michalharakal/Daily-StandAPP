@@ -5,12 +5,11 @@
 [link=https://meine.doag.org/events/javaland/2026/agenda/#agendaId.7511]
 image::https://www.javaland.eu/fileadmin/Event/JavaLand/Banner/2026/JL_2026-Banner-1920x1080px.jpg[]
 
-*Javaland 2025*
+*Javaland 2026*
 
 xref:bios.adoc[]
 
 Michal Harakal, Alexander von Below, Falk Sippach
 
-== Setup the environment
 
-See detailed instructions in the xref:setup.adoc[] section.
+TBD
