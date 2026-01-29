@@ -1,3 +1,3 @@
-rootProject.name = "koog-starter-agent"
+rootProject.name = "cloudapi"
 
-include("llm-client")
+include("model", "server", "client", "agent")

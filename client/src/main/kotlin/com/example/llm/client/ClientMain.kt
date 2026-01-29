@@ -1,15 +1,13 @@
-package com.example.llmclient
+package com.example.llm.client
 
 import kotlinx.coroutines.runBlocking
 
 fun main(): Unit = runBlocking {
     LlmClient().use { client ->
-        // List models
         val models = client.listModels()
         println("Available models:")
         models.data.forEach { println("  - ${it.id}") }
 
-        // Send a chat completion
         val response = client.chatCompletion(
             model = "local-stub",
             userMessage = "What is Kotlin Multiplatform?",

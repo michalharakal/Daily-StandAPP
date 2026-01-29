@@ -1,8 +1,11 @@
+package com.example.llm.agent
+
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
 import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
+import com.example.llm.server.createLocalAIServer
 import kotlinx.coroutines.runBlocking
 
 fun main(): Unit = runBlocking {

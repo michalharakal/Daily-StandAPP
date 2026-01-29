@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.koog.ai)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(gradle wrapper:*)",
+      "Bash(./gradlew jvmMainClasses:*)",
+      "Bash(jar tf:*)",
+      "Bash(jar xf:*)",
+      "Bash(javap:*)",
+      "Bash(git -C /Users/A9973957/projects/javaland/javaland2026/cloudapi status:*)",
+      "Bash(xargs cat:*)",
+      "Bash(xargs basename:*)",
+      "Bash(jar tvf:*)",
+      "Bash(./gradlew:*)",
+      "Bash(tree:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill)",
+      "Bash(xargs kill sleep 1 ./gradlew :jvmJar)"
+    ]
+  }
+}

@@ -1,3 +1,9 @@
+package com.example.llm.server
+
+import com.example.llm.model.ChatCompletionResponse
+import com.example.llm.model.Choice
+import com.example.llm.model.ResponseMessage
+import com.example.llm.model.Usage
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -7,46 +13,10 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-
-// --- Response types (OpenAI Chat Completions format) ---
-
-@Serializable
-data class ChatCompletionResponse(
-    val id: String,
-    @SerialName("object") val objectType: String = "chat.completion",
-    val created: Long,
-    val model: String,
-    val choices: List<Choice>,
-    val usage: Usage,
-)
-
-@Serializable
-data class Choice(
-    val index: Int = 0,
-    val message: ResponseMessage,
-    @SerialName("finish_reason") val finishReason: String = "stop",
-)
-
-@Serializable
-data class ResponseMessage(
-    val role: String = "assistant",
-    val content: String?,
-)
-
-@Serializable
-data class Usage(
-    @SerialName("prompt_tokens") val promptTokens: Int = 0,
-    @SerialName("completion_tokens") val completionTokens: Int = 0,
-    @SerialName("total_tokens") val totalTokens: Int = 0,
-)
-
-// --- Server factory ---
 
 private val lenientJson = Json {
     ignoreUnknownKeys = true

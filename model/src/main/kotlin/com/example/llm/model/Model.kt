@@ -1,4 +1,4 @@
-package com.example.llmclient
+package com.example.llm.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -27,7 +27,7 @@ data class ChatMessage(
 @Serializable
 data class ChatCompletionResponse(
     val id: String,
-    @SerialName("object") val objectType: String,
+    @SerialName("object") val objectType: String = "chat.completion",
     val created: Long,
     val model: String,
     val choices: List<Choice>,
@@ -58,11 +58,11 @@ data class Usage(
 
 @Serializable
 data class ModelsResponse(
-    val data: List<Model>,
+    val data: List<ModelInfo>,
 )
 
 @Serializable
-data class Model(
+data class ModelInfo(
     val id: String,
     @SerialName("object") val objectType: String = "model",
 )

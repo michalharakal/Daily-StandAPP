@@ -1,5 +1,9 @@
-package com.example.llmclient
+package com.example.llm.client
 
+import com.example.llm.model.ChatCompletionRequest
+import com.example.llm.model.ChatCompletionResponse
+import com.example.llm.model.ChatMessage
+import com.example.llm.model.ModelsResponse
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -25,9 +29,6 @@ class LlmClient(
         }
     }
 
-    /**
-     * POST /v1/chat/completions
-     */
     suspend fun chatCompletion(request: ChatCompletionRequest): ChatCompletionResponse {
         val response = httpClient.post("$baseUrl/v1/chat/completions") {
             contentType(ContentType.Application.Json)
@@ -36,9 +37,6 @@ class LlmClient(
         return response.body()
     }
 
-    /**
-     * Convenience overload: send a single user message with a given model.
-     */
     suspend fun chatCompletion(
         model: String,
         userMessage: String,
@@ -53,9 +51,6 @@ class LlmClient(
         return chatCompletion(ChatCompletionRequest(model = model, messages = messages))
     }
 
-    /**
-     * GET /v1/models
-     */
     suspend fun listModels(): ModelsResponse {
         val response = httpClient.get("$baseUrl/v1/models")
         return response.body()
