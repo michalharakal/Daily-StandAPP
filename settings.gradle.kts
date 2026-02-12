@@ -32,6 +32,16 @@ dependencyResolutionManagement {
 include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server")
 include("StandAPP-cli")
 
+// SKaiNET composite build -- compile from source, no publishing needed
+includeBuild("../SKaiNET") {
+    dependencySubstitution {
+        substitute(module("sk.ainet.core:skainet-kllama"))
+            .using(project(":skainet-apps:skainet-kllama"))
+        substitute(module("sk.ainet.core:skainet-kllama-agent"))
+            .using(project(":skainet-apps:skainet-kllama-agent"))
+    }
+}
+
 check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
     """
     Daily-StandApp requires JDK 21+ but it is currently using JDK ${JavaVersion.current()}.

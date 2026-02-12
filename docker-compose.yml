@@ -49,12 +49,13 @@ services:
       - MCP_GIT_MAX_COMMIT_HISTORY=100
       - MCP_GIT_CACHE_ENABLED=true
       
-      # LLM configuration (uncomment and set as needed)
-      # - MCP_LLM_MODEL_PATH=/app/models/your-model.ggml
-      # - MCP_LLM_MAX_TOKENS=2048
-      # - MCP_LLM_TEMPERATURE=0.7
-      # - MCP_LLM_GPU_ENABLED=false
-      # - MCP_LLM_THREAD_COUNT=4
+      # LLM backend selection (required): SKAINET | REST_API | JLAMA
+      - MCP_LLM_BACKEND=SKAINET
+      # SKaiNET backend: path to GGUF model file
+      - MCP_LLM_MODEL_PATH=/app/models/model.gguf
+      # REST API backend: OpenAI-compatible endpoint
+      - MCP_LLM_REST_BASE_URL=http://host.docker.internal:11434
+      - MCP_LLM_REST_MODEL=llama3.2:3b
       
       # Java JVM options
       - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom
@@ -70,7 +71,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 8G
           cpus: '2.0'
         reservations:
           memory: 512M
