@@ -9,11 +9,7 @@ actual fun getLLMSummarizer(): LLMSummarizer = JvmLLMSummarizer(512)
 class JvmLLMSummarizer(maxSeqLen: Int) : LLMSummarizer {
     private val scope = CoroutineScope(Dispatchers.IO)
 
-    val llmService: JLamaService = JLamaService.create(
-        modelPath = "",
-        tokenizerPath = "",
-        maxSequenceLength = maxSeqLen
-    )
+    val llmService: LLMService = LLMServiceFactory.create()
 
 
     override suspend fun summarize(text: String): String = llmService.generate(

@@ -5,6 +5,7 @@ import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    kotlin("plugin.serialization") version libs.versions.kotlin.get()
 }
 
 val osName: String = System.getProperty("os.name").toLowerCase()
@@ -46,10 +47,20 @@ kotlin {
             implementation(libs.kotlinx.coroutines.core)
         }
         jvmMain.dependencies {
+            // JLama backend
             implementation("com.github.tjake:jlama-core:0.8.4") {
                 exclude("org.slf4j", "slf4j-log4j12")
             }
             implementation("com.github.tjake:jlama-native:0.8.4:$detectedOs-$detectedArch")
+
+            // SKaiNET KLlama (resolved via composite build)
+            implementation("sk.ainet.core:skainet-kllama:0.12.0")
+            implementation("sk.ainet.core:skainet-kllama-agent:0.12.0")
+
+            // Ktor HTTP client for REST API backend
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
     }
 }
