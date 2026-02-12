@@ -1,0 +1,55 @@
+{
+  "id": "case-15",
+  "description": "Minimal messages: 5 commits with terse single-word or very short messages — tests handling of low-information input",
+  "commits": [
+    {
+      "id": "1a2b3c4",
+      "authorName": "Tom Klein",
+      "authorEmail": "tom.klein@example.com",
+      "whenDate": "2025-10-03T09:10:00Z",
+      "message": "fix"
+    },
+    {
+      "id": "5d6e7f8",
+      "authorName": "Tom Klein",
+      "authorEmail": "tom.klein@example.com",
+      "whenDate": "2025-10-03T10:25:00Z",
+      "message": "wip"
+    },
+    {
+      "id": "9a0b1c2",
+      "authorName": "Tom Klein",
+      "authorEmail": "tom.klein@example.com",
+      "whenDate": "2025-10-03T11:40:00Z",
+      "message": "update"
+    },
+    {
+      "id": "d3e4f5a",
+      "authorName": "Tom Klein",
+      "authorEmail": "tom.klein@example.com",
+      "whenDate": "2025-10-03T14:00:00Z",
+      "message": "cleanup"
+    },
+    {
+      "id": "6b7c8d9",
+      "authorName": "Tom Klein",
+      "authorEmail": "tom.klein@example.com",
+      "whenDate": "2025-10-03T16:30:00Z",
+      "message": "done"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["1a2b3c4", "5d6e7f8", "9a0b1c2"],
+      "forbiddenIds": [],
+      "notes": "Model should not hallucinate details beyond what the terse messages provide. Acceptable to say 'details unclear' or similar. Must not invent feature names or bug descriptions."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Bug Fixes", "Maintenance"],
+      "expectedCommitCount": 5,
+      "notes": "With minimal messages, category assignment is ambiguous. Model should make reasonable guesses but not fabricate specifics."
+    }
+  }
+}

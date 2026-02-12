@@ -1,0 +1,55 @@
+{
+  "id": "case-05",
+  "description": "Conflicting: 5 commits where two have contradictory messages about the same feature. One commit adds streaming response support and a later commit reverts it, creating ambiguity about final state.",
+  "commits": [
+    {
+      "id": "aa1bb2c",
+      "authorName": "David Richter",
+      "authorEmail": "david.richter@jug-da.de",
+      "whenDate": "2025-06-05T08:00:00Z",
+      "message": "Add streaming response support to KLlama backend"
+    },
+    {
+      "id": "dd3ee4f",
+      "authorName": "David Richter",
+      "authorEmail": "david.richter@jug-da.de",
+      "whenDate": "2025-06-05T09:30:00Z",
+      "message": "Wire streaming callback into MCP server SSE transport"
+    },
+    {
+      "id": "ff5aa6b",
+      "authorName": "David Richter",
+      "authorEmail": "david.richter@jug-da.de",
+      "whenDate": "2025-06-05T11:15:00Z",
+      "message": "Revert streaming response support in KLlama backend due to memory leak"
+    },
+    {
+      "id": "cc7dd8e",
+      "authorName": "David Richter",
+      "authorEmail": "david.richter@jug-da.de",
+      "whenDate": "2025-06-05T13:00:00Z",
+      "message": "Add memory profiling hooks to LLMService for leak detection"
+    },
+    {
+      "id": "ee9ff0a",
+      "authorName": "David Richter",
+      "authorEmail": "david.richter@jug-da.de",
+      "whenDate": "2025-06-05T14:45:00Z",
+      "message": "Update CHANGELOG with note about deferred streaming feature"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["aa1bb2c", "ff5aa6b", "cc7dd8e"],
+      "forbiddenIds": [],
+      "notes": "Model must acknowledge the add-then-revert cycle. Should note that streaming was attempted and reverted due to a memory leak. Blocker section should mention the memory leak issue. Must not present streaming as a completed feature."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Features", "Bug Fixes", "Documentation"],
+      "expectedCommitCount": 5,
+      "notes": "The revert should appear as a bug fix or be clearly linked to the original feature. Memory profiling is a feature/tooling addition. CHANGELOG is documentation."
+    }
+  }
+}

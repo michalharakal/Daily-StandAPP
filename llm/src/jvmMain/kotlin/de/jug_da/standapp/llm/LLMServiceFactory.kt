@@ -11,6 +11,26 @@ package de.jug_da.standapp.llm
  */
 object LLMServiceFactory {
 
+    /**
+     * Create an [LLMService] from explicit configuration (no env vars).
+     * Used by the benchmark module to iterate backends programmatically.
+     */
+    fun create(backendType: LLMBackendType, config: LLMConfig): LLMService {
+        println("[LLMServiceFactory] Creating backend: $backendType (programmatic)")
+        return when (backendType) {
+            LLMBackendType.SKAINET -> {
+                require(config.modelPath.isNotBlank()) { "modelPath is required for SKAINET backend" }
+                SKaiNetLLMService.create(config.modelPath)
+            }
+            LLMBackendType.REST_API -> {
+                RestApiLLMService(baseUrl = config.baseUrl, modelName = config.modelName)
+            }
+            LLMBackendType.JLAMA -> {
+                JLamaService.create(modelPath = config.modelPath, tokenizerPath = "")
+            }
+        }
+    }
+
     fun create(): LLMService {
         val backend = LLMBackendType.fromEnv()
         println("[LLMServiceFactory] Selected backend: $backend")

@@ -1,0 +1,55 @@
+{
+  "id": "case-11",
+  "description": "Refactoring: 5 commits all refactoring (rename, extract method, move class) — no user-facing changes",
+  "commits": [
+    {
+      "id": "b1c2d3e",
+      "authorName": "Marco Bianchi",
+      "authorEmail": "marco.bianchi@example.com",
+      "whenDate": "2025-08-05T09:00:00Z",
+      "message": "Rename UserRepository to UserPersistenceAdapter to follow hexagonal naming"
+    },
+    {
+      "id": "f4a5b6c",
+      "authorName": "Marco Bianchi",
+      "authorEmail": "marco.bianchi@example.com",
+      "whenDate": "2025-08-05T10:30:00Z",
+      "message": "Extract notification sending logic from OrderService into NotificationDispatcher"
+    },
+    {
+      "id": "7d8e9f0",
+      "authorName": "Marco Bianchi",
+      "authorEmail": "marco.bianchi@example.com",
+      "whenDate": "2025-08-05T11:45:00Z",
+      "message": "Move domain models from de.jug_da.app.models to de.jug_da.app.domain.model"
+    },
+    {
+      "id": "a1b2c3f",
+      "authorName": "Marco Bianchi",
+      "authorEmail": "marco.bianchi@example.com",
+      "whenDate": "2025-08-05T13:20:00Z",
+      "message": "Replace manual DI wiring in Application.kt with Koin module declarations"
+    },
+    {
+      "id": "4d5e6a7",
+      "authorName": "Marco Bianchi",
+      "authorEmail": "marco.bianchi@example.com",
+      "whenDate": "2025-08-05T15:00:00Z",
+      "message": "Inline trivial extension functions from StringUtils into call sites"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["b1c2d3e", "f4a5b6c", "7d8e9f0", "a1b2c3f"],
+      "forbiddenIds": [],
+      "notes": "Summary should clearly state that all changes are internal refactoring with no user-facing impact. Blockers should be none."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Refactoring"],
+      "expectedCommitCount": 5,
+      "notes": "All commits should fall under a single Refactoring category. No Features or Bug Fixes expected."
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "case-04",
+  "description": "Single commit: Exactly one commit adding a Kotlin coroutine-based timeout to the LLM service. Tests minimal-input handling.",
+  "commits": [
+    {
+      "id": "3f4a5b6",
+      "authorName": "Clara Hoffmann",
+      "authorEmail": "clara.hoffmann@jug-da.de",
+      "whenDate": "2025-05-21T10:05:00Z",
+      "message": "Add withTimeout wrapper to LLMService.generate() to enforce 30s deadline"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["3f4a5b6"],
+      "forbiddenIds": [],
+      "notes": "Model must reference the single commit. Should not pad output with invented work. Today section may infer continuation (e.g., testing the timeout)."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Features"],
+      "expectedCommitCount": 1,
+      "notes": "Single commit should appear in one category. Timeout wrapper is a feature or enhancement."
+    }
+  }
+}

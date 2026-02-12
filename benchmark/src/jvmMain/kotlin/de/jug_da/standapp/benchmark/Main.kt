@@ -1,0 +1,134 @@
+package de.jug_da.standapp.benchmark
+
+import de.jug_da.standapp.llm.LLMBackendType
+import de.jug_da.standapp.llm.LLMConfig
+import kotlinx.coroutines.runBlocking
+import java.io.File
+
+/**
+ * CLI entry point: `./gradlew :benchmark:run`
+ *
+ * Environment variables:
+ * - BENCH_DIR           — path to bench/ directory (default: ./bench)
+ * - BENCH_BACKENDS      — comma-separated backend names to test (default: all)
+ * - BENCH_RUNS          — number of runs per case (default: 5)
+ * - BENCH_CLOUD_URL     — cloud REST endpoint URL (required for cloud baseline)
+ * - BENCH_CLOUD_MODEL   — cloud model name (default: gpt-4o-mini)
+ * - MCP_LLM_MODEL_PATH  — GGUF model path for SKAINET backend
+ */
+fun main() {
+    val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
+    val runsPerCase = System.getenv("BENCH_RUNS")?.toIntOrNull() ?: 5
+    val cloudUrl = System.getenv("BENCH_CLOUD_URL")
+    val cloudModel = System.getenv("BENCH_CLOUD_MODEL") ?: "gpt-4o-mini"
+    val modelPath = System.getenv("MCP_LLM_MODEL_PATH") ?: ""
+    val outputDir = File(System.getenv("BENCH_OUTPUT_DIR") ?: "benchmark-results")
+
+    val requestedBackends = System.getenv("BENCH_BACKENDS")
+        ?.split(",")
+        ?.map { it.trim().uppercase() }
+
+    // Build backend configurations
+    val backends = mutableMapOf<String, Pair<LLMBackendType, LLMConfig>>()
+
+    if (requestedBackends == null || "SKAINET" in requestedBackends) {
+        if (modelPath.isNotBlank()) {
+            backends["SKAINET"] = LLMBackendType.SKAINET to LLMConfig(modelPath = modelPath)
+        } else {
+            println("WARN: Skipping SKAINET — MCP_LLM_MODEL_PATH not set")
+        }
+    }
+
+    if (requestedBackends == null || "JLAMA" in requestedBackends) {
+        backends["JLAMA"] = LLMBackendType.JLAMA to LLMConfig()
+    }
+
+    if (requestedBackends == null || "REST_API" in requestedBackends) {
+        backends["REST_API (local)"] = LLMBackendType.REST_API to LLMConfig(
+            baseUrl = "http://localhost:11434",
+            modelName = "llama3.2:3b",
+        )
+    }
+
+    // Mandatory cloud baseline
+    if (cloudUrl != null) {
+        backends["REST_API (cloud)"] = LLMBackendType.REST_API to LLMConfig(
+            baseUrl = cloudUrl,
+            modelName = cloudModel,
+        )
+    } else {
+        println("WARN: BENCH_CLOUD_URL not set — cloud baseline will be skipped")
+        println("      Set BENCH_CLOUD_URL to an OpenAI-compatible endpoint for mandatory cloud comparison")
+    }
+
+    if (backends.isEmpty()) {
+        println("ERROR: No backends configured. Set environment variables and retry.")
+        return
+    }
+
+    val runner = BenchmarkRunner(
+        benchDir = benchDir,
+        backends = backends,
+        runsPerCase = runsPerCase,
+    )
+
+    runBlocking {
+        runner.run()
+    }
+
+    // Generate reports
+    outputDir.mkdirs()
+    val results = runner.getResults()
+    val summaries = runner.buildSummaries()
+
+    // Markdown comparison table
+    val mdReport = buildString {
+        appendLine("# Benchmark Results")
+        appendLine()
+        appendLine("Cases: ${benchDir.listFiles { f -> f.name.startsWith("case-") }?.size ?: 0}")
+        appendLine("Runs per case: $runsPerCase")
+        appendLine()
+        appendLine("## Comparison Table")
+        appendLine()
+        append(Reporting.markdownTable(summaries))
+        appendLine()
+
+        // Thresholds
+        appendLine("## Pass/Fail Thresholds")
+        appendLine()
+        for (summary in summaries) {
+            appendLine("### ${summary.backend}")
+            val thresholds = Reporting.evaluateThresholds(summary)
+            for (t in thresholds) {
+                val icon = when (t.status) {
+                    Reporting.ThresholdStatus.PASS -> "PASS"
+                    Reporting.ThresholdStatus.WARN -> "WARN"
+                    Reporting.ThresholdStatus.FAIL -> "FAIL"
+                }
+                appendLine("- [$icon] ${t.criterion}: ${"%.2f".format(t.value)} (threshold: ${"%.2f".format(t.threshold)})")
+            }
+            appendLine()
+        }
+
+        // Cloud vs local deltas
+        val cloudSummary = summaries.find { it.backend.contains("cloud", ignoreCase = true) }
+        if (cloudSummary != null) {
+            appendLine("## Cloud vs Local Delta Analysis")
+            appendLine()
+            for (summary in summaries.filter { it != cloudSummary }) {
+                val deltas = Reporting.computeDeltas(summary, cloudSummary)
+                append(Reporting.deltaMarkdown(deltas, summary.backend))
+                appendLine()
+            }
+        }
+    }
+
+    File(outputDir, "benchmark-report.md").writeText(mdReport)
+    println("Markdown report: ${File(outputDir, "benchmark-report.md").absolutePath}")
+
+    // CSV
+    Reporting.writeCsv(results, File(outputDir, "benchmark-results.csv"))
+    println("CSV results: ${File(outputDir, "benchmark-results.csv").absolutePath}")
+
+    println("\nDone.")
+}

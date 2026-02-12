@@ -29,7 +29,7 @@ dependencyResolutionManagement {
     }
 }
 
-include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server")
+include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server", ":benchmark")
 include("StandAPP-cli")
 
 // SKaiNET composite build -- compile from source, no publishing needed

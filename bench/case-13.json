@@ -1,0 +1,55 @@
+{
+  "id": "case-13",
+  "description": "Mixed languages: 5 commits with messages in English, German, and mixed — tests multilingual handling",
+  "commits": [
+    {
+      "id": "e3f4a5b",
+      "authorName": "Stefan Huber",
+      "authorEmail": "stefan.huber@example.com",
+      "whenDate": "2025-05-19T09:00:00Z",
+      "message": "Fix der Authentifizierung bei abgelaufenem JWT-Token"
+    },
+    {
+      "id": "6c7d8e9",
+      "authorName": "Stefan Huber",
+      "authorEmail": "stefan.huber@example.com",
+      "whenDate": "2025-05-19T10:30:00Z",
+      "message": "Update README with new deployment instructions"
+    },
+    {
+      "id": "f0a1b2c",
+      "authorName": "Stefan Huber",
+      "authorEmail": "stefan.huber@example.com",
+      "whenDate": "2025-05-19T11:15:00Z",
+      "message": "Fehler bei Login behoben wenn Sonderzeichen im Passwort"
+    },
+    {
+      "id": "3d4e5f6",
+      "authorName": "Stefan Huber",
+      "authorEmail": "stefan.huber@example.com",
+      "whenDate": "2025-05-19T13:45:00Z",
+      "message": "Add Pagination-Support fuer die Benutzerliste im Admin-Panel"
+    },
+    {
+      "id": "7a8b9c0",
+      "authorName": "Stefan Huber",
+      "authorEmail": "stefan.huber@example.com",
+      "whenDate": "2025-05-19T15:20:00Z",
+      "message": "Datenbankindex auf users.email Spalte hinzugefuegt fuer schnellere Suche"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["e3f4a5b", "f0a1b2c", "3d4e5f6", "7a8b9c0"],
+      "forbiddenIds": [],
+      "notes": "Model should produce a coherent English summary even though input messages are in mixed languages. Auth fix and login fix are most important."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Bug Fixes", "Features", "Documentation", "Database"],
+      "expectedCommitCount": 5,
+      "notes": "Model must correctly interpret German and mixed-language messages and categorize them appropriately."
+    }
+  }
+}

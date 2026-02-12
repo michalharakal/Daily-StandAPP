@@ -1,0 +1,62 @@
+{
+  "id": "case-07",
+  "description": "Noisy: 6 commits with typos, abbreviations, mixed English/German, and emoji in messages. Tests model robustness against messy real-world commit messages.",
+  "commits": [
+    {
+      "id": "ab12cd3",
+      "authorName": "Felix Wagner",
+      "authorEmail": "felix.wagner@jug-da.de",
+      "whenDate": "2025-08-19T07:50:00Z",
+      "message": "fxi typo in LLMServce config loader"
+    },
+    {
+      "id": "de45fg6",
+      "authorName": "Felix Wagner",
+      "authorEmail": "felix.wagner@jug-da.de",
+      "whenDate": "2025-08-19T09:10:00Z",
+      "message": "WIP refaktor Konfiguration f\u00fcr Ollama Backend \ud83d\udee0\ufe0f"
+    },
+    {
+      "id": "hi78jk9",
+      "authorName": "Felix Wagner",
+      "authorEmail": "felix.wagner@jug-da.de",
+      "whenDate": "2025-08-19T10:40:00Z",
+      "message": "add env var parsing 4 REST_API endpnt url"
+    },
+    {
+      "id": "lm01no2",
+      "authorName": "Felix Wagner",
+      "authorEmail": "felix.wagner@jug-da.de",
+      "whenDate": "2025-08-19T12:25:00Z",
+      "message": "\ud83d\ude80 neues Feature: Token-Z\u00e4hler f\u00fcr LLM Antworten hinzugef\u00fcgt"
+    },
+    {
+      "id": "pq34rs5",
+      "authorName": "Felix Wagner",
+      "authorEmail": "felix.wagner@jug-da.de",
+      "whenDate": "2025-08-19T14:00:00Z",
+      "message": "fixd broken test nach config \u00c4nderung, sry"
+    },
+    {
+      "id": "tu67vw8",
+      "authorName": "Felix Wagner",
+      "authorEmail": "felix.wagner@jug-da.de",
+      "whenDate": "2025-08-19T15:35:00Z",
+      "message": "cleanup & fmt \u2728"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["ab12cd3", "de45fg6", "hi78jk9", "lm01no2", "pq34rs5", "tu67vw8"],
+      "forbiddenIds": [],
+      "notes": "Model must interpret noisy messages correctly: 'fxi' = fix, 'refaktor Konfiguration' = refactor configuration, '4' = for, 'endpnt' = endpoint, 'fixd' = fixed, 'sry' = sorry. Should produce clean English summary despite input noise. German messages should be understood and summarized."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Bug Fixes", "Features", "Refactoring"],
+      "expectedCommitCount": 6,
+      "notes": "Token counter is a feature. Typo fix and broken test fix are bug fixes. Config refactoring and cleanup are refactoring. Model must categorize despite noisy messages."
+    }
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "id": "case-10",
+  "description": "Merge-heavy: 6 commits where 3 are merge commits mixed with regular commits — tests whether merge noise is handled gracefully",
+  "commits": [
+    {
+      "id": "f1a2b3c",
+      "authorName": "Lena Fischer",
+      "authorEmail": "lena.fischer@example.com",
+      "whenDate": "2025-07-14T08:30:00Z",
+      "message": "Implement WebSocket support for live notifications"
+    },
+    {
+      "id": "4d5e6f7",
+      "authorName": "Lena Fischer",
+      "authorEmail": "lena.fischer@example.com",
+      "whenDate": "2025-07-14T09:00:00Z",
+      "message": "Merge branch 'feature/websocket-notifications' into main"
+    },
+    {
+      "id": "8a9b0c1",
+      "authorName": "Lena Fischer",
+      "authorEmail": "lena.fischer@example.com",
+      "whenDate": "2025-07-14T10:15:00Z",
+      "message": "Add retry logic for failed webhook deliveries"
+    },
+    {
+      "id": "d2e3f4a",
+      "authorName": "Lena Fischer",
+      "authorEmail": "lena.fischer@example.com",
+      "whenDate": "2025-07-14T10:45:00Z",
+      "message": "Merge branch 'feature/webhook-retry' into main"
+    },
+    {
+      "id": "5b6c7d8",
+      "authorName": "Lena Fischer",
+      "authorEmail": "lena.fischer@example.com",
+      "whenDate": "2025-07-14T14:00:00Z",
+      "message": "Fix incorrect timezone handling in scheduled task executor"
+    },
+    {
+      "id": "e9f0a1b",
+      "authorName": "Lena Fischer",
+      "authorEmail": "lena.fischer@example.com",
+      "whenDate": "2025-07-14T14:30:00Z",
+      "message": "Merge branch 'bugfix/timezone-scheduler' into main"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["f1a2b3c", "8a9b0c1", "5b6c7d8"],
+      "forbiddenIds": [],
+      "notes": "Merge commits should not dominate the summary. The actual work (WebSocket, webhook retry, timezone fix) must be highlighted."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Features", "Bug Fixes"],
+      "expectedCommitCount": 6,
+      "notes": "Model may choose to omit merge commits from categories or group them separately. Either is acceptable as long as all 6 are counted."
+    }
+  }
+}
