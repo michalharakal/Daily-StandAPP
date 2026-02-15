@@ -12,6 +12,8 @@ import java.io.File
  * - BENCH_DIR           — path to bench/ directory (default: ./bench)
  * - BENCH_BACKENDS      — comma-separated backend names to test (default: all)
  * - BENCH_RUNS          — number of runs per case (default: 5)
+ * - BENCH_LOCAL_URL     — local REST endpoint URL (default: http://localhost:1234)
+ * - BENCH_LOCAL_MODEL   — local REST model name (default: tinyllama-1.1b-chat-v1.0)
  * - BENCH_CLOUD_URL     — cloud REST endpoint URL (required for cloud baseline)
  * - BENCH_CLOUD_MODEL   — cloud model name (default: gpt-4o-mini)
  * - MCP_LLM_MODEL_PATH  — GGUF model path for SKAINET backend
@@ -19,6 +21,8 @@ import java.io.File
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
     val runsPerCase = System.getenv("BENCH_RUNS")?.toIntOrNull() ?: 5
+    val localUrl = System.getenv("BENCH_LOCAL_URL") ?: "http://localhost:1234"
+    val localModel = System.getenv("BENCH_LOCAL_MODEL") ?: "tinyllama-1.1b-chat-v1.0"
     val cloudUrl = System.getenv("BENCH_CLOUD_URL")
     val cloudModel = System.getenv("BENCH_CLOUD_MODEL") ?: "gpt-4o-mini"
     val modelPath = System.getenv("MCP_LLM_MODEL_PATH") ?: ""
@@ -45,8 +49,8 @@ fun main() {
 
     if (requestedBackends == null || "REST_API" in requestedBackends) {
         backends["REST_API (local)"] = LLMBackendType.REST_API to LLMConfig(
-            baseUrl = "http://localhost:11434",
-            modelName = "llama3.2:3b",
+            baseUrl = localUrl,
+            modelName = localModel,
         )
     }
 
@@ -63,6 +67,10 @@ fun main() {
 
     if (backends.isEmpty()) {
         println("ERROR: No backends configured. Set environment variables and retry.")
+        println()
+        println("Usage examples:")
+        println("  BENCH_BACKENDS=REST_API BENCH_LOCAL_URL=http://192.168.1.100:1234 BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 java -jar benchmark-jvm.jar")
+        println("  BENCH_BACKENDS=REST_API BENCH_LOCAL_URL=http://localhost:11434 BENCH_LOCAL_MODEL=llama3.2:3b java -jar benchmark-jvm.jar")
         return
     }
 
