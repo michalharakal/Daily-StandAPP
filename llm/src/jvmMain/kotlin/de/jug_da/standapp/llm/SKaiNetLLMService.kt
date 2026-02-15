@@ -12,7 +12,7 @@ import sk.ainet.apps.kllama.agent.generateUntilStop
 import sk.ainet.apps.kllama.chat.ChatMessage
 import sk.ainet.apps.kllama.chat.ChatRole
 import sk.ainet.apps.kllama.chat.Llama3ChatTemplate
-import sk.ainet.context.DirectCpuExecutionContext
+import sk.ainet.lang.nn.DefaultNeuralNetworkExecutionContext
 import sk.ainet.io.JvmRandomAccessSource
 import sk.ainet.lang.types.FP32
 
@@ -71,7 +71,7 @@ class SKaiNetLLMService private constructor(
          * tensor data is loaded on demand during inference.
          */
         fun create(modelPath: String): SKaiNetLLMService {
-            val ctx = DirectCpuExecutionContext()
+            val ctx = DefaultNeuralNetworkExecutionContext()
 
             val ingestion = LlamaIngestion<FP32>(
                 ctx = ctx,

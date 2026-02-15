@@ -53,16 +53,15 @@ kotlin {
             }
             implementation("com.github.tjake:jlama-native:0.8.4:$detectedOs-$detectedArch")
 
-            // SKaiNET KLlama 0.13.0 (resolved via composite build)
-            implementation("sk.ainet.core:skainet-apps-kllama:0.13.0")
-            implementation("sk.ainet.core:skainet-apps-kllama-agent:0.13.0")
-
-            // SKaiNET transitive modules used directly by SKaiNetLLMService
-            implementation("sk.ainet.core:skainet-lang-core:0.13.0")
-            implementation("sk.ainet.core:skainet-backend-cpu:0.13.0")
-            implementation("sk.ainet.core:skainet-io-core:0.13.0")
-            implementation("sk.ainet.core:skainet-io-gguf:0.13.0")
-            implementation("sk.ainet.core:skainet-llm:0.13.0")
+            implementation(libs.skainet.kllama)
+            // SKaiNET LLM + Agent APIs (generateUntilStop, ChatMLTemplate, Tokenizer)
+            implementation(libs.skainet.llm)
+            implementation(libs.skainet.kllama.agents)
+            // Explicit transitive deps needed for SKaiNET types used in source
+            implementation(libs.skainet.lang.core)
+            implementation(libs.skainet.io.core)
+            implementation(libs.skainet.io.gguf)
+            implementation(libs.skainet.backend.cpu)
 
             // Ktor HTTP client for REST API backend
             implementation(libs.ktor.client.cio)
