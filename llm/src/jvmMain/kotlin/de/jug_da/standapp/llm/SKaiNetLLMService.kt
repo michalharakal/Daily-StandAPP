@@ -7,7 +7,7 @@ import sk.ainet.apps.kllama.GGUFTokenizer
 import sk.ainet.apps.kllama.LlamaIngestion
 import sk.ainet.apps.kllama.LlamaLoadConfig
 import sk.ainet.apps.kllama.LlamaRuntime
-import sk.ainet.apps.kllama.LlamaWeightLoader
+import sk.ainet.io.gguf.llama.LlamaWeightLoader
 import sk.ainet.apps.kllama.agent.generateUntilStop
 import sk.ainet.apps.kllama.chat.ChatMessage
 import sk.ainet.apps.kllama.chat.ChatRole

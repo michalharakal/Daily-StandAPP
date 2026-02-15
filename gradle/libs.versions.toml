@@ -20,7 +20,7 @@ kotlinxIo = "0.7.0"
 mcpSdk = "0.7.2"
 mcp-kotlin = "0.7.2"
 orgEclipseJgit = "7.1.0.202411261347-r"
-skainet = "0.0.1"
+skainet = "0.13.0"
 slf4jSimple = "2.0.17"
 ktor = "3.3.0"
 

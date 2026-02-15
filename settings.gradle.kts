@@ -32,13 +32,23 @@ dependencyResolutionManagement {
 include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server", ":benchmark")
 include("StandAPP-cli")
 
-// SKaiNET composite build -- compile from source, no publishing needed
+// SKaiNET 0.13.0 -- composite build for agent module resolution
 includeBuild("../SKaiNET") {
     dependencySubstitution {
-        substitute(module("sk.ainet.core:skainet-kllama"))
+        substitute(module("sk.ainet.core:skainet-apps-kllama"))
             .using(project(":skainet-apps:skainet-kllama"))
-        substitute(module("sk.ainet.core:skainet-kllama-agent"))
+        substitute(module("sk.ainet.core:skainet-apps-kllama-agent"))
             .using(project(":skainet-apps:skainet-kllama-agent"))
+        substitute(module("sk.ainet.core:skainet-lang-core"))
+            .using(project(":skainet-lang:skainet-lang-core"))
+        substitute(module("sk.ainet.core:skainet-backend-cpu"))
+            .using(project(":skainet-backends:skainet-backend-cpu"))
+        substitute(module("sk.ainet.core:skainet-io-core"))
+            .using(project(":skainet-io:skainet-io-core"))
+        substitute(module("sk.ainet.core:skainet-io-gguf"))
+            .using(project(":skainet-io:skainet-io-gguf"))
+        substitute(module("sk.ainet.core:skainet-llm"))
+            .using(project(":skainet-apps:skainet-llm"))
     }
 }
 
