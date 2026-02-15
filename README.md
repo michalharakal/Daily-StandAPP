@@ -10,25 +10,82 @@ The `:benchmark` module evaluates local LLM backends for standup summary generat
 
 - JDK 21+
 - At least one backend available:
-  - **Ollama** running locally (`http://localhost:11434`) with a model pulled, or
+  - **LM Studio** or **Ollama** running locally or on a remote machine, or
   - **SKAINET** with a GGUF model file on disk, or
   - **JLama** (downloads model automatically on first run)
 
-### Quick Start
+### Unit Tests
 
-Run against local Ollama only:
+Run the benchmark scoring, metrics, and formatting unit tests (no backend required):
 
 ```bash
-BENCH_BACKENDS=REST_API ./gradlew :benchmark:jvmRun
+./gradlew :benchmark:jvmTest
 ```
 
-Run all local backends with a cloud baseline:
+### Running the Benchmark
+
+#### 1. Build the fat JAR
+
+```bash
+./gradlew :benchmark:jvmJar
+```
+
+The JAR is written to `benchmark/build/libs/benchmark-jvm.jar`.
+
+#### 2. Run against a local LLM server
+
+The benchmark connects to any **OpenAI-compatible** `/v1/chat/completions` endpoint (LM Studio, Ollama, llama.cpp server, vLLM, etc.).
+
+**LM Studio** (default port 1234):
+
+```bash
+BENCH_BACKENDS=REST_API \
+BENCH_LOCAL_URL=http://localhost:1234 \
+BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
+BENCH_RUNS=3 \
+java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
+```
+
+**Ollama** (default port 11434):
+
+```bash
+BENCH_BACKENDS=REST_API \
+BENCH_LOCAL_URL=http://localhost:11434 \
+BENCH_LOCAL_MODEL=llama3.2:3b \
+BENCH_RUNS=3 \
+java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
+```
+
+**Remote machine** (e.g., LM Studio on another computer):
+
+```bash
+BENCH_BACKENDS=REST_API \
+BENCH_LOCAL_URL=http://192.168.1.100:1234 \
+BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
+java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
+```
+
+#### 3. Run with a cloud baseline
+
+Add a cloud endpoint for quality comparison:
+
+```bash
+BENCH_BACKENDS=REST_API \
+BENCH_LOCAL_URL=http://localhost:1234 \
+BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
+BENCH_CLOUD_URL=https://api.openai.com/v1 \
+BENCH_CLOUD_MODEL=gpt-4o-mini \
+java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
+```
+
+#### 4. Run all backends
 
 ```bash
 MCP_LLM_MODEL_PATH=/path/to/model.gguf \
+BENCH_LOCAL_URL=http://localhost:1234 \
+BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
 BENCH_CLOUD_URL=https://api.openai.com/v1 \
-BENCH_CLOUD_MODEL=gpt-4o-mini \
-./gradlew :benchmark:jvmRun
+java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
 ```
 
 ### Environment Variables
@@ -38,6 +95,8 @@ BENCH_CLOUD_MODEL=gpt-4o-mini \
 | `BENCH_DIR` | `./bench` | Directory containing `case-XX.json` test files |
 | `BENCH_BACKENDS` | all | Comma-separated list: `SKAINET`, `JLAMA`, `REST_API` |
 | `BENCH_RUNS` | `5` | Number of repeated runs per case (for determinism scoring) |
+| `BENCH_LOCAL_URL` | `http://localhost:1234` | Local REST endpoint URL (LM Studio, Ollama, etc.) |
+| `BENCH_LOCAL_MODEL` | `tinyllama-1.1b-chat-v1.0` | Model name for the local endpoint |
 | `BENCH_CLOUD_URL` | _(none)_ | OpenAI-compatible endpoint URL for cloud baseline |
 | `BENCH_CLOUD_MODEL` | `gpt-4o-mini` | Model name for the cloud endpoint |
 | `BENCH_OUTPUT_DIR` | `./benchmark-results` | Where reports are written |
