@@ -22,6 +22,7 @@ import java.io.File
  * - BENCH_CLOUD_MODEL       — cloud model name (default: gpt-4o-mini)
  * - BENCH_CLOUD_API_KEY     — optional cloud Bearer token (falls back to OPENAI_API_KEY)
  * - MCP_LLM_MODEL_PATH      — GGUF model path for SKAINET backend
+ * - BENCH_JLAMA_MODEL       — HuggingFace model ID for JLAMA backend (default: mistralai/Mistral-7B-Instruct-v0.3)
  */
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
@@ -50,6 +51,7 @@ fun main() {
     val cloudModel = System.getenv("BENCH_CLOUD_MODEL") ?: "gpt-4o-mini"
     val cloudApiKey = System.getenv("BENCH_CLOUD_API_KEY") ?: System.getenv("OPENAI_API_KEY")
     val modelPath = System.getenv("MCP_LLM_MODEL_PATH") ?: ""
+    val jlamaModel = System.getenv("BENCH_JLAMA_MODEL") ?: ""
     val outputDir = File(System.getenv("BENCH_OUTPUT_DIR") ?: "benchmark-results")
 
     val requestedBackends = System.getenv("BENCH_BACKENDS")
@@ -65,6 +67,10 @@ fun main() {
         } else {
             println("WARN: Skipping SKAINET — MCP_LLM_MODEL_PATH not set")
         }
+    }
+
+    if (requestedBackends == null || "JLAMA" in requestedBackends) {
+        backends["JLAMA"] = LLMBackendType.JLAMA to LLMConfig(modelPath = jlamaModel)
     }
 
     if (requestedBackends == null || "REST_API" in requestedBackends) {
