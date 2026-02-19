@@ -12,19 +12,42 @@ import java.io.File
  * - BENCH_DIR           — path to bench/ directory (default: ./bench)
  * - BENCH_BACKENDS      — comma-separated backend names to test (default: all)
  * - BENCH_RUNS          — number of runs per case (default: 5)
+ * - BENCH_CASES         — comma-separated case ids to run (default: all)
+ * - BENCH_PROMPTS       — comma-separated prompt types: SUMMARY,JSON (default: both)
  * - BENCH_LOCAL_URL     — local REST endpoint URL (default: http://localhost:1234)
  * - BENCH_LOCAL_MODEL   — local REST model name (default: tinyllama-1.1b-chat-v1.0)
+ * - BENCH_LOCAL_API_KEY — optional Bearer token for local REST endpoint
  * - BENCH_CLOUD_URL     — cloud REST endpoint URL (required for cloud baseline)
  * - BENCH_CLOUD_MODEL   — cloud model name (default: gpt-4o-mini)
+ * - BENCH_CLOUD_API_KEY — optional cloud Bearer token (falls back to OPENAI_API_KEY)
  * - MCP_LLM_MODEL_PATH  — GGUF model path for SKAINET backend
  */
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
     val runsPerCase = System.getenv("BENCH_RUNS")?.toIntOrNull() ?: 5
+    val caseFilter = System.getenv("BENCH_CASES")
+        ?.split(",")
+        ?.map { it.trim() }
+        ?.filter { it.isNotBlank() }
+        ?.toSet()
+        ?.takeIf { it.isNotEmpty() }
+
+    val promptFilter = System.getenv("BENCH_PROMPTS")
+        ?.split(",")
+        ?.mapNotNull { raw ->
+            val normalized = raw.trim().uppercase()
+            PromptType.entries.find { it.name == normalized }
+        }
+        ?.distinct()
+        ?.takeIf { it.isNotEmpty() }
+        ?: PromptType.entries
+
     val localUrl = System.getenv("BENCH_LOCAL_URL") ?: "http://localhost:1234"
     val localModel = System.getenv("BENCH_LOCAL_MODEL") ?: "tinyllama-1.1b-chat-v1.0"
+    val localApiKey = System.getenv("BENCH_LOCAL_API_KEY")
     val cloudUrl = System.getenv("BENCH_CLOUD_URL")
     val cloudModel = System.getenv("BENCH_CLOUD_MODEL") ?: "gpt-4o-mini"
+    val cloudApiKey = System.getenv("BENCH_CLOUD_API_KEY") ?: System.getenv("OPENAI_API_KEY")
     val modelPath = System.getenv("MCP_LLM_MODEL_PATH") ?: ""
     val outputDir = File(System.getenv("BENCH_OUTPUT_DIR") ?: "benchmark-results")
 
@@ -51,6 +74,7 @@ fun main() {
         backends["REST_API (local)"] = LLMBackendType.REST_API to LLMConfig(
             baseUrl = localUrl,
             modelName = localModel,
+            apiKey = localApiKey,
         )
     }
 
@@ -59,6 +83,7 @@ fun main() {
         backends["REST_API (cloud)"] = LLMBackendType.REST_API to LLMConfig(
             baseUrl = cloudUrl,
             modelName = cloudModel,
+            apiKey = cloudApiKey,
         )
     } else {
         println("WARN: BENCH_CLOUD_URL not set — cloud baseline will be skipped")
@@ -78,6 +103,8 @@ fun main() {
         benchDir = benchDir,
         backends = backends,
         runsPerCase = runsPerCase,
+        caseFilter = caseFilter,
+        promptTypes = promptFilter,
     )
 
     runBlocking {

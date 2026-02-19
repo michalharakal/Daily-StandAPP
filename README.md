@@ -75,6 +75,7 @@ BENCH_LOCAL_URL=http://localhost:1234 \
 BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
 BENCH_CLOUD_URL=https://api.openai.com/v1 \
 BENCH_CLOUD_MODEL=gpt-4o-mini \
+BENCH_CLOUD_API_KEY=$OPENAI_API_KEY \
 java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
 ```
 
@@ -85,6 +86,7 @@ MCP_LLM_MODEL_PATH=/path/to/model.gguf \
 BENCH_LOCAL_URL=http://localhost:1234 \
 BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
 BENCH_CLOUD_URL=https://api.openai.com/v1 \
+BENCH_CLOUD_API_KEY=$OPENAI_API_KEY \
 java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
 ```
 
@@ -95,12 +97,28 @@ java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.
 | `BENCH_DIR` | `./bench` | Directory containing `case-XX.json` test files |
 | `BENCH_BACKENDS` | all | Comma-separated list: `SKAINET`, `JLAMA`, `REST_API` |
 | `BENCH_RUNS` | `5` | Number of repeated runs per case (for determinism scoring) |
+| `BENCH_CASES` | all | Comma-separated case IDs, e.g. `case-01,case-08` |
+| `BENCH_PROMPTS` | both | Comma-separated prompt types: `SUMMARY`, `JSON` |
 | `BENCH_LOCAL_URL` | `http://localhost:1234` | Local REST endpoint URL (LM Studio, Ollama, etc.) |
 | `BENCH_LOCAL_MODEL` | `tinyllama-1.1b-chat-v1.0` | Model name for the local endpoint |
+| `BENCH_LOCAL_API_KEY` | _(none)_ | Optional Bearer token for local REST endpoint |
 | `BENCH_CLOUD_URL` | _(none)_ | OpenAI-compatible endpoint URL for cloud baseline |
 | `BENCH_CLOUD_MODEL` | `gpt-4o-mini` | Model name for the cloud endpoint |
+| `BENCH_CLOUD_API_KEY` | `OPENAI_API_KEY` | Optional cloud Bearer token (falls back to `OPENAI_API_KEY`) |
 | `BENCH_OUTPUT_DIR` | `./benchmark-results` | Where reports are written |
 | `MCP_LLM_MODEL_PATH` | _(none)_ | Path to GGUF model file (required for SKAINET) |
+
+Example focused run (single case, single prompt, single run):
+
+```bash
+BENCH_BACKENDS=REST_API \
+BENCH_LOCAL_URL=http://localhost:1234 \
+BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
+BENCH_CASES=case-01 \
+BENCH_PROMPTS=SUMMARY \
+BENCH_RUNS=1 \
+java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.jar
+```
 
 ### Output
 

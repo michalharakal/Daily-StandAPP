@@ -5,10 +5,12 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.SerialName
@@ -23,7 +25,7 @@ import kotlinx.serialization.json.Json
 class RestApiLLMService(
     private val baseUrl: String = "http://localhost:11434",
     private val modelName: String = "llama3.2:3b",
-    private val apiPath: String = "/v1/chat/completions"
+    private val apiKey: String? = null,
 ) : LLMService {
 
     private val client = HttpClient(CIO) {
@@ -59,9 +61,12 @@ class RestApiLLMService(
             topP = topP
         )
 
-        val url = "${baseUrl.trimEnd('/')}$apiPath"
+        val url = resolveCompletionsUrl(baseUrl)
         val response = client.post(url) {
             contentType(ContentType.Application.Json)
+            if (!apiKey.isNullOrBlank()) {
+                header(HttpHeaders.Authorization, "Bearer $apiKey")
+            }
             setBody(request)
         }
 
@@ -73,6 +78,16 @@ class RestApiLLMService(
         val completion: ChatCompletionResponse = response.body()
         return completion.choices.firstOrNull()?.message?.content
             ?: error("REST API returned empty choices")
+    }
+
+    private fun resolveCompletionsUrl(baseUrl: String): String {
+        val normalized = baseUrl.trimEnd('/')
+        return when {
+            normalized.endsWith("/v1/chat/completions") -> normalized
+            normalized.endsWith("/chat/completions") -> normalized
+            normalized.endsWith("/v1") -> "$normalized/chat/completions"
+            else -> "$normalized/v1/chat/completions"
+        }
     }
 
     // --- OpenAI chat completion request/response DTOs ---
