@@ -8,6 +8,7 @@ package de.jug_da.standapp.llm
  * - `MCP_LLM_MODEL_PATH`    – Path to GGUF model file (SKAINET backend)
  * - `MCP_LLM_REST_BASE_URL` – Base URL for REST API backend (default: http://localhost:11434)
  * - `MCP_LLM_REST_MODEL`    – Model name for REST API backend (default: llama3.2:3b)
+ * - `MCP_LLM_REST_API_KEY`  – Optional Bearer token for authenticated REST API endpoints
  */
 object LLMServiceFactory {
 
@@ -23,7 +24,11 @@ object LLMServiceFactory {
                 SKaiNetLLMService.create(config.modelPath)
             }
             LLMBackendType.REST_API -> {
-                RestApiLLMService(baseUrl = config.baseUrl, modelName = config.modelName)
+                RestApiLLMService(
+                    baseUrl = config.baseUrl,
+                    modelName = config.modelName,
+                    apiKey = config.apiKey,
+                )
             }
             LLMBackendType.JLAMA -> {
                 JLamaService.create(modelPath = config.modelPath, tokenizerPath = "")
@@ -46,8 +51,9 @@ object LLMServiceFactory {
             LLMBackendType.REST_API -> {
                 val baseUrl = System.getenv("MCP_LLM_REST_BASE_URL") ?: "http://localhost:11434"
                 val model = System.getenv("MCP_LLM_REST_MODEL") ?: "llama3.2:3b"
+                val apiKey = System.getenv("MCP_LLM_REST_API_KEY") ?: System.getenv("OPENAI_API_KEY")
                 println("[LLMServiceFactory] REST API at $baseUrl, model=$model")
-                RestApiLLMService(baseUrl = baseUrl, modelName = model)
+                RestApiLLMService(baseUrl = baseUrl, modelName = model, apiKey = apiKey)
             }
 
             LLMBackendType.JLAMA -> {

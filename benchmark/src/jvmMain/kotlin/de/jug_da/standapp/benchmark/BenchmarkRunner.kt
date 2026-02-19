@@ -14,15 +14,23 @@ class BenchmarkRunner(
     private val benchDir: File,
     private val backends: Map<String, Pair<LLMBackendType, LLMConfig>>,
     private val runsPerCase: Int = 5,
+    private val caseFilter: Set<String>? = null,
+    private val promptTypes: List<PromptType> = PromptType.entries,
     private val timeoutMs: Long = 30_000,
 ) {
-    private val cases: List<BenchmarkCase> = BenchmarkCaseLoader.loadAll(benchDir)
+    private val cases: List<BenchmarkCase> = BenchmarkCaseLoader
+        .loadAll(benchDir)
+        .filter { caseFilter == null || it.id in caseFilter }
     private val results = mutableListOf<Reporting.CaseResult>()
     private val allOutputs = mutableMapOf<String, MutableList<String>>() // backend -> outputs for determinism
 
     suspend fun run() {
         println("Loaded ${cases.size} benchmark cases from ${benchDir.absolutePath}")
+        if (caseFilter != null) {
+            println("Case filter: ${caseFilter.joinToString()}")
+        }
         println("Backends: ${backends.keys.joinToString()}")
+        println("Prompt types: ${promptTypes.joinToString()}")
         println("Runs per case: $runsPerCase")
         println()
 
@@ -42,7 +50,7 @@ class BenchmarkRunner(
             var errorCount = 0
 
             for (case in cases) {
-                for (promptType in PromptType.entries) {
+                for (promptType in promptTypes) {
                     val formatted = CommitFormatter.format(case.commits)
                     val prompt = when (promptType) {
                         PromptType.SUMMARY -> PromptTemplates.summaryPrompt(formatted)
@@ -52,6 +60,7 @@ class BenchmarkRunner(
                     for (runIdx in 1..runsPerCase) {
                         val heapBefore = Metrics.heapUsageMb()
                         val startTime = System.currentTimeMillis()
+                        var failedWithError = false
 
                         val output: String? = try {
                             withTimeoutOrNull(timeoutMs) {
@@ -63,6 +72,7 @@ class BenchmarkRunner(
                                 )
                             }
                         } catch (e: Exception) {
+                            failedWithError = true
                             errorCount++
                             println("  ERROR ${case.id}/$promptType run $runIdx: ${e.message}")
                             null
@@ -72,8 +82,10 @@ class BenchmarkRunner(
                         val heapAfter = Metrics.heapUsageMb()
 
                         if (output == null) {
-                            timeoutCount++
-                            println("  TIMEOUT ${case.id}/$promptType run $runIdx (${latencyMs}ms)")
+                            if (!failedWithError) {
+                                timeoutCount++
+                                println("  TIMEOUT ${case.id}/$promptType run $runIdx (${latencyMs}ms)")
+                            }
                             continue
                         }
 
