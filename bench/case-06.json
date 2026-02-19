@@ -4,28 +4,28 @@
   "commits": [
     {
       "id": "1f2e3d4",
-      "authorName": "Eva Braun",
+      "authorName": "Eva Green",
       "authorEmail": "eva.braun@jug-da.de",
       "whenDate": "2025-07-14T08:20:00Z",
       "message": "WIP on #42: partial fix for model loading race condition"
     },
     {
       "id": "5c6b7a8",
-      "authorName": "Eva Braun",
+      "authorName": "Eva Green",
       "authorEmail": "eva.braun@jug-da.de",
       "whenDate": "2025-07-14T10:45:00Z",
       "message": "Related to #42 and #57: add synchronization to model init path"
     },
     {
       "id": "9d0e1f2",
-      "authorName": "Eva Braun",
+      "authorName": "Eva Green",
       "authorEmail": "eva.braun@jug-da.de",
       "whenDate": "2025-07-14T13:30:00Z",
       "message": "Addresses #57: improve error message when model file not found"
     },
     {
       "id": "3a4b5c6",
-      "authorName": "Eva Braun",
+      "authorName": "Eva Green",
       "authorEmail": "eva.braun@jug-da.de",
       "whenDate": "2025-07-14T15:00:00Z",
       "message": "See #42 — still investigating intermittent deadlock on multi-core"
