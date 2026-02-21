@@ -30,6 +30,9 @@ dependencyResolutionManagement {
 
 include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server", ":benchmark")
 include("StandAPP-cli")
+include(":standapp-ai-engine")
+include(":standapp-ai-engine-skainet")
+include(":standapp-ai-engine-jlama")
 
 
 check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {

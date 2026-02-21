@@ -2,6 +2,7 @@ package de.jug_da.standapp.benchmark
 
 import de.jug_da.standapp.llm.LLMBackendType
 import de.jug_da.standapp.llm.LLMConfig
+import dev.standapp.engine.entity.PromptType
 import kotlinx.coroutines.runBlocking
 import java.io.File
 

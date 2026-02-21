@@ -1,5 +1,7 @@
 package de.jug_da.standapp.benchmark
 
+import dev.standapp.engine.control.QualityScorer
+import dev.standapp.engine.entity.PromptType
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
@@ -12,13 +14,13 @@ class ScoringTest {
     @Test
     fun `valid JSON is parseable`() {
         val json = """{"date":"2025-01-15","author":"Alice","categories":[],"blockers":[]}"""
-        assertTrue(Scoring.isJsonParseable(json))
+        assertTrue(QualityScorer.isJsonParseable(json))
     }
 
     @Test
     fun `invalid JSON is not parseable`() {
-        assertFalse(Scoring.isJsonParseable("This is not JSON at all"))
-        assertFalse(Scoring.isJsonParseable("{broken"))
+        assertFalse(QualityScorer.isJsonParseable("This is not JSON at all"))
+        assertFalse(QualityScorer.isJsonParseable("{broken"))
     }
 
     // ── JSON Schema Compliance (T12) ────────────────────────────────
@@ -40,16 +42,16 @@ class ScoringTest {
           "blockers": []
         }
         """.trimIndent()
-        assertTrue(Scoring.isJsonSchemaCompliant(json))
+        assertTrue(QualityScorer.isJsonSchemaCompliant(json))
     }
 
     @Test
     fun `JSON missing required fields fails schema check`() {
         val missingAuthor = """{"date":"2025-01-15","categories":[],"blockers":[]}"""
-        assertFalse(Scoring.isJsonSchemaCompliant(missingAuthor))
+        assertFalse(QualityScorer.isJsonSchemaCompliant(missingAuthor))
 
         val missingCategories = """{"date":"2025-01-15","author":"Alice","blockers":[]}"""
-        assertFalse(Scoring.isJsonSchemaCompliant(missingCategories))
+        assertFalse(QualityScorer.isJsonSchemaCompliant(missingCategories))
     }
 
     @Test
@@ -57,7 +59,7 @@ class ScoringTest {
         val noCommitsInCategory = """
         {"date":"2025-01-15","author":"Alice","categories":[{"name":"Fixes"}],"blockers":[]}
         """.trimIndent()
-        assertFalse(Scoring.isJsonSchemaCompliant(noCommitsInCategory))
+        assertFalse(QualityScorer.isJsonSchemaCompliant(noCommitsInCategory))
     }
 
     // ── Heading Presence (T13) ──────────────────────────────────────
@@ -72,7 +74,7 @@ class ScoringTest {
             ## Blockers
             None
         """.trimIndent()
-        assertTrue(Scoring.hasRequiredHeadings(output))
+        assertTrue(QualityScorer.hasRequiredHeadings(output))
     }
 
     @Test
@@ -83,7 +85,7 @@ class ScoringTest {
             ## Blockers
             None
         """.trimIndent()
-        assertFalse(Scoring.hasRequiredHeadings(output))
+        assertFalse(QualityScorer.hasRequiredHeadings(output))
     }
 
     // ── Commit Hash Validation (T14) ────────────────────────────────
@@ -91,7 +93,7 @@ class ScoringTest {
     @Test
     fun `valid commit hashes pass`() {
         val output = """ID: abc1234 and ID: def5678"""
-        assertTrue(Scoring.allReferencedIdsValid(output))
+        assertTrue(QualityScorer.allReferencedIdsValid(output))
     }
 
     // ── Hallucination Detection (T15) ────────────────────────────────
@@ -100,7 +102,7 @@ class ScoringTest {
     fun `no hallucinated IDs when all match input`() {
         val output = """{"id": "abc1234", "summary": "test"}"""
         val inputIds = setOf("abc1234", "def5678")
-        val hallucinated = Scoring.findHallucinatedIds(output, inputIds)
+        val hallucinated = QualityScorer.findHallucinatedIds(output, inputIds)
         assertTrue(hallucinated.isEmpty())
     }
 
@@ -108,7 +110,7 @@ class ScoringTest {
     fun `detects hallucinated IDs`() {
         val output = """{"id": "abc1234", "summary": "test"}, {"id": "bad9999", "summary": "fake"}"""
         val inputIds = setOf("abc1234")
-        val hallucinated = Scoring.findHallucinatedIds(output, inputIds)
+        val hallucinated = QualityScorer.findHallucinatedIds(output, inputIds)
         assertEquals(setOf("bad9999"), hallucinated)
     }
 
@@ -124,7 +126,7 @@ class ScoringTest {
             ## Blockers
             None
         """.trimIndent()
-        val result = Scoring.score(output, PromptType.SUMMARY, setOf("abc1234", "def5678"))
+        val result = QualityScorer.score(output, PromptType.SUMMARY, setOf("abc1234", "def5678"))
         assertTrue(result.headingsPresent!!)
         assertTrue(result.allIdsValid)
         assertTrue(result.noHallucinatedIds)
@@ -141,7 +143,7 @@ class ScoringTest {
           "blockers": []
         }
         """.trimIndent()
-        val result = Scoring.score(output, PromptType.JSON, setOf("abc1234"))
+        val result = QualityScorer.score(output, PromptType.JSON, setOf("abc1234"))
         assertTrue(result.jsonParseable!!)
         assertTrue(result.jsonSchemaCompliant!!)
         assertTrue(result.allIdsValid)
