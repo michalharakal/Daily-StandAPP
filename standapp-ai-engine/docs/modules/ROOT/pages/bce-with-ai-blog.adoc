@@ -1,0 +1,391 @@
+= BCE Architecture for AI-Powered Libraries: Lessons from Building a Multi-Backend LLM Engine
+:toc: left
+:toclevels: 2
+:icons: font
+:source-highlighter: highlight.js
+
+[.lead]
+How the Boundary-Control-Entity pattern turned a tangled LLM integration into a clean, testable, backend-swappable Kotlin library.
+
+== The Problem
+
+You are building a developer tool that generates standup summaries from Git commits.
+It needs to call an LLM -- but _which_ LLM?
+Maybe Ollama running locally.
+Maybe OpenAI's API.
+Maybe a pure-Java model running in-process for air-gapped environments.
+Maybe a pure-Kotlin inference engine you wrote yourself.
+
+The naive approach -- hardcoding HTTP calls into your business logic -- falls apart the moment you need a second backend.
+And with LLMs, you _always_ need a second backend.
+Local models for development, cloud APIs for production, embedded models for offline use.
+
+We needed an architecture that could:
+
+* Swap LLM backends without touching business logic
+* Parse two different output formats (markdown and JSON) into the same domain model
+* Stream tokens progressively while maintaining type safety
+* Score output quality without coupling the scorer to the LLM
+
+The Boundary-Control-Entity pattern solved all four.
+
+== What is BCE?
+
+BCE is a cousin of Clean Architecture, originally described by Ivar Jacobson.
+It divides code into three layers:
+
+**Boundary** -- everything that touches the outside world.
+API clients, user-facing facades, DSL builders.
+The Boundary layer is the only layer that knows about HTTP, file I/O, or framework-specific APIs.
+
+**Control** -- pure business logic.
+No I/O, no side effects, no framework dependencies.
+Given inputs, it produces outputs.
+This is where prompt templates get expanded, LLM output gets parsed, and quality checks run.
+
+**Entity** -- domain data.
+Immutable data classes and sealed interfaces that model the problem space.
+They have no behavior beyond carrying data and enforcing type constraints.
+
+The key rule: **dependencies flow inward**.
+Boundary depends on Control and Entity.
+Control depends on Entity.
+Entity depends on nothing.
+
+[mermaid]
+----
+graph TB
+    B["Boundary\n(I/O, APIs, facades)"]
+    C["Control\n(pure logic)"]
+    E["Entity\n(data models)"]
+
+    B --> C
+    B --> E
+    C --> E
+
+    style B fill:#4A90D9,color:#fff
+    style C fill:#F5A623,color:#fff
+    style E fill:#7ED321,color:#fff
+----
+
+== Applying BCE to AI
+
+Let's walk through how each layer maps to the problem of "call an LLM, parse its output, score the result."
+
+=== Entity Layer: Define the Domain First
+
+Before writing any logic, we define what the system _talks about_.
+In our case: commits go in, scored summaries come out, and progress states flow during processing.
+
+[source,kotlin]
+----
+// What goes in
+data class CommitInfo(
+    val id: String,
+    val authorName: String,
+    val authorEmail: String,
+    val date: String,
+    val message: String,
+)
+
+// What comes out
+data class StandupSummary(
+    val raw: String,
+    val date: String,
+    val author: String,
+    val sections: List<SummarySection>,
+    val promptType: PromptType,
+)
+
+// How quality is measured
+data class QualityScores(
+    val jsonParseable: Boolean? = null,
+    val headingsPresent: Boolean? = null,
+    val allIdsValid: Boolean,
+    val noHallucinatedIds: Boolean,
+    val passCount: Int,
+    val totalChecks: Int,
+)
+----
+
+The most interesting entity is the progress state machine:
+
+[source,kotlin]
+----
+sealed interface SummaryProgress {
+    data object BuildingPrompt : SummaryProgress
+    data object Generating : SummaryProgress
+    data class Streaming(val tokenDelta: String, val accumulated: String) : SummaryProgress
+    data object Parsing : SummaryProgress
+    data object Scoring : SummaryProgress
+    data class Complete(val result: ScoredResult) : SummaryProgress
+    data class Failed(val error: Throwable) : SummaryProgress
+}
+----
+
+This is a sealed interface -- Kotlin's version of a tagged union.
+The compiler _forces_ consumers to handle every case:
+
+[source,kotlin]
+----
+when (progress) {
+    is SummaryProgress.BuildingPrompt -> showSpinner("Building prompt...")
+    is SummaryProgress.Generating -> showSpinner("Generating...")
+    is SummaryProgress.Streaming -> updatePreview(progress.accumulated)
+    is SummaryProgress.Parsing -> showSpinner("Parsing...")
+    is SummaryProgress.Scoring -> showSpinner("Scoring...")
+    is SummaryProgress.Complete -> showResult(progress.result)
+    is SummaryProgress.Failed -> showError(progress.error)
+}
+// No `else` needed. If we add a new state, this won't compile until it's handled.
+----
+
+This turns a runtime problem ("did I forget to handle the scoring state?") into a compile-time error.
+For AI pipelines where states are added as features grow, this is invaluable.
+
+=== Control Layer: Logic Without Side Effects
+
+The Control layer is where the real work happens, and where BCE pays off the most for AI applications.
+
+==== Prompt Building is Just String Templating
+
+[source,kotlin]
+----
+class PromptBuilder(
+    private val systemPrompt: String = DefaultPrompts.SYSTEM,
+    private val summaryTemplate: String = DefaultPrompts.SUMMARY_USER,
+    private val jsonTemplate: String = DefaultPrompts.JSON_USER,
+) {
+    fun buildUserPrompt(commits: List<CommitInfo>, promptType: PromptType): String {
+        val formatted = CommitFormatter.format(commits)
+        val template = when (promptType) {
+            PromptType.SUMMARY -> summaryTemplate
+            PromptType.JSON -> jsonTemplate
+        }
+        return template.replace("{{commits}}", formatted)
+    }
+}
+----
+
+No HTTP.
+No LLM.
+Just string processing.
+You can unit test this with zero mocking:
+
+[source,kotlin]
+----
+@Test
+fun `prompt includes all commit IDs`() {
+    val prompt = promptBuilder.buildUserPrompt(testCommits, PromptType.SUMMARY)
+    assertContains(prompt, "abc1234")
+    assertContains(prompt, "def5678")
+}
+----
+
+==== Output Parsing is Format-Agnostic
+
+The `OutputParser` converts raw LLM text into domain objects.
+It handles two formats -- markdown and JSON -- and produces the same `StandupSummary` type from both.
+
+This means the rest of your application never needs to know which format the LLM used.
+Switching from markdown to JSON mode is a one-line change at the call site.
+
+==== Quality Scoring Catches Hallucinations
+
+This is where BCE really shines for AI.
+The `QualityScorer` is pure logic that validates LLM output:
+
+* Did the model produce valid JSON when asked for JSON?
+* Did it include the required headings when asked for markdown?
+* Are all referenced commit IDs real, or did the model hallucinate them?
+
+[source,kotlin]
+----
+fun findHallucinatedIds(output: String, inputIds: Set<String>): Set<String>
+----
+
+Because this is in the Control layer, it has no idea _which_ LLM produced the output.
+It doesn't care if it was GPT-4, Mistral, or a local GGUF model.
+Same checks, same scoring, regardless of backend.
+
+This is exactly the kind of logic that gets tangled up with API calls in a less structured codebase.
+BCE forces it into a testable, reusable location.
+
+=== Boundary Layer: The Strategy Pattern for LLMs
+
+The Boundary layer defines a two-method interface:
+
+[source,kotlin]
+----
+interface LLMBackend {
+    suspend fun generate(prompt: String, config: GenerationConfig): String
+
+    fun generateStream(prompt: String, config: GenerationConfig): Flow<String> =
+        flow { emit(generate(prompt, config)) }
+}
+----
+
+Three implementations exist:
+
+[cols="1,2,2", options="header"]
+|===
+| Backend | How It Works | When to Use
+
+| `RestLLMBackend`
+| HTTP + SSE to any OpenAI-compatible API
+| Production, cloud inference, Ollama
+
+| `JLamaBackend`
+| Pure-Java inference via JLama
+| Air-gapped environments, no native deps
+
+| `SKaiNetBackend`
+| Pure-Kotlin inference via SKaiNET
+| Zero external dependencies, GGUF models
+
+|===
+
+Because `LLMBackend` is an interface in the Boundary layer, adding a fourth backend (say, Anthropic Claude) requires:
+
+1. One new class implementing `LLMBackend`
+2. Zero changes to the Control or Entity layers
+3. Zero changes to existing backends
+
+This is the Open/Closed Principle enforced by architecture, not discipline.
+
+The `SummaryEngine` facade wires everything together:
+
+[source,kotlin]
+----
+class SummaryEngine(
+    private val backend: LLMBackend,
+    private val promptBuilder: PromptBuilder,
+    private val config: GenerationConfig,
+    private val scoringEnabled: Boolean,
+)
+----
+
+And a Kotlin DSL makes construction ergonomic:
+
+[source,kotlin]
+----
+val engine = StandupEngine {
+    backend = RestLLMBackend(model = "llama3.2:3b")
+    maxTokens = 1024
+    scoring = true
+}
+----
+
+== Why Not Just Use Clean Architecture?
+
+Clean Architecture works, but it is designed for large applications with use cases, interactors, presenters, and gateway interfaces.
+For a _library_, that is too many layers.
+
+BCE gives you the same core benefit -- dependency inversion, testable logic, swappable I/O -- with exactly three layers instead of five or six.
+The mapping is intuitive:
+
+* **Boundary** = "things that talk to the outside"
+* **Control** = "things that think"
+* **Entity** = "things that hold data"
+
+There is no ambiguity about where a class belongs.
+`RestLLMBackend` does I/O? Boundary.
+`QualityScorer` does pure validation? Control.
+`CommitInfo` holds data? Entity.
+
+== Lessons Learned
+
+=== 1. Sealed interfaces are the best thing that happened to AI pipelines
+
+LLM pipelines have inherently complex state: building prompts, waiting for tokens, streaming, parsing, scoring, handling errors.
+Modeling these as a sealed interface turns forgotten states into compiler errors.
+
+=== 2. Keep parsers in the Control layer, not next to the API client
+
+It is tempting to parse API responses inside the backend implementation.
+Resist this.
+By putting `OutputParser` in Control, we can:
+
+* Test parsing independently of any LLM
+* Reuse the same parser across all backends
+* Change parsing logic without touching network code
+
+=== 3. Quality scoring is business logic, not an afterthought
+
+Hallucination detection, schema validation, and format checking are core business rules.
+They belong in the Control layer, running on _every_ backend's output.
+This catches quality issues early, regardless of which model is running.
+
+=== 4. The default-implementation trick makes interfaces adoptable
+
+[source,kotlin]
+----
+fun generateStream(...): Flow<String> = flow { emit(generate(...)) }
+----
+
+By giving `generateStream()` a default implementation that wraps `generate()`, backends only need to implement one method.
+Streaming support is opt-in.
+This lowers the barrier for new backend implementations while still giving full streaming to backends that support it.
+
+=== 5. Companion factory methods hide complexity
+
+`JLamaBackend.create()` downloads a model from HuggingFace, initializes a runtime, and returns a ready-to-use instance.
+`SKaiNetBackend.create()` loads a GGUF file, sets up tensor streaming, and initializes a tokenizer.
+
+The caller sees one line:
+
+[source,kotlin]
+----
+val backend = JLamaBackend.create()
+----
+
+The complexity is real, but it is contained in the Boundary layer where it belongs.
+
+== The Payoff
+
+With BCE in place, here's what day-to-day development looks like:
+
+**Adding a new output format** (say, YAML)?
+Add a `PromptType.YAML` variant, a template in `DefaultPrompts`, and a `parseYaml()` method in `OutputParser`.
+No backend changes.
+No entity changes beyond the enum variant.
+
+**Adding a new backend** (say, Anthropic)?
+Create `AnthropicBackend : LLMBackend` in a new module.
+Implement `generate()`.
+Optionally override `generateStream()`.
+No control changes.
+No entity changes.
+
+**Adding a new quality check** (say, "summary is under 500 words")?
+Add a method to `QualityScorer`, add a field to `QualityScores`.
+No backend changes.
+No parsing changes.
+
+Each change is scoped to exactly one layer.
+That is the promise of BCE, and for AI-powered libraries, it delivers.
+
+== Try It
+
+[source,kotlin]
+----
+val engine = StandupEngine {
+    backend = RestLLMBackend() // or JLamaBackend.create() or SKaiNetBackend.create(path)
+    scoring = true
+}
+
+engine.summarizeWithProgress(commits, PromptType.SUMMARY)
+    .collect { progress ->
+        when (progress) {
+            is SummaryProgress.Streaming -> print(progress.tokenDelta)
+            is SummaryProgress.Complete -> {
+                val scores = progress.result.scores
+                println("\nQuality: ${scores?.passCount}/${scores?.totalChecks}")
+            }
+            is SummaryProgress.Failed -> System.err.println(progress.error)
+            else -> {} // BuildingPrompt, Generating, Parsing, Scoring
+        }
+    }
+----
+
+The source is available at https://github.com/nickhudkins/Daily-StandAPP[Daily-StandAPP on GitHub].

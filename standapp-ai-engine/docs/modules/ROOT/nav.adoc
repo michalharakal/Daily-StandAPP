@@ -1,0 +1,2 @@
+* xref:architecture.adoc[Architecture]
+* xref:bce-with-ai-blog.adoc[Blog: BCE with AI]

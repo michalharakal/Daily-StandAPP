@@ -1,0 +1,5 @@
+name: standapp-ai-engine
+title: StandApp AI Engine
+version: '0.1'
+nav:
+  - modules/ROOT/nav.adoc

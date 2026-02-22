@@ -1,0 +1,1039 @@
+= StandApp AI Engine Architecture
+:toc: left
+:toclevels: 3
+:icons: font
+:source-highlighter: highlight.js
+:sectanchors:
+:sectlinks:
+
+== Introduction
+
+The *standapp-ai-engine* is a Kotlin Multiplatform (KMP) library that transforms Git commit history into structured standup summaries using Large Language Models.
+It is built around the **Boundary-Control-Entity (BCE)** architectural pattern, which enforces a clean separation between external interfaces, business logic, and domain data.
+
+=== Why BCE?
+
+BCE was chosen for three reasons:
+
+1. **Swappable backends** -- the Boundary layer defines an `LLMBackend` interface that lets callers swap between REST APIs, JLama (pure-Java inference), and SKaiNET (pure-Kotlin inference) without touching business logic.
+2. **Testable business rules** -- the Control layer (prompt building, output parsing, quality scoring) is pure logic with no I/O, making it trivially unit-testable.
+3. **Stable domain model** -- the Entity layer captures domain concepts (commits, summaries, progress states) as immutable data classes and sealed interfaces that change only when the domain changes.
+
+== BCE Layer Overview
+
+[mermaid]
+----
+graph TB
+    subgraph Boundary["Boundary Layer"]
+        LLMBackend["LLMBackend\n(interface)"]
+        SummaryEngine["SummaryEngine\n(facade)"]
+        SummaryEngineBuilder["SummaryEngineBuilder\n(DSL builder)"]
+        RestLLMBackend["RestLLMBackend\n(REST/SSE)"]
+        JLamaBackend["JLamaBackend\n(pure-Java)"]
+        SKaiNetBackend["SKaiNetBackend\n(pure-Kotlin)"]
+    end
+
+    subgraph Control["Control Layer"]
+        PromptBuilder["PromptBuilder"]
+        CommitFormatter["CommitFormatter"]
+        OutputParser["OutputParser"]
+        QualityScorer["QualityScorer"]
+        DefaultPrompts["DefaultPrompts"]
+    end
+
+    subgraph Entity["Entity Layer"]
+        CommitInfo["CommitInfo"]
+        GenerationConfig["GenerationConfig"]
+        StandupSummary["StandupSummary"]
+        SummarySection["SummarySection"]
+        SummaryItem["SummaryItem"]
+        SummaryProgress["SummaryProgress\n(sealed interface)"]
+        ScoredResult["ScoredResult"]
+        QualityScores["QualityScores"]
+        Status["Status (enum)"]
+        PromptType["PromptType (enum)"]
+    end
+
+    SummaryEngine --> PromptBuilder
+    SummaryEngine --> OutputParser
+    SummaryEngine --> QualityScorer
+    SummaryEngine --> LLMBackend
+
+    PromptBuilder --> CommitFormatter
+    PromptBuilder --> DefaultPrompts
+
+    RestLLMBackend -.->|implements| LLMBackend
+    JLamaBackend -.->|implements| LLMBackend
+    SKaiNetBackend -.->|implements| LLMBackend
+
+    SummaryEngine --> CommitInfo
+    SummaryEngine --> SummaryProgress
+    SummaryEngine --> ScoredResult
+
+    PromptBuilder --> CommitInfo
+    PromptBuilder --> PromptType
+    OutputParser --> StandupSummary
+    OutputParser --> PromptType
+    QualityScorer --> QualityScores
+
+    StandupSummary --> SummarySection
+    SummarySection --> SummaryItem
+    SummaryItem --> Status
+    ScoredResult --> QualityScores
+    ScoredResult --> StandupSummary
+
+    LLMBackend --> GenerationConfig
+
+    style Boundary fill:#4A90D9,color:#fff
+    style Control fill:#F5A623,color:#fff
+    style Entity fill:#7ED321,color:#fff
+----
+
+=== Class Reference
+
+[cols="1,1,2,3", options="header"]
+|===
+| Class | Layer | Source | Purpose
+
+| `LLMBackend`
+| Boundary
+| `boundary/LLMBackend.kt`
+| Strategy interface for LLM providers
+
+| `SummaryEngine`
+| Boundary
+| `boundary/SummaryEngine.kt`
+| Orchestration facade -- three public methods
+
+| `SummaryEngineBuilder`
+| Boundary
+| `boundary/SummaryEngineBuilder.kt`
+| DSL builder for `SummaryEngine`
+
+| `RestLLMBackend`
+| Boundary
+| `jvmMain/boundary/RestLLMBackend.kt`
+| REST/SSE client (Ollama, OpenAI-compatible)
+
+| `JLamaBackend`
+| Boundary
+| `standapp-ai-engine-jlama/.../JLamaBackend.kt`
+| Pure-Java local inference via JLama
+
+| `SKaiNetBackend`
+| Boundary
+| `standapp-ai-engine-skainet/.../SKaiNetBackend.kt`
+| Pure-Kotlin local inference via SKaiNET
+
+| `PromptBuilder`
+| Control
+| `control/PromptBuilder.kt`
+| Prompt template expansion
+
+| `CommitFormatter`
+| Control
+| `control/CommitFormatter.kt`
+| Formats `CommitInfo` list into text
+
+| `OutputParser`
+| Control
+| `control/OutputParser.kt`
+| Parses LLM output (markdown or JSON)
+
+| `QualityScorer`
+| Control
+| `control/QualityScorer.kt`
+| Validates and scores LLM output
+
+| `DefaultPrompts`
+| Control
+| `control/PromptBuilder.kt`
+| Built-in prompt templates
+
+| `CommitInfo`
+| Entity
+| `entity/CommitInfo.kt`
+| Git commit input model
+
+| `GenerationConfig`
+| Entity
+| `entity/GenerationConfig.kt`
+| LLM generation parameters
+
+| `StandupSummary`
+| Entity
+| `entity/StandupSummary.kt`
+| Parsed summary result
+
+| `SummarySection`
+| Entity
+| `entity/StandupSummary.kt`
+| Named section within a summary
+
+| `SummaryItem`
+| Entity
+| `entity/StandupSummary.kt`
+| Individual item within a section
+
+| `Status`
+| Entity
+| `entity/StandupSummary.kt`
+| Task status enum: `DONE`, `IN_PROGRESS`, `UNKNOWN`
+
+| `PromptType`
+| Entity
+| `entity/StandupSummary.kt`
+| Output mode: `SUMMARY` or `JSON`
+
+| `SummaryProgress`
+| Entity
+| `entity/SummaryProgress.kt`
+| Sealed interface for streaming progress states
+
+| `ScoredResult`
+| Entity
+| `entity/ScoredResult.kt`
+| Summary paired with quality scores
+
+| `QualityScores`
+| Entity
+| `entity/ScoredResult.kt`
+| Quality check results
+
+|===
+
+== Boundary Layer
+
+The Boundary layer mediates all interactions between the library and the outside world -- both the calling application and external LLM services.
+
+=== LLMBackend Interface
+
+The `LLMBackend` interface is the core abstraction point.
+It defines the **strategy pattern** that makes backend swapping possible.
+
+[source,kotlin]
+----
+interface LLMBackend {
+    /** Single-shot generation. */
+    suspend fun generate(prompt: String, config: GenerationConfig): String
+
+    /** Streaming generation. Default implementation wraps [generate]. */
+    fun generateStream(prompt: String, config: GenerationConfig): Flow<String> =
+        flow { emit(generate(prompt, config)) }
+}
+----
+
+Key design decisions:
+
+* `generate()` is `suspend` -- it cooperates with structured concurrency without blocking threads.
+* `generateStream()` returns a cold `Flow<String>` of token deltas, enabling progressive UI updates.
+* The default `generateStream()` wraps `generate()` in a single-emit flow, so backends that do not support streaming still satisfy the interface.
+
+=== SummaryEngine Facade
+
+`SummaryEngine` is the primary entry point.
+It orchestrates the full pipeline: prompt building, LLM invocation, output parsing, and optional quality scoring.
+
+[source,kotlin]
+----
+class SummaryEngine(
+    private val backend: LLMBackend,
+    private val promptBuilder: PromptBuilder,
+    private val config: GenerationConfig,
+    private val scoringEnabled: Boolean,
+)
+----
+
+It exposes three public methods:
+
+==== `summarize()`
+
+[source,kotlin]
+----
+suspend fun summarize(
+    commits: List<CommitInfo>,
+    promptType: PromptType,
+): StandupSummary
+----
+
+Builds a prompt, calls `backend.generate()`, and parses the result into a `StandupSummary`.
+
+==== `summarizeAndScore()`
+
+[source,kotlin]
+----
+suspend fun summarizeAndScore(
+    commits: List<CommitInfo>,
+    promptType: PromptType,
+): ScoredResult
+----
+
+Calls `summarize()`, then runs `QualityScorer.score()` on the output.
+Returns a `ScoredResult` containing both the summary and quality metrics.
+
+==== `summarizeWithProgress()`
+
+[source,kotlin]
+----
+fun summarizeWithProgress(
+    commits: List<CommitInfo>,
+    promptType: PromptType,
+): Flow<SummaryProgress>
+----
+
+Returns a `Flow<SummaryProgress>` that emits progress states as the pipeline executes.
+This is the method to use for UI integration where you want to show a progress indicator and stream tokens.
+
+=== StandupEngine DSL Builder
+
+The `StandupEngine {}` function provides a Kotlin DSL for constructing a `SummaryEngine`.
+
+[source,kotlin]
+----
+val engine = StandupEngine {
+    backend = RestLLMBackend(
+        baseUrl = "http://localhost:11434",
+        model = "llama3.2:3b",
+    )
+    maxTokens = 1024
+    temperature = 0.2f
+    topP = 0.9f
+    scoring = true
+
+    prompts {
+        system = "You are a senior developer assistant."
+        user(PromptType.SUMMARY, """
+            |Given these commits, create a standup report:
+            |{{commits}}
+        """.trimMargin())
+    }
+}
+----
+
+The builder validates that a `backend` is set and uses sensible defaults for everything else:
+
+[cols="1,1,2", options="header"]
+|===
+| Property | Default | Description
+
+| `backend`
+| _(required)_
+| LLM backend implementation
+
+| `maxTokens`
+| `512`
+| Maximum tokens to generate
+
+| `temperature`
+| `0.1f`
+| Sampling temperature
+
+| `topP`
+| `0.9f`
+| Nucleus sampling threshold
+
+| `scoring`
+| `false`
+| Enable quality scoring
+
+| `prompts {}`
+| `DefaultPrompts`
+| Custom prompt configuration
+
+|===
+
+== Control Layer
+
+The Control layer contains pure business logic with no I/O.
+Every class here is deterministic and trivially testable.
+
+=== PromptBuilder
+
+`PromptBuilder` expands prompt templates by injecting formatted commit data.
+
+[source,kotlin]
+----
+class PromptBuilder(
+    private val systemPrompt: String = DefaultPrompts.SYSTEM,
+    private val summaryTemplate: String = DefaultPrompts.SUMMARY_USER,
+    private val jsonTemplate: String = DefaultPrompts.JSON_USER,
+)
+----
+
+==== Template System
+
+Templates use a `{{commits}}` placeholder that gets replaced with the output of `CommitFormatter.format()`.
+
+The `DefaultPrompts` object provides two built-in templates:
+
+[cols="1,3", options="header"]
+|===
+| Template | Purpose
+
+| `SUMMARY_USER`
+| Produces markdown with `## Yesterday`, `## Today`, `## Blockers` headings
+
+| `JSON_USER`
+| Produces structured JSON with `date`, `author`, `categories`, and `blockers` fields
+
+|===
+
+==== CommitFormatter
+
+`CommitFormatter` is a stateless object that serializes commits into a text block:
+
+[source,kotlin]
+----
+object CommitFormatter {
+    fun format(commits: List<CommitInfo>): String
+}
+----
+
+Each commit is rendered as:
+
+----
+ID: abc1234
+Author: Jane Doe <jane@example.com>
+Date: 2025-01-15
+Message: Fix null pointer in login flow
+---
+----
+
+=== OutputParser
+
+`OutputParser` is a stateless object that converts raw LLM output into a `StandupSummary`.
+
+[source,kotlin]
+----
+object OutputParser {
+    fun parse(raw: String, promptType: PromptType): StandupSummary
+}
+----
+
+It dispatches to one of two internal parsers based on `promptType`:
+
+* **`SUMMARY` mode** -- parses markdown headings (`##`) and bullet items.
+* **`JSON` mode** -- parses a JSON object using `kotlinx.serialization`, extracting `date`, `author`, `categories` (mapped to `SummarySection`), and `blockers`.
+
+Both paths produce the same `StandupSummary` type, so downstream code is format-agnostic.
+
+=== QualityScorer
+
+`QualityScorer` validates LLM output against a set of quality checks.
+
+[source,kotlin]
+----
+object QualityScorer {
+    fun score(
+        output: String,
+        promptType: PromptType,
+        inputIds: Set<String>,
+    ): QualityScores
+}
+----
+
+==== Quality Checks
+
+[cols="1,1,3", options="header"]
+|===
+| Check | Applies To | Description
+
+| `headingsPresent`
+| `SUMMARY`
+| Verifies `## Yesterday`, `## Today`, `## Blockers` headings exist (case-insensitive)
+
+| `jsonParseable`
+| `JSON`
+| Attempts to parse output as JSON
+
+| `jsonSchemaCompliant`
+| `JSON`
+| Validates required keys: `date`, `author`, `blockers` (array), `categories` with nested `commits`
+
+| `allIdsValid`
+| Both
+| All referenced commit IDs match 7-40 character hexadecimal format
+
+| `noHallucinatedIds`
+| Both
+| No commit IDs appear in the output that were not in the input
+
+|===
+
+The result includes `passCount` and `totalChecks` for a quick pass-rate metric.
+
+== Entity Layer
+
+The Entity layer defines all domain models as immutable data classes and sealed interfaces.
+
+=== Input Model
+
+[source,kotlin]
+----
+@Serializable
+data class CommitInfo(
+    val id: String,
+    val authorName: String,
+    val authorEmail: String,
+    val date: String,
+    val message: String,
+)
+----
+
+=== Generation Configuration
+
+[source,kotlin]
+----
+data class GenerationConfig(
+    val maxTokens: Int = 512,
+    val temperature: Float = 0.1f,
+    val topP: Float = 0.9f,
+)
+----
+
+=== Output Models
+
+[source,kotlin]
+----
+@Serializable
+data class StandupSummary(
+    val raw: String,
+    val date: String,
+    val author: String,
+    val sections: List<SummarySection>,
+    val promptType: PromptType,
+)
+
+@Serializable
+data class SummarySection(
+    val name: String,
+    val items: List<SummaryItem>,
+)
+
+@Serializable
+data class SummaryItem(
+    val commitId: String? = null,
+    val text: String,
+    val status: Status = Status.UNKNOWN,
+)
+
+@Serializable
+enum class Status { DONE, IN_PROGRESS, UNKNOWN }
+
+@Serializable
+enum class PromptType { SUMMARY, JSON }
+----
+
+=== Streaming Progress State Machine
+
+`SummaryProgress` is a sealed interface that models every state of the `summarizeWithProgress()` pipeline:
+
+[source,kotlin]
+----
+sealed interface SummaryProgress {
+    data object BuildingPrompt : SummaryProgress
+    data object Generating : SummaryProgress
+    data class Streaming(val tokenDelta: String, val accumulated: String) : SummaryProgress
+    data object Parsing : SummaryProgress
+    data object Scoring : SummaryProgress
+    data class Complete(val result: ScoredResult) : SummaryProgress
+    data class Failed(val error: Throwable) : SummaryProgress
+}
+----
+
+Using a sealed interface guarantees exhaustive `when` matching at compile time -- the compiler ensures every state is handled.
+
+=== Quality Result
+
+[source,kotlin]
+----
+@Serializable
+data class ScoredResult(
+    val summary: StandupSummary,
+    val scores: QualityScores? = null,
+)
+
+@Serializable
+data class QualityScores(
+    val jsonParseable: Boolean? = null,
+    val jsonSchemaCompliant: Boolean? = null,
+    val headingsPresent: Boolean? = null,
+    val allIdsValid: Boolean,
+    val noHallucinatedIds: Boolean,
+    val passCount: Int,
+    val totalChecks: Int,
+)
+----
+
+== Data Flow
+
+The following sequence diagram shows the complete `summarizeWithProgress()` pipeline:
+
+[mermaid]
+----
+sequenceDiagram
+    participant App
+    participant SummaryEngine
+    participant PromptBuilder
+    participant CommitFormatter
+    participant LLMBackend
+    participant OutputParser
+    participant QualityScorer
+
+    App->>SummaryEngine: summarizeWithProgress(commits, promptType)
+    activate SummaryEngine
+
+    SummaryEngine-->>App: emit BuildingPrompt
+    SummaryEngine->>PromptBuilder: buildSystemPrompt()
+    PromptBuilder-->>SummaryEngine: systemPrompt
+    SummaryEngine->>PromptBuilder: buildUserPrompt(commits, promptType)
+    PromptBuilder->>CommitFormatter: format(commits)
+    CommitFormatter-->>PromptBuilder: formattedText
+    PromptBuilder-->>SummaryEngine: userPrompt (with {{commits}} replaced)
+
+    SummaryEngine-->>App: emit Generating
+    SummaryEngine->>LLMBackend: generateStream(prompt, config)
+    activate LLMBackend
+
+    loop For each token
+        LLMBackend-->>SummaryEngine: token delta
+        SummaryEngine-->>App: emit Streaming(delta, accumulated)
+    end
+    deactivate LLMBackend
+
+    SummaryEngine-->>App: emit Parsing
+    SummaryEngine->>OutputParser: parse(raw, promptType)
+    OutputParser-->>SummaryEngine: StandupSummary
+
+    SummaryEngine-->>App: emit Scoring
+    SummaryEngine->>QualityScorer: score(raw, promptType, inputIds)
+    QualityScorer-->>SummaryEngine: QualityScores
+
+    SummaryEngine-->>App: emit Complete(ScoredResult)
+    deactivate SummaryEngine
+----
+
+== Backend Implementations
+
+[mermaid]
+----
+classDiagram
+    class LLMBackend {
+        <<interface>>
+        +generate(prompt: String, config: GenerationConfig) String
+        +generateStream(prompt: String, config: GenerationConfig) Flow~String~
+    }
+
+    class RestLLMBackend {
+        -baseUrl: String
+        -model: String
+        -apiKey: String?
+        -requestTimeoutMs: Long
+        -connectTimeoutMs: Long
+        +generate(prompt, config) String
+        +generateStream(prompt, config) Flow~String~
+    }
+
+    class JLamaBackend {
+        -model: AbstractModel
+        +generate(prompt, config) String
+        +create(modelName, workingDirectory)$ JLamaBackend
+    }
+
+    class SKaiNetBackend {
+        -runtime: LlamaRuntime~FP32~
+        -tokenizer: GGUFTokenizer
+        -chatTemplate: Llama3ChatTemplate
+        +generate(prompt, config) String
+        +create(modelPath)$ SKaiNetBackend
+    }
+
+    LLMBackend <|.. RestLLMBackend
+    LLMBackend <|.. JLamaBackend
+    LLMBackend <|.. SKaiNetBackend
+----
+
+=== RestLLMBackend
+
+The default backend for remote inference.
+Supports any OpenAI-compatible chat completions API.
+
+[source,kotlin]
+----
+class RestLLMBackend(
+    private val baseUrl: String = "http://localhost:11434",
+    private val model: String = "llama3.2:3b",
+    private val apiKey: String? = null,
+    private val requestTimeoutMs: Long = 120_000,
+    private val connectTimeoutMs: Long = 10_000,
+) : LLMBackend
+----
+
+* **Streaming**: Uses Server-Sent Events (SSE) -- reads `data: {json}` lines and stops on `[DONE]`.
+* **URL resolution**: Automatically normalizes base URLs by appending `/v1/chat/completions` when needed.
+* **Platform**: JVM (uses Ktor CIO engine).
+
+=== JLamaBackend
+
+Pure-Java local inference using the JLama runtime.
+
+[source,kotlin]
+----
+class JLamaBackend private constructor(
+    private val model: AbstractModel,
+) : LLMBackend {
+
+    companion object {
+        fun create(
+            modelName: String = "mistralai/Mistral-7B-Instruct-v0.3",
+            workingDirectory: String = "./models",
+        ): JLamaBackend
+    }
+}
+----
+
+* **Model source**: Downloads from HuggingFace automatically, caching to `workingDirectory`.
+* **Streaming**: Uses default single-emit wrapper (no native streaming).
+* **Platform**: JVM only (uses `Dispatchers.IO`).
+
+=== SKaiNetBackend
+
+Pure-Kotlin local inference using the SKaiNET framework.
+
+[source,kotlin]
+----
+class SKaiNetBackend private constructor(
+    private val runtime: LlamaRuntime<FP32>,
+    private val tokenizer: GGUFTokenizer,
+    private val chatTemplate: Llama3ChatTemplate = Llama3ChatTemplate(),
+) : LLMBackend {
+
+    companion object {
+        fun create(modelPath: String): SKaiNetBackend
+    }
+}
+----
+
+* **Model source**: Local GGUF file (no network required).
+* **Streaming**: Uses default single-emit wrapper (no native streaming).
+* **Platform**: JVM only (uses `Dispatchers.Default`, benefits from `jdk.incubator.vector`).
+
+=== Backend Comparison
+
+[cols="1,1,1,1,1,1,1", options="header"]
+|===
+| Backend | Module | Platform | Model Source | Streaming | Network | Default Model
+
+| `RestLLMBackend`
+| `standapp-ai-engine`
+| JVM
+| Remote API
+| SSE
+| Required
+| `llama3.2:3b`
+
+| `JLamaBackend`
+| `standapp-ai-engine-jlama`
+| JVM
+| HuggingFace (auto-download)
+| Single-emit
+| First run only
+| `Mistral-7B-Instruct-v0.3`
+
+| `SKaiNetBackend`
+| `standapp-ai-engine-skainet`
+| JVM
+| Local GGUF file
+| Single-emit
+| None
+| _(user-provided)_
+
+|===
+
+== Module Dependencies
+
+[mermaid]
+----
+graph LR
+    Core["standapp-ai-engine\n(core)"]
+    JLama["standapp-ai-engine-jlama"]
+    SKaiNet["standapp-ai-engine-skainet"]
+
+    JLama -->|depends on| Core
+    SKaiNet -->|depends on| Core
+
+    Core -->|kotlinx| Coroutines["kotlinx-coroutines"]
+    Core -->|kotlinx| Serialization["kotlinx-serialization"]
+    Core -->|ktor| Ktor["ktor-client"]
+
+    JLama -->|com.github.tjake| JLamaLib["jlama-core\n0.8.4"]
+    SKaiNet -->|dev.skainet| SKaiNetLib["SKaiNET KLlama\n+ CPU backend"]
+
+    style Core fill:#4A90D9,color:#fff
+    style JLama fill:#F5A623,color:#fff
+    style SKaiNet fill:#7ED321,color:#fff
+----
+
+=== Dependency Configurations
+
+==== Core only (REST backend)
+
+[source,kotlin]
+----
+dependencies {
+    implementation("dev.standapp:standapp-ai-engine:0.1.0")
+}
+----
+
+==== Core + JLama (local Java inference)
+
+[source,kotlin]
+----
+dependencies {
+    implementation("dev.standapp:standapp-ai-engine:0.1.0")
+    implementation("dev.standapp:standapp-ai-engine-jlama:0.1.0")
+}
+----
+
+==== Core + SKaiNET (local Kotlin inference)
+
+[source,kotlin]
+----
+dependencies {
+    implementation("dev.standapp:standapp-ai-engine:0.1.0")
+    implementation("dev.standapp:standapp-ai-engine-skainet:0.1.0")
+}
+----
+
+==== All backends
+
+[source,kotlin]
+----
+dependencies {
+    implementation("dev.standapp:standapp-ai-engine:0.1.0")
+    implementation("dev.standapp:standapp-ai-engine-jlama:0.1.0")
+    implementation("dev.standapp:standapp-ai-engine-skainet:0.1.0")
+}
+----
+
+== Usage Examples
+
+=== Basic Summary with REST/Ollama
+
+[source,kotlin]
+----
+val engine = StandupEngine {
+    backend = RestLLMBackend() // defaults to localhost:11434, llama3.2:3b
+}
+
+val commits = listOf(
+    CommitInfo(
+        id = "abc1234",
+        authorName = "Jane Doe",
+        authorEmail = "jane@example.com",
+        date = "2025-01-15",
+        message = "Fix null pointer in login flow",
+    ),
+    CommitInfo(
+        id = "def5678",
+        authorName = "Jane Doe",
+        authorEmail = "jane@example.com",
+        date = "2025-01-15",
+        message = "Add unit tests for auth service",
+    ),
+)
+
+val summary: StandupSummary = engine.summarize(commits, PromptType.SUMMARY)
+println(summary.raw)
+----
+
+=== JSON Mode with Quality Scoring
+
+[source,kotlin]
+----
+val engine = StandupEngine {
+    backend = RestLLMBackend(
+        baseUrl = "https://api.openai.com",
+        model = "gpt-4o-mini",
+        apiKey = System.getenv("OPENAI_API_KEY"),
+    )
+    scoring = true
+}
+
+val result: ScoredResult = engine.summarizeAndScore(commits, PromptType.JSON)
+
+println("Summary: ${result.summary.raw}")
+result.scores?.let { scores ->
+    println("Quality: ${scores.passCount}/${scores.totalChecks} checks passed")
+    println("  JSON parseable:       ${scores.jsonParseable}")
+    println("  Schema compliant:     ${scores.jsonSchemaCompliant}")
+    println("  All IDs valid:        ${scores.allIdsValid}")
+    println("  No hallucinated IDs:  ${scores.noHallucinatedIds}")
+}
+----
+
+=== Streaming Progress for UI Integration
+
+[source,kotlin]
+----
+engine.summarizeWithProgress(commits, PromptType.SUMMARY)
+    .collect { progress ->
+        when (progress) {
+            is SummaryProgress.BuildingPrompt -> showSpinner("Building prompt...")
+            is SummaryProgress.Generating -> showSpinner("Waiting for LLM...")
+            is SummaryProgress.Streaming -> updatePreview(progress.accumulated)
+            is SummaryProgress.Parsing -> showSpinner("Parsing output...")
+            is SummaryProgress.Scoring -> showSpinner("Scoring quality...")
+            is SummaryProgress.Complete -> showResult(progress.result)
+            is SummaryProgress.Failed -> showError(progress.error)
+        }
+    }
+----
+
+Because `SummaryProgress` is a sealed interface, the Kotlin compiler ensures this `when` block handles every possible state.
+Adding a new state in the future will produce a compile error at every call site until it is handled.
+
+=== Swapping Backends at Runtime
+
+[source,kotlin]
+----
+// Strategy pattern: select backend based on configuration
+val backend: LLMBackend = when (config.inferenceMode) {
+    "remote" -> RestLLMBackend(
+        baseUrl = config.apiUrl,
+        model = config.modelName,
+        apiKey = config.apiKey,
+    )
+    "jlama" -> JLamaBackend.create(
+        modelName = config.modelName,
+        workingDirectory = config.modelCacheDir,
+    )
+    "skainet" -> SKaiNetBackend.create(
+        modelPath = config.modelPath,
+    )
+    else -> error("Unknown inference mode: ${config.inferenceMode}")
+}
+
+val engine = StandupEngine {
+    this.backend = backend
+    maxTokens = 1024
+    scoring = true
+}
+----
+
+=== Custom Prompts
+
+[source,kotlin]
+----
+val engine = StandupEngine {
+    backend = RestLLMBackend()
+
+    prompts {
+        system = "You are a tech lead summarizing sprint progress."
+
+        user(PromptType.SUMMARY, """
+            |Analyze these commits and create a sprint update:
+            |
+            |## Completed
+            |(What was finished)
+            |
+            |## In Progress
+            |(What is ongoing)
+            |
+            |## Risks
+            |(Any risks or delays)
+            |
+            |Commits:
+            |{{commits}}
+        """.trimMargin())
+    }
+}
+----
+
+NOTE: Custom templates must include the `{{commits}}` placeholder.
+The `PromptBuilder` replaces it with the formatted commit data at runtime.
+
+== Design Patterns
+
+[cols="1,3", options="header"]
+|===
+| Pattern | Usage
+
+| **Strategy**
+| `LLMBackend` interface with three interchangeable implementations (`RestLLMBackend`, `JLamaBackend`, `SKaiNetBackend`)
+
+| **Builder / DSL**
+| `SummaryEngineBuilder` with the `StandupEngine {}` top-level function provides a type-safe Kotlin DSL
+
+| **Facade**
+| `SummaryEngine` provides a simple three-method API that hides the complexity of prompt building, LLM invocation, parsing, and scoring
+
+| **Sealed Interface State Machine**
+| `SummaryProgress` models all pipeline states as a sealed hierarchy, enabling exhaustive `when` matching
+
+| **Kotlin Flow (Reactive Streams)**
+| `generateStream()` and `summarizeWithProgress()` use cold `Flow` for backpressure-aware streaming
+
+| **Template Method**
+| `PromptBuilder` injects formatted data into `{{commits}}` placeholders within configurable templates
+
+| **Companion Factory**
+| `JLamaBackend.create()` and `SKaiNetBackend.create()` encapsulate complex initialization behind simple factory methods
+
+|===
+
+== KMP Source Set Organization
+
+[source]
+----
+standapp-ai-engine/src/
+  commonMain/                    <1>
+    kotlin/dev/standapp/engine/
+      boundary/
+        LLMBackend.kt           # Interface (expect-compatible)
+        SummaryEngine.kt        # Core orchestration
+        SummaryEngineBuilder.kt  # DSL builder
+      control/
+        PromptBuilder.kt        # Template expansion
+        OutputParser.kt         # Markdown & JSON parsing
+        QualityScorer.kt        # Output validation
+        CommitFormatter.kt      # Commit formatting
+      entity/
+        CommitInfo.kt
+        GenerationConfig.kt
+        StandupSummary.kt
+        SummaryProgress.kt
+        ScoredResult.kt
+  jvmMain/                       <2>
+    kotlin/dev/standapp/engine/
+      boundary/
+        RestLLMBackend.kt       # Ktor-based REST client
+----
+
+<1> `commonMain` contains all platform-independent code: the BCE interfaces, control logic, and entity models.
+This code compiles for every Kotlin target.
+
+<2> `jvmMain` contains JVM-specific implementations.
+`RestLLMBackend` lives here because it depends on Ktor's CIO engine.
+
+The backend modules (`standapp-ai-engine-jlama`, `standapp-ai-engine-skainet`) are separate Gradle modules that depend on the core.
+They contribute additional `LLMBackend` implementations without modifying the core module:
+
+[source]
+----
+standapp-ai-engine-jlama/src/jvmMain/
+  kotlin/dev/standapp/engine/backend/
+    JLamaBackend.kt             # JLama integration
+
+standapp-ai-engine-skainet/src/jvmMain/
+  kotlin/dev/standapp/engine/backend/
+    SKaiNetBackend.kt           # SKaiNET integration
+----
+
+This structure means:
+
+* **Adding a new backend** requires only creating a new Gradle module that depends on `standapp-ai-engine` and implements `LLMBackend`.
+No changes to existing code are needed.
+* **The core module has zero knowledge** of JLama or SKaiNET.
+It depends only on the `LLMBackend` interface.
+* **Applications choose their backends** by including the appropriate Gradle dependencies and passing the desired implementation to `StandupEngine {}`.
