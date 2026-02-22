@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ScoredResult(
     val summary: StandupSummary,
-    val scores: QualityScores,
+    val scores: QualityScores? = null,
 )
 
 @Serializable
