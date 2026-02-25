@@ -51,7 +51,7 @@ java --add-modules jdk.incubator.vector \
 |Must use Gradle with Kotlin DSL for build configuration.
 
 |*OC-03: Version Catalog*
-|Dependencies managed via `gradle/libs.versions.toml` and `skainet.versions.toml`.
+|Dependencies managed via `gradle/libs.versions.toml`.
 |===
 
 == 2.3 Conventions

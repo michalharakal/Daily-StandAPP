@@ -71,30 +71,36 @@ Need local LLM inference without cloud dependencies. Options considered:
 * SKaiNET kllama (Pure Kotlin)
 
 === Decision
-Define `LLMService` interface for pluggable LLM backends. Use SKaiNET kllama as the current implementation.
+Define `LLMService` interface for pluggable LLM backends. Use `LLMServiceFactory` to instantiate backends based on the `MCP_LLM_BACKEND` environment variable.
+
+=== Current Implementations
+* **SKaiNET kllama** (`SKaiNetLLMService`) - Pure Kotlin, GGUF model loading, SIMD via Vector API
+* **REST API** (`RestApiLLMService`) - OpenAI-compatible HTTP endpoints (Ollama, llama.cpp server, LM Studio, vLLM)
+* **JLama** (`JLamaService`) - Pure Java LLM inference
 
 === Rationale
-* Pluggable architecture allows future backend additions
-* Pure Kotlin - no native dependencies to manage
-* SIMD acceleration via Java Vector API
-* Same language as the rest of the project
-* Active development and support
+* Pluggable architecture enables comparing multiple backends
+* SKaiNET: Pure Kotlin, no native dependencies, SIMD acceleration via Java Vector API
+* REST API: Leverage existing local inference servers
+* JLama: Pure Java alternative for environments where Kotlin is not preferred
 
 === Consequences
-* (+) Extensible - new backends can be added by implementing `LLMService`
-* (+) No native library management with SKaiNET
-* (+) Full Kotlin integration
-* (+) Works on any JDK 21+ platform
-* (-) Requires JDK 21+ for Vector API
+* (+) Three production backends available
+* (+) Benchmark module can compare backends side-by-side
+* (+) No native library management with SKaiNET/JLama
+* (+) REST API allows using Ollama and other local servers
+* (-) Requires JDK 21+ for Vector API (SKaiNET)
 
 [mermaid]
 ----
 graph LR
-    IFACE[LLMService<br/>interface] --> SKAINET[SkainetKLlamaService<br/>current]
-    IFACE -.-> FUTURE[Future Backends<br/>extensible]
+    IFACE[LLMService<br/>interface] --> SKAINET[SKaiNetLLMService]
+    IFACE --> REST[RestApiLLMService]
+    IFACE --> JLAMA[JLamaService]
 
     style SKAINET fill:#c8e6c9
-    style FUTURE fill:#f5f5f5,stroke-dasharray: 5 5
+    style REST fill:#e3f2fd
+    style JLAMA fill:#fff3e0
 ----
 
 == ADR-004: MCP Protocol for AI Assistant Integration
@@ -163,13 +169,13 @@ Accepted
 Managing dependencies across multiple modules and platforms.
 
 === Decision
-Use Gradle Version Catalogs (`libs.versions.toml` and `skainet.versions.toml`).
+Use Gradle Version Catalogs (`libs.versions.toml`).
 
 === Consequences
 * (+) Centralized version management
 * (+) Type-safe dependency references
 * (+) Easy to update versions
-* (-) Two catalog files to maintain
+* (+) Single catalog file for all dependencies including SKaiNET
 
 == ADR-007: Fat JAR for MCP Server Deployment
 
@@ -204,33 +210,30 @@ tasks.named<Jar>("jvmJar") {
 * (-) Larger file size (~50MB+)
 * (-) Duplicate class handling required
 
-== ADR-008: System Properties for Configuration
+== ADR-008: Environment Variables for Configuration
 
 === Status
-Accepted
+Accepted (supersedes previous system-properties-only approach)
 
 === Context
-Need runtime configuration for LLM engine selection and model paths.
+Need runtime configuration for LLM engine selection, model paths, and REST API endpoints. Environment variables work better with Docker, CI/CD, and MCP server stdio transport.
 
 === Decision
-Use Java system properties for all configuration.
+Use environment variables as the primary configuration mechanism via `LLMServiceFactory`. System properties remain supported for `getLLMSummarizer()`.
 
-=== Rationale
-* Simple and well-understood
-* Can be set via command line, environment, or programmatically
-* No additional configuration framework needed
-
-=== Properties
+=== Environment Variables
 [source,bash]
 ----
--Dllm.engine=skainet
--Dllm.skainet.model=/path/to/model.gguf
--Dllm.max.seq.len=2048
--Dtest.mode=true
+MCP_LLM_BACKEND=SKAINET          # or REST_API, JLAMA
+MCP_LLM_MODEL_PATH=/path/to/model.gguf
+MCP_LLM_REST_BASE_URL=http://localhost:11434
+MCP_LLM_REST_MODEL=llama3.2:3b
+MCP_LLM_REST_API_KEY=optional-key
 ----
 
 === Consequences
 * (+) Zero dependencies
-* (+) Easy command-line configuration
-* (-) No validation at startup
-* (-) No structured configuration file
+* (+) Works well with Docker and container orchestration
+* (+) Easy to configure in Claude Desktop MCP config
+* (+) `LLMBackendType.fromEnv()` provides validation at startup
+* (-) Two configuration paths coexist (env vars and system properties)

@@ -54,21 +54,33 @@ module/src/
 
 == 8.2 Dependency Injection
 
-The project uses factory functions instead of a DI framework for simplicity.
+The project uses factory functions instead of a DI framework for simplicity. Two patterns coexist:
+
+=== Pattern 1: Environment Variable Factory (MCP Server, Benchmark)
 
 [source,kotlin]
 ----
-// Factory function pattern
-object LLMEngineConfig {
-    fun getSkainetConfig(): SkainetConfig {
-        return SkainetConfig(
-            modelPath = System.getProperty("llm.model", "./models/model.gguf"),
-            maxSeqLen = System.getProperty("llm.max.seq.len", "2048").toInt()
-        )
+// LLMServiceFactory selects backend from environment
+object LLMServiceFactory {
+    fun create(): LLMService {
+        val backend = LLMBackendType.fromEnv() // MCP_LLM_BACKEND
+        return when (backend) {
+            LLMBackendType.SKAINET -> SKaiNetLLMService.create(modelPath)
+            LLMBackendType.REST_API -> RestApiLLMService(baseUrl, model, apiKey)
+            LLMBackendType.JLAMA -> JLamaService.create(modelPath, tokenizerPath)
+        }
     }
-}
 
-// Conditional instantiation
+    // Programmatic configuration (used by benchmark)
+    fun create(backendType: LLMBackendType, config: LLMConfig): LLMService
+}
+----
+
+=== Pattern 2: System Property Factory (getLLMSummarizer)
+
+[source,kotlin]
+----
+// Conditional instantiation via system properties
 actual fun getLLMSummarizer(): LLMSummarizer = when {
     System.getProperty("test.mode") == "true" ->
         MockJvmLLMSummarizer()
@@ -119,7 +131,34 @@ class SkainetKLlamaService {
 
 == 8.4 Configuration Management
 
-=== System Properties
+=== Environment Variables (Primary - MCP Server & Benchmark)
+
+[cols="1,2,2"]
+|===
+|Variable |Default |Description
+
+|`MCP_LLM_BACKEND`
+|_(required)_
+|Backend: `SKAINET`, `REST_API`, `JLAMA`
+
+|`MCP_LLM_MODEL_PATH`
+|_(required for SKAINET)_
+|Path to GGUF model file
+
+|`MCP_LLM_REST_BASE_URL`
+|`http://localhost:11434`
+|REST API endpoint URL
+
+|`MCP_LLM_REST_MODEL`
+|`llama3.2:3b`
+|Model name for REST API
+
+|`MCP_LLM_REST_API_KEY`
+|_(optional)_
+|Bearer token for authenticated endpoints
+|===
+
+=== System Properties (Legacy - getLLMSummarizer)
 
 [cols="1,2,2"]
 |===
@@ -147,15 +186,13 @@ class SkainetKLlamaService {
 [mermaid]
 ----
 flowchart LR
-    ENV[Environment / CLI Args]
-    PROPS[System Properties]
-    CONFIG[LLMEngineConfig]
-    FACTORY[Factory Function]
-    IMPL[Implementation]
+    ENV[Environment Variables]
+    BACKEND[LLMBackendType.fromEnv]
+    FACTORY[LLMServiceFactory]
+    IMPL[LLMService Implementation]
 
-    ENV --> PROPS
-    PROPS --> CONFIG
-    CONFIG --> FACTORY
+    ENV --> BACKEND
+    BACKEND --> FACTORY
     FACTORY --> IMPL
 ----
 

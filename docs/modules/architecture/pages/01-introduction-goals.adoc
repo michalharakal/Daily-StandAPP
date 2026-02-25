@@ -9,7 +9,7 @@ DailyStandApp is designed to streamline the daily standup process for software d
 
 * *Automated commit retrieval*: Fetching git commits from local repositories for a specified time period
 * *AI-powered summarization*: Using local LLM inference to generate concise, standup-ready summaries
-* *Multiple access methods*: Supporting CLI, desktop UI, and MCP protocol for AI assistant integration
+* *Multiple access methods*: Supporting CLI, MCP protocol for AI assistant integration, and a benchmark suite for evaluating LLM backends
 
 === Key Functional Requirements
 
@@ -38,7 +38,7 @@ DailyStandApp is designed to streamline the daily standup process for software d
 |Medium
 
 |FR-06
-|Provide desktop GUI for interactive use
+|Benchmark and evaluate different LLM backends
 |Medium
 |===
 
@@ -90,7 +90,7 @@ graph LR
 
 |5
 |*Extensibility*
-|Pluggable LLM architecture via `LLMService` interface. Currently implemented with SKaiNET kllama, but extensible for future local backends.
+|Pluggable LLM architecture via `LLMService` interface. Currently implemented with three backends: SKaiNET kllama (local), REST API (OpenAI-compatible), and JLama (pure Java).
 |===
 
 IMPORTANT: Privacy is non-negotiable. The embedded AI engine (SKaiNET kllama) exists specifically to ensure commit data never leaves the developer's machine. Cloud-based AI services are explicitly excluded from this architecture.

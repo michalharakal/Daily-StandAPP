@@ -54,7 +54,6 @@ Models are 4-8GB
 graph TB
     subgraph "High Priority"
         TD1[CLI Not Implemented<br/>Stub only]
-        TD2[ComposeApp Incomplete<br/>Basic UI]
     end
 
     subgraph "Medium Priority"
@@ -69,7 +68,6 @@ graph TB
     end
 
     style TD1 fill:#ffcdd2
-    style TD2 fill:#ffcdd2
     style TD3 fill:#fff9c4
     style TD4 fill:#fff9c4
 ----
@@ -84,11 +82,6 @@ graph TB
 |*CLI Implementation*
 |`Main.java` prints "Hello, World!"
 |Implement argument parsing, wire to GitClient and LLMSummarizer
-
-|TD-02
-|*ComposeApp UI*
-|Basic "Click me!" button
-|Build proper UI with repository selection, date pickers, summary display
 
 |TD-03
 |*MCP standup_summary Tool*
@@ -142,14 +135,14 @@ quadrantChart
 === Medium Term
 
 * [ ] Complete CLI implementation
-* [ ] Build functional ComposeApp UI
 * [ ] Add integration tests
+* [ ] Unify configuration approach (env vars vs system properties)
 
 === Long Term
 
 * [ ] Native platform support (beyond stubs)
 * [ ] HTTP transport option for MCP
-* [ ] Model management UI
+* [ ] Model management tooling
 
 == 11.5 Dependencies Risk
 
@@ -158,9 +151,9 @@ quadrantChart
 |Dependency |Version |Risk Level |Notes
 
 |SKaiNET
-|0.8.3
+|0.13.0
 |Medium
-|Active development, API may change
+|Active development, API may change (migrated from 0.8.3)
 
 |MCP Kotlin SDK
 |0.7.2

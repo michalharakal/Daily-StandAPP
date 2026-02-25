@@ -61,9 +61,9 @@ The documentation follows the https://arc42.org[arc42] template for software arc
 ----
 graph TB
     subgraph "DailyStandApp"
-        UI[composeApp<br/>Desktop UI]
         CLI[StandAPP-cli<br/>Command Line]
         MCP[mcp-server<br/>MCP Protocol]
+        BENCH[benchmark<br/>LLM Evaluation]
 
         LLM[llm<br/>AI Engine]
         DATA[data<br/>Git Access]
@@ -76,20 +76,19 @@ graph TB
         MCPCLIENT[MCP Clients<br/>Claude, etc.]
     end
 
-    UI --> LLM
-    UI --> DATA
     CLI --> LLM
     CLI --> DATA
     MCP --> LLM
     MCP --> DATA
+    BENCH --> LLM
 
     LLM --> MODELS
     DATA --> GIT
     MCPCLIENT --> MCP
 
-    style UI fill:#e1f5fe
     style CLI fill:#e1f5fe
     style MCP fill:#e1f5fe
+    style BENCH fill:#e1f5fe
     style LLM fill:#fff3e0
     style DATA fill:#e8f5e9
 ----
@@ -98,7 +97,6 @@ graph TB
 
 * *Language*: Kotlin 2.2+ with Multiplatform
 * *Runtime*: JDK 21+ (required for Vector API)
-* *UI Framework*: Compose Multiplatform
 * *Build System*: Gradle with Kotlin DSL
 * *AI Engine*: SKaiNET kllama
 * *Git Integration*: Eclipse JGit

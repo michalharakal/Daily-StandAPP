@@ -121,8 +121,14 @@
 |*JGit*
 |Eclipse Foundation's pure Java implementation of Git.
 
-|*Compose Multiplatform*
-|JetBrains' declarative UI framework based on Jetpack Compose, supporting desktop, web, and mobile.
+|*Ollama*
+|Local LLM inference server exposing an OpenAI-compatible REST API.
+
+|*LM Studio*
+|Desktop application for running local LLMs with an OpenAI-compatible API.
+
+|*JLama*
+|Pure Java implementation for LLM inference.
 
 |*Antora*
 |Documentation site generator designed for creating documentation portals from AsciiDoc content.

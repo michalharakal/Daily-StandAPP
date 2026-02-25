@@ -17,10 +17,6 @@
 |Gradle with Kotlin DSL
 |First-class Kotlin Multiplatform support, version catalogs
 
-|*UI Framework*
-|Compose Multiplatform
-|Declarative UI, shares code with Android, native desktop rendering
-
 |*Git Library*
 |Eclipse JGit
 |Pure Java, no native dependencies, mature and stable
@@ -46,9 +42,9 @@
 ----
 graph TB
     subgraph "Presentation Layer"
-        UI[composeApp]
         CLI[StandAPP-cli]
         MCP[mcp-server]
+        BENCH[benchmark]
     end
 
     subgraph "Application Layer"
@@ -60,19 +56,18 @@ graph TB
         DOMAIN[domain module]
     end
 
-    UI --> LLM
-    UI --> DATA
     CLI --> LLM
     CLI --> DATA
     MCP --> LLM
     MCP --> DATA
+    BENCH --> LLM
 
     LLM --> DOMAIN
     DATA --> DOMAIN
 
-    style UI fill:#bbdefb
     style CLI fill:#bbdefb
     style MCP fill:#bbdefb
+    style BENCH fill:#bbdefb
     style LLM fill:#c8e6c9
     style DATA fill:#c8e6c9
     style DOMAIN fill:#fff9c4
@@ -123,7 +118,11 @@ actual fun getLLMSummarizer(): LLMSummarizer = when {
 
 *Problem*: Need local LLM inference without cloud dependencies, with flexibility to swap implementations.
 
-*Solution*: Define `LLMService` interface for pluggable backends. Currently implemented with SKaiNET kllama - a pure Kotlin LLM implementation with SIMD acceleration via Java Vector API.
+*Solution*: Define `LLMService` interface for pluggable backends. Currently implemented with three backends, selectable via `MCP_LLM_BACKEND` environment variable:
+
+* **SKaiNET kllama** - Pure Kotlin LLM with SIMD acceleration via Java Vector API
+* **REST API** - OpenAI-compatible HTTP endpoint (Ollama, llama.cpp server, LM Studio, etc.)
+* **JLama** - Pure Java LLM inference
 
 [mermaid]
 ----
@@ -133,21 +132,32 @@ classDiagram
         +generate(prompt, maxTokens, temp, topP) String
     }
 
-    class SkainetKLlamaService {
+    class SKaiNetLLMService {
         -runtime: LlamaRuntime
         -tokenizer: GGUFTokenizer
-        -mutex: Mutex
-        +generate()
-        +generateStream()
-    }
-
-    class FutureBackend {
-        <<future>>
         +generate()
     }
 
-    LLMService <|.. SkainetKLlamaService
-    LLMService <|.. FutureBackend
+    class RestApiLLMService {
+        -baseUrl: String
+        -modelName: String
+        -apiKey: String
+        +generate()
+    }
+
+    class JLamaService {
+        +generate()
+    }
+
+    class LLMServiceFactory {
+        +create() LLMService
+        +create(backendType, config) LLMService
+    }
+
+    LLMService <|.. SKaiNetLLMService
+    LLMService <|.. RestApiLLMService
+    LLMService <|.. JLamaService
+    LLMServiceFactory ..> LLMService : creates
 ----
 
 *Consequences*:

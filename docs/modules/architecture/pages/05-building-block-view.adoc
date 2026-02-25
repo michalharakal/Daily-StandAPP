@@ -10,37 +10,34 @@
 graph TB
     subgraph "DailyStandApp System"
         subgraph "Presentation"
-            COMPOSE[composeApp]
             CLI[StandAPP-cli]
             MCPS[mcp-server]
+            BENCH[benchmark]
         end
 
         subgraph "Core Modules"
             LLM[llm]
             DATA[data]
             DOMAIN[domain]
-            SHARED[shared]
         end
     end
 
-    COMPOSE --> LLM
-    COMPOSE --> DATA
     CLI --> LLM
     CLI --> DATA
     MCPS --> LLM
     MCPS --> DATA
     MCPS --> DOMAIN
+    BENCH --> LLM
 
     LLM --> DOMAIN
     DATA --> DOMAIN
 
-    style COMPOSE fill:#bbdefb
     style CLI fill:#bbdefb
     style MCPS fill:#bbdefb
+    style BENCH fill:#bbdefb
     style LLM fill:#c8e6c9
     style DATA fill:#c8e6c9
     style DOMAIN fill:#fff9c4
-    style SHARED fill:#f5f5f5
 ----
 
 === Module Overview
@@ -48,10 +45,6 @@ graph TB
 [cols="1,2,3"]
 |===
 |Module |Responsibility |Key Technologies
-
-|`composeApp`
-|Desktop UI for interactive use
-|Compose Multiplatform, Lifecycle ViewModel
 
 |`StandAPP-cli`
 |Command-line interface
@@ -62,8 +55,8 @@ graph TB
 |MCP Kotlin SDK, Ktor, Stdio transport
 
 |`llm`
-|LLM inference abstraction and implementations
-|SKaiNET kllama, Coroutines
+|LLM inference abstraction with pluggable backends
+|SKaiNET kllama, REST API (Ktor Client), JLama, Coroutines
 
 |`data`
 |Git repository access
@@ -73,14 +66,14 @@ graph TB
 |Shared domain models
 |Kotlin data classes
 
-|`shared`
-|Shared utilities
-|Kotlin Multiplatform
+|`benchmark`
+|LLM backend evaluation and comparison
+|JVM, JSON test cases, Markdown/CSV reporting
 |===
 
 == 5.2 Module: llm (Level 2)
 
-The LLM module provides AI inference capabilities with a pluggable architecture. Currently implemented with SKaiNET kllama.
+The LLM module provides AI inference capabilities with a pluggable architecture. Three backends are available, selected via the `MCP_LLM_BACKEND` environment variable.
 
 [mermaid]
 ----
@@ -93,33 +86,46 @@ graph TB
 
         subgraph "jvmMain"
             ACTUAL[actual fun<br/>getLLMSummarizer]
+            FACTORY[LLMServiceFactory]
+            BACKEND[LLMBackendType<br/>enum]
+            LCONFIG[LLMConfig]
             CONFIG[LLMEngineConfig]
             MOCK[MockJvmLLMSummarizer]
             SERVICE[LLMService<br/>interface - pluggable]
+            REST[RestApiLLMService]
+            JLAMA[JLamaService]
         end
 
         subgraph "jvmMain/kotlin-skainet"
             SKAINET[SkainetKLlamaService]
             SKSUM[SkainetLLMSummarizer]
+            SKLLM[SKaiNetLLMService]
         end
-
-        FUTURE[Future Backends...]
     end
 
     EXPECT --> ACTUAL
     ACTUAL --> CONFIG
     CONFIG --> SKSUM
-    CONFIG -->|"test"| MOCK
+    ACTUAL -->|"test"| MOCK
 
     SKSUM --> SKAINET
-    SKAINET --> SERVICE
-    FUTURE -.-> SERVICE
+    FACTORY --> BACKEND
+    FACTORY --> LCONFIG
+    FACTORY --> SKLLM
+    FACTORY --> REST
+    FACTORY --> JLAMA
+
+    SKLLM --> SERVICE
+    REST --> SERVICE
+    JLAMA --> SERVICE
 
     style IFACE fill:#e1f5fe
     style SERVICE fill:#fff9c4
-    style SKAINET fill:#fff3e0
+    style FACTORY fill:#e8f5e9
+    style SKLLM fill:#fff3e0
+    style REST fill:#fff3e0
+    style JLAMA fill:#fff3e0
     style SKSUM fill:#c8e6c9
-    style FUTURE fill:#f5f5f5,stroke-dasharray: 5 5
 ----
 
 === Key Classes
@@ -134,20 +140,35 @@ graph TB
 |`LLMService`
 |JVM interface for pluggable backends: `generate(prompt, maxTokens, temperature, topP): String`
 
+|`LLMServiceFactory`
+|Factory that instantiates the right `LLMService` based on `MCP_LLM_BACKEND` environment variable or explicit `LLMConfig`
+
+|`LLMBackendType`
+|Enum: `SKAINET`, `REST_API`, `JLAMA` - selectable via `MCP_LLM_BACKEND` env var
+
+|`LLMConfig`
+|Data class for programmatic backend configuration (modelPath, baseUrl, modelName, apiKey)
+
+|`SKaiNetLLMService`
+|SKaiNET kllama implementation with GGUF model loading, streaming mode, chat templates
+
+|`RestApiLLMService`
+|OpenAI-compatible REST endpoint client (works with Ollama, llama.cpp server, LM Studio, vLLM)
+
+|`JLamaService`
+|Pure Java LLM inference backend
+
 |`SkainetKLlamaService`
-|SKaiNET kllama implementation with GGUF model loading, KV-cache, streaming
+|Lower-level SKaiNET kllama wrapper with Mutex-based thread safety
 
 |`SkainetLLMSummarizer`
-|Production summarizer wrapping SkainetKLlamaService
+|Production summarizer wrapping SkainetKLlamaService (used via `getLLMSummarizer()`)
 
 |`LLMEngineConfig`
-|Configuration via system properties (`llm.model`, `llm.max.seq.len`)
-
-|`SkainetConfig`
-|Data class for SKaiNET settings (modelPath, maxSeqLen, temperature, etc.)
+|Configuration via system properties (`llm.model`, `llm.max.seq.len`) for `getLLMSummarizer()`
 |===
 
-NOTE: The `LLMService` interface enables future backend implementations. New backends can be added by implementing this interface.
+NOTE: New backends can be added by implementing the `LLMService` interface and registering them in `LLMServiceFactory`.
 
 == 5.3 Module: data (Level 2)
 
@@ -269,7 +290,82 @@ graph TB
 |Fetch all commits within date range
 |===
 
-== 5.5 Component Interaction
+== 5.5 Module: benchmark (Level 2)
+
+The benchmark module evaluates and compares LLM backends using predefined test cases.
+
+[mermaid]
+----
+graph TB
+    subgraph "benchmark module"
+        subgraph "Entry"
+            MAIN[Main.kt<br/>CLI entry]
+        end
+
+        subgraph "Core"
+            RUNNER[BenchmarkRunner]
+            CASES[BenchmarkCase]
+            PROMPTS[PromptTemplates]
+            FORMAT[CommitFormatter]
+        end
+
+        subgraph "Evaluation"
+            SCORING[Scoring]
+            METRICS[Metrics]
+        end
+
+        subgraph "Output"
+            REPORT[Reporting<br/>Markdown + CSV]
+        end
+    end
+
+    subgraph "Dependencies"
+        LLM[llm module<br/>LLMServiceFactory]
+    end
+
+    subgraph "Test Data"
+        JSON[(bench/<br/>case-*.json)]
+    end
+
+    MAIN --> RUNNER
+    RUNNER --> CASES
+    RUNNER --> PROMPTS
+    RUNNER --> FORMAT
+    RUNNER --> LLM
+    CASES --> JSON
+    RUNNER --> SCORING
+    RUNNER --> METRICS
+    SCORING --> REPORT
+    METRICS --> REPORT
+
+    style RUNNER fill:#c8e6c9
+    style SCORING fill:#fff9c4
+    style REPORT fill:#e3f2fd
+----
+
+=== Benchmark Features
+
+[cols="1,3"]
+|===
+|Feature |Description
+
+|*Test Cases*
+|15 JSON scenarios (normal, edge, stress) in `bench/` directory
+
+|*Multi-Backend*
+|Compares SKaiNET, JLama, and REST API backends side-by-side
+
+|*Quality Scoring*
+|JSON validity, schema compliance, hallucination detection
+
+|*Performance Metrics*
+|Latency (p50/p95), throughput, determinism across runs
+
+|*Reporting*
+|Generates Markdown reports and CSV results for analysis
+|===
+
+== 5.6 Component Interaction
 
 [mermaid]
 ----
@@ -296,5 +392,5 @@ flowchart LR
     TRANSPORT <--> SERVER
     SERVER --> TOOLS
     TOOLS --> GITCLIENT
-    TOOLS -.->|"future"| SUMMARIZER
+    TOOLS --> SUMMARIZER
 ----

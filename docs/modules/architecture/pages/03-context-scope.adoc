@@ -24,7 +24,7 @@ graph TB
         MODEL[(GGUF Models)]
     end
 
-    DEV -->|"CLI / Desktop UI"| APP
+    DEV -->|"CLI"| APP
     AI -->|"MCP Protocol"| APP
     APP -->|"Read commits"| GIT
     APP -->|"Load weights"| MODEL
@@ -48,10 +48,6 @@ graph TB
 |Developer
 |Command-line interface for scripted use
 
-|*Desktop UI*
-|Developer
-|Compose Multiplatform GUI
-
 |*MCP Protocol*
 |AI Assistant
 |Model Context Protocol over stdio transport
@@ -73,14 +69,13 @@ flowchart LR
     subgraph "Client Layer"
         CLAUDE[Claude Desktop]
         TERMINAL[Terminal]
-        DESKTOP[Desktop App]
     end
 
     subgraph "DailyStandApp"
         subgraph "Entry Points"
             MCP[MCP Server<br/>stdio]
             CLI[CLI<br/>args]
-            UI[Compose UI]
+            BENCH[Benchmark<br/>CLI]
         end
 
         subgraph "Core"
@@ -96,14 +91,13 @@ flowchart LR
 
     CLAUDE -->|"JSON-RPC/stdio"| MCP
     TERMINAL -->|"args"| CLI
-    DESKTOP -->|"events"| UI
+    TERMINAL -->|"args"| BENCH
 
     MCP --> LLM
     MCP --> DATA
     CLI --> LLM
     CLI --> DATA
-    UI --> LLM
-    UI --> DATA
+    BENCH --> LLM
 
     DATA -->|"org.eclipse.jgit"| GIT
     LLM -->|"SKaiNET kllama"| GGUF
@@ -125,10 +119,10 @@ flowchart LR
 |JVM Main
 |Text output
 
-|Desktop UI
-|In-process
-|Compose Multiplatform
-|Kotlin data classes
+|Benchmark
+|Process Args + Env Vars
+|JVM Main
+|Markdown report + CSV
 
 |Git Access
 |File System
