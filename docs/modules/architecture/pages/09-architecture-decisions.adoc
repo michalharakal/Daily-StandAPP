@@ -210,6 +210,40 @@ tasks.named<Jar>("jvmJar") {
 * (-) Larger file size (~50MB+)
 * (-) Duplicate class handling required
 
+== ADR-009: OpenAI-Compatible Cloud API Module
+
+=== Status
+Accepted
+
+=== Context
+The existing LLM integration options (SKaiNET kllama, JLama, REST API client) are tightly coupled to the application's internal `LLMService` interface. External tools and standard OpenAI-compatible clients cannot interact with the system directly.
+
+=== Decision
+Add a separate `cloud-api` module group providing an OpenAI-compatible REST API server, client, model DTOs, and Koog agent integration. The modules are:
+
+* **`cloud-api:model`** - Shared `ChatCompletionRequest`/`ChatCompletionResponse` DTOs with Kotlin Serialization
+* **`cloud-api:server`** - Ktor CIO server exposing `/v1/chat/completions` and `/v1/models`
+* **`cloud-api:client`** - `LlmClient` HTTP client for calling the API
+* **`cloud-api:agent`** - Koog `AIAgent` that starts the local server and runs agent interactions
+
+The API contract is documented in `cloud-api/openapi.yaml` (OpenAPI 3.1).
+
+=== Rationale
+* OpenAI API is the de facto standard for LLM interaction
+* Enables any OpenAI-compatible tool to use local inference
+* Koog agent framework provides structured agent workflows
+* Separate module group keeps cloud-api concerns isolated from core modules
+
+=== Consequences
+* (+) Standard API compatible with a wide ecosystem of tools
+* (+) Clean separation from core modules
+* (+) Can be deployed independently as a standalone server
+* (+) Koog agent integration for advanced agent workflows
+* (-) Currently uses a stub backend (echoes user messages)
+* (-) Additional dependencies (Ktor server, Koog agents)
+
+---
+
 == ADR-008: Environment Variables for Configuration
 
 === Status

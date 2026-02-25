@@ -45,6 +45,7 @@ graph TB
         CLI[StandAPP-cli]
         MCP[mcp-server]
         BENCH[benchmark]
+        CLOUD[cloud-api]
     end
 
     subgraph "Application Layer"
@@ -61,6 +62,7 @@ graph TB
     MCP --> LLM
     MCP --> DATA
     BENCH --> LLM
+    CLOUD --> LLM
 
     LLM --> DOMAIN
     DATA --> DOMAIN
@@ -68,6 +70,7 @@ graph TB
     style CLI fill:#bbdefb
     style MCP fill:#bbdefb
     style BENCH fill:#bbdefb
+    style CLOUD fill:#bbdefb
     style LLM fill:#c8e6c9
     style DATA fill:#c8e6c9
     style DOMAIN fill:#fff9c4

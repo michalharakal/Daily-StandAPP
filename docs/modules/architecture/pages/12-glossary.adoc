@@ -135,6 +135,15 @@
 
 |*Arc42*
 |Template for documenting software and system architectures, providing a standardized structure.
+
+|*Ktor*
+|Kotlin-first asynchronous web framework by JetBrains, used for both server and client HTTP in the cloud-api modules.
+
+|*Koog*
+|Kotlin agent framework (by JetBrains) for building AI agents with OpenAI-compatible LLM backends.
+
+|*OpenAI API*
+|De facto standard REST API for LLM chat completions, originally by OpenAI, widely adopted by local inference tools.
 |===
 
 == Abbreviations

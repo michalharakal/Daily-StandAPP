@@ -152,7 +152,65 @@ sequenceDiagram
     Note over Setup: Server running...<br/>waiting for requests
 ----
 
-== 6.5 Error Handling Flow
+== 6.5 Cloud API Request Flow
+
+This scenario shows how an external client interacts with the cloud-api server via the OpenAI-compatible REST API.
+
+[mermaid]
+----
+sequenceDiagram
+    participant Client as HTTP Client<br/>(LlmClient / curl)
+    participant Server as LocalAIServer<br/>(Ktor CIO)
+    participant Handler as Route Handler
+    participant Model as Response Builder
+
+    Client->>Server: POST /v1/chat/completions<br/>{model, messages}
+    Server->>Handler: dispatch request
+
+    Handler->>Handler: parse JSON body
+    Handler->>Handler: extract model & messages
+    Handler->>Handler: find last user message
+
+    Handler->>Model: build ChatCompletionResponse
+    Model-->>Handler: response with choices & usage
+
+    Handler-->>Server: respond(response)
+    Server-->>Client: 200 OK<br/>{id, choices, usage}
+
+    alt Error
+        Handler-->>Server: 500 error JSON
+        Server-->>Client: {"error": {...}}
+    end
+----
+
+== 6.6 Cloud API Agent Flow
+
+Shows the Koog agent starting the local server and running an AI interaction.
+
+[mermaid]
+----
+sequenceDiagram
+    participant Main as AgentMain
+    participant Server as LocalAIServer
+    participant Agent as Koog AIAgent
+    participant Client as OpenAILLMClient
+
+    Main->>Server: createLocalAIServer(8080)
+    Main->>Server: start(wait=false)
+
+    Main->>Client: new OpenAILLMClient<br/>(baseUrl=localhost:8080)
+    Main->>Agent: new AIAgent(executor, model, systemPrompt)
+
+    Agent->>Client: run(userMessage)
+    Client->>Server: POST /v1/chat/completions
+    Server-->>Client: ChatCompletionResponse
+    Client-->>Agent: response text
+
+    Agent-->>Main: result
+    Main->>Server: stop()
+----
+
+== 6.7 Error Handling Flow
 
 [mermaid]
 ----

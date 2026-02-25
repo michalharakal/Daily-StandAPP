@@ -13,6 +13,7 @@ graph TB
             MCP[mcp-server-jvm.jar]
             CLI[StandAPP-cli]
             BENCH[benchmark]
+            CLOUDAPI[cloud-api:server<br/>port 8080]
         end
 
         subgraph "File System"
@@ -35,6 +36,7 @@ graph TB
     style MCP fill:#c8e6c9
     style CLI fill:#bbdefb
     style BENCH fill:#bbdefb
+    style CLOUDAPI fill:#e3f2fd
     style REPOS fill:#fff9c4
     style MODELS fill:#fce4ec
 ----
@@ -59,6 +61,21 @@ graph TB
 |Fat JAR
 |`./gradlew :benchmark:jvmJar`
 |`benchmark/build/libs/benchmark-jvm.jar`
+
+|Cloud API Server
+|Application (Gradle `run`)
+|`./gradlew :cloud-api:server:run`
+|Ktor server on port 8080
+
+|Cloud API Client
+|Application (Gradle `run`)
+|`./gradlew :cloud-api:client:run`
+|Connects to cloud-api server
+
+|Cloud API Agent
+|Application (Gradle `run`)
+|`./gradlew :cloud-api:agent:run`
+|Starts server + runs Koog agent
 
 |Docker Image
 |Container

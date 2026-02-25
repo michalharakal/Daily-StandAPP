@@ -15,6 +15,13 @@ graph TB
             BENCH[benchmark]
         end
 
+        subgraph "Cloud API"
+            APISERVER[cloud-api:server]
+            APICLIENT[cloud-api:client]
+            APIAGENT[cloud-api:agent]
+            APIMODEL[cloud-api:model]
+        end
+
         subgraph "Core Modules"
             LLM[llm]
             DATA[data]
@@ -29,12 +36,20 @@ graph TB
     MCPS --> DOMAIN
     BENCH --> LLM
 
+    APISERVER --> APIMODEL
+    APICLIENT --> APIMODEL
+    APIAGENT --> APISERVER
+
     LLM --> DOMAIN
     DATA --> DOMAIN
 
     style CLI fill:#bbdefb
     style MCPS fill:#bbdefb
     style BENCH fill:#bbdefb
+    style APISERVER fill:#e3f2fd
+    style APICLIENT fill:#e3f2fd
+    style APIAGENT fill:#e3f2fd
+    style APIMODEL fill:#e3f2fd
     style LLM fill:#c8e6c9
     style DATA fill:#c8e6c9
     style DOMAIN fill:#fff9c4
@@ -69,6 +84,22 @@ graph TB
 |`benchmark`
 |LLM backend evaluation and comparison
 |JVM, JSON test cases, Markdown/CSV reporting
+
+|`cloud-api:model`
+|OpenAI-compatible data types (request/response DTOs)
+|Kotlin Serialization
+
+|`cloud-api:server`
+|OpenAI-compatible REST API server (`/v1/chat/completions`, `/v1/models`)
+|Ktor Server (CIO), Kotlin Serialization
+
+|`cloud-api:client`
+|HTTP client for the OpenAI-compatible API
+|Ktor Client (CIO), Kotlin Serialization
+
+|`cloud-api:agent`
+|AI agent using the local cloud-api server via Koog framework
+|Koog Agents, Ktor
 |===
 
 == 5.2 Module: llm (Level 2)
@@ -365,7 +396,75 @@ graph TB
 |Generates Markdown reports and CSV results for analysis
 |===
 
-== 5.6 Component Interaction
+== 5.6 Module: cloud-api (Level 2)
+
+The cloud-api module group provides an OpenAI-compatible REST API as an alternative interface to LLM capabilities. It consists of four submodules organized around a shared data model.
+
+[mermaid]
+----
+graph TB
+    subgraph "cloud-api module group"
+        subgraph "Shared"
+            MODEL[cloud-api:model<br/>DTOs & serialization]
+        end
+
+        subgraph "Server"
+            SERVER[cloud-api:server<br/>Ktor CIO]
+            ENDPOINTS["/v1/chat/completions<br/>/v1/models"]
+        end
+
+        subgraph "Client"
+            CLIENT[cloud-api:client<br/>LlmClient]
+        end
+
+        subgraph "Agent"
+            AGENT[cloud-api:agent<br/>Koog AIAgent]
+        end
+    end
+
+    SERVER --> MODEL
+    SERVER --> ENDPOINTS
+    CLIENT --> MODEL
+    AGENT --> SERVER
+
+    style MODEL fill:#fff9c4
+    style SERVER fill:#c8e6c9
+    style CLIENT fill:#e3f2fd
+    style AGENT fill:#f3e5f5
+----
+
+=== Key Classes
+
+[cols="1,2,3"]
+|===
+|Class |Module |Description
+
+|`ChatCompletionRequest`
+|`cloud-api:model`
+|OpenAI-compatible request with model, messages, temperature, max_tokens
+
+|`ChatCompletionResponse`
+|`cloud-api:model`
+|Response with choices, usage stats, and model info
+
+|`LocalAIServer`
+|`cloud-api:server`
+|Ktor-based server exposing `/v1/chat/completions` and `/v1/models` endpoints
+
+|`LlmClient`
+|`cloud-api:client`
+|HTTP client with `chatCompletion()` and `listModels()` methods
+
+|`AgentMain`
+|`cloud-api:agent`
+|Koog AIAgent that starts the local server and runs agent interactions
+|===
+
+=== OpenAPI Specification
+
+The API contract is documented in `cloud-api/openapi.yaml` following OpenAPI 3.1, covering request/response schemas, error types, and endpoint definitions.
+
+== 5.7 Component Interaction
 
 [mermaid]
 ----

@@ -59,6 +59,10 @@ graph TB
 |*File System*
 |GGUF Model
 |SKaiNET loads quantized model files
+
+|*REST API*
+|Cloud API Client / External Consumers
+|OpenAI-compatible HTTP API (`/v1/chat/completions`, `/v1/models`) via cloud-api server module
 |===
 
 == 3.2 Technical Context
@@ -82,6 +86,11 @@ flowchart LR
             LLM[LLM Module]
             DATA[Data Module]
         end
+
+        subgraph "Cloud API"
+            APISERVER[Cloud API Server<br/>OpenAI-compatible]
+            APICLIENT[Cloud API Client]
+        end
     end
 
     subgraph "Infrastructure"
@@ -92,12 +101,14 @@ flowchart LR
     CLAUDE -->|"JSON-RPC/stdio"| MCP
     TERMINAL -->|"args"| CLI
     TERMINAL -->|"args"| BENCH
+    TERMINAL -->|"HTTP REST"| APISERVER
 
     MCP --> LLM
     MCP --> DATA
     CLI --> LLM
     CLI --> DATA
     BENCH --> LLM
+    APICLIENT --> APISERVER
 
     DATA -->|"org.eclipse.jgit"| GIT
     LLM -->|"SKaiNET kllama"| GGUF
@@ -133,6 +144,11 @@ flowchart LR
 |File System
 |SKaiNET I/O
 |GGUF binary format
+
+|Cloud API
+|HTTP REST
+|Ktor Server/Client
+|OpenAI-compatible JSON
 |===
 
 == 3.3 Data Flow Overview

@@ -102,6 +102,11 @@ graph TB
 |*Error Handling*
 |Silent failures in GitClient
 |Add proper error propagation and user-friendly messages
+
+|TD-07
+|*Cloud API Stub Backend*
+|Server echoes user messages instead of running real inference
+|Wire cloud-api server to an actual LLM backend (e.g., `LLMService` from llm module)
 |===
 
 == 11.3 Risk Matrix
@@ -131,6 +136,7 @@ quadrantChart
 * [ ] Implement `standup_summary` MCP tool
 * [ ] Add streaming support to MCP responses
 * [ ] Improve error messages
+* [ ] Wire cloud-api server to real LLM backend
 
 === Medium Term
 
@@ -169,4 +175,14 @@ quadrantChart
 |2.2.20
 |Low
 |Stable releases, good compatibility
+
+|Ktor
+|3.3.0
+|Low
+|Mature, stable API (used by cloud-api modules)
+
+|Koog Agents
+|0.6.1
+|Medium
+|Early-stage framework, API may change
 |===
