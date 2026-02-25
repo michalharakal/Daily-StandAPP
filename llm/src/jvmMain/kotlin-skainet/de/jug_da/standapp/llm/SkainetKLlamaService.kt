@@ -6,14 +6,15 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
+import sk.ainet.apps.kllama.CpuAttentionBackend
 import sk.ainet.apps.kllama.GGUFTokenizer
 import sk.ainet.apps.kllama.LlamaIngestion
 import sk.ainet.apps.kllama.LlamaRuntime
-import sk.ainet.apps.kllama.createOptimalKvCache
-import sk.ainet.lang.DirectCpuExecutionContext
+import sk.ainet.context.DefaultDataExecutionContext
+import sk.ainet.lang.types.FP32
 
 class SkainetKLlamaService private constructor(
-    private val runtime: LlamaRuntime,
+    private val runtime: LlamaRuntime<FP32>,
     private val tokenizer: GGUFTokenizer,
     private val config: SkainetConfig
 ) : LLMService {
@@ -22,8 +23,8 @@ class SkainetKLlamaService private constructor(
 
     companion object {
         fun create(config: SkainetConfig): SkainetKLlamaService = runBlocking {
-            val ctx = DirectCpuExecutionContext()
-            val ingestion = LlamaIngestion(ctx)
+            val ctx = DefaultDataExecutionContext()
+            val ingestion = LlamaIngestion(ctx, FP32::class)
 
             val weights = ingestion.load {
                 SystemFileSystem.source(Path(config.modelPath)).buffered()
@@ -33,17 +34,18 @@ class SkainetKLlamaService private constructor(
                 SystemFileSystem.source(Path(config.modelPath)).buffered()
             )
 
-            val kvCache = createOptimalKvCache(
-                nLayers = weights.nLayers,
-                seqLen = config.maxSeqLen,
-                kvDim = weights.kvDim
+            val attentionBackend = CpuAttentionBackend(
+                ctx = ctx,
+                weights = weights,
+                dtype = FP32::class,
+                ropeFreqBase = config.ropeFreqBase
             )
 
             val runtime = LlamaRuntime(
                 ctx = ctx,
                 weights = weights,
-                kvCache = kvCache,
-                ropeFreqBase = config.ropeFreqBase,
+                attentionBackend = attentionBackend,
+                dtype = FP32::class,
                 eps = config.eps
             )
 

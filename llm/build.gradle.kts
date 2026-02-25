@@ -26,9 +26,6 @@ kotlin {
         }
     }
 
-    macosX64()
-    macosArm64()
-
     sourceSets {
         commonMain.dependencies {
             implementation(libs.kotlinx.io.core)

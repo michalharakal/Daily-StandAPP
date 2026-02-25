@@ -66,10 +66,6 @@ fun main() {
         }
     }
 
-    if (requestedBackends == null || "JLAMA" in requestedBackends) {
-        backends["JLAMA"] = LLMBackendType.JLAMA to LLMConfig()
-    }
-
     if (requestedBackends == null || "REST_API" in requestedBackends) {
         backends["REST_API (local)"] = LLMBackendType.REST_API to LLMConfig(
             baseUrl = localUrl,
