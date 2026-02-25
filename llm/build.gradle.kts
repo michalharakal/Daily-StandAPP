@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
+    kotlin("plugin.serialization") version libs.versions.kotlin.get()
 }
 
 kotlin {
@@ -47,6 +48,16 @@ kotlin {
                 implementation(libs.skainet.backend.cpu)
                 implementation(libs.skainet.io.core)
                 implementation(libs.skainet.io.gguf)
+
+                implementation(libs.skainet.kllama)
+                // SKaiNET LLM + Agent APIs (generateUntilStop, ChatMLTemplate, Tokenizer)
+                implementation(libs.skainet.llm)
+                implementation(libs.skainet.kllama.agents)
+
+                // Ktor HTTP client for REST API backend
+                implementation(libs.ktor.client.cio)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
             }
         }
     }

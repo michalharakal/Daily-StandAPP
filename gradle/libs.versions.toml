@@ -12,7 +12,7 @@ kotlinxDatetimeVersion = "0.7.1"
 kotlinxIo = "0.8.0"
 mcp-kotlin = "0.7.2"
 orgEclipseJgit = "7.1.0.202411261347-r"
-skainet = "0.8.3"
+skainet = "0.13.0"
 slf4jSimple = "2.0.17"
 ktor = "3.3.0"
 
@@ -28,19 +28,27 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 mcp-kotlin-server = { group = "io.modelcontextprotocol", name = "kotlin-sdk-server", version.ref = "mcp-kotlin" }
 
-skainet-apps-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }
-skainet-lang-core = { module = "sk.ainet.core:skainet-lang-core", version.ref = "skainet" }
-skainet-lang-models = { module = "sk.ainet.core:skainet-lang-models", version.ref = "skainet" }
-skainet-backend-cpu = { module = "sk.ainet.core:skainet-backend-cpu", version.ref = "skainet" }
-skainet-io-core = { module = "sk.ainet.core:skainet-io-core", version.ref = "skainet" }
-skainet-io-gguf = { module = "sk.ainet.core:skainet-io-gguf", version.ref = "skainet" }
-
 eclipse-jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "orgEclipseJgit" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4jSimple" }
 
 ktor-server-cio = { group = "io.ktor", name = "ktor-server-cio", version.ref = "ktor" }
 ktor-server-sse = { group = "io.ktor", name = "ktor-server-sse", version.ref = "ktor" }
 
+ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
+ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+# SKaiNET
+skainet-apps-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }
+skainet-lang-core = { module = "sk.ainet.core:skainet-lang-core", version.ref = "skainet" }
+skainet-lang-models = { module = "sk.ainet.core:skainet-lang-models", version.ref = "skainet" }
+skainet-compile-core = { module = "sk.ainet.core:skainet-compile-core", version.ref = "skainet" }
+skainet-backend-cpu = { module = "sk.ainet.core:skainet-backend-cpu", version.ref = "skainet" }
+skainet-io-core = { module = "sk.ainet.core:skainet-io-core", version.ref = "skainet" }
+skainet-io-gguf = { module = "sk.ainet.core:skainet-io-gguf", version.ref = "skainet" }
+skainet-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }
+skainet-kllama-agents = { module = "sk.ainet.core:skainet-kllama-agents", version.ref = "skainet" }
+skainet-llm = { module = "sk.ainet.core:skainet-llm", version.ref = "skainet" }
 
 
 [plugins]

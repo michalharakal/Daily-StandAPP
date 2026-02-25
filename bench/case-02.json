@@ -1,0 +1,69 @@
+{
+  "id": "case-02",
+  "description": "Normal: Multi-topic day with 7 commits mixing bug fixes and feature work from a single author (Bob Schmidt). Covers REST API error handling, a new health-check endpoint, and test fixes.",
+  "commits": [
+    {
+      "id": "b1a2f3e",
+      "authorName": "Bob Schmidt",
+      "authorEmail": "bob.schmidt@jug-da.de",
+      "whenDate": "2025-04-08T07:45:00Z",
+      "message": "Fix NPE in REST API client when server returns empty body"
+    },
+    {
+      "id": "d4c5b6a",
+      "authorName": "Bob Schmidt",
+      "authorEmail": "bob.schmidt@jug-da.de",
+      "whenDate": "2025-04-08T08:30:00Z",
+      "message": "Add retry logic with exponential backoff for transient HTTP errors"
+    },
+    {
+      "id": "f7e8d9c",
+      "authorName": "Bob Schmidt",
+      "authorEmail": "bob.schmidt@jug-da.de",
+      "whenDate": "2025-04-08T10:15:00Z",
+      "message": "Implement /health endpoint for Ollama backend connectivity check"
+    },
+    {
+      "id": "2b3c4d5",
+      "authorName": "Bob Schmidt",
+      "authorEmail": "bob.schmidt@jug-da.de",
+      "whenDate": "2025-04-08T11:00:00Z",
+      "message": "Add integration test for health endpoint with WireMock"
+    },
+    {
+      "id": "6e7f8a9",
+      "authorName": "Bob Schmidt",
+      "authorEmail": "bob.schmidt@jug-da.de",
+      "whenDate": "2025-04-08T13:20:00Z",
+      "message": "Fix flaky timeout test by increasing WireMock stub delay"
+    },
+    {
+      "id": "0b1c2d3",
+      "authorName": "Bob Schmidt",
+      "authorEmail": "bob.schmidt@jug-da.de",
+      "whenDate": "2025-04-08T14:45:00Z",
+      "message": "Refactor HTTP client configuration into dedicated OllamaClientConfig class"
+    },
+    {
+      "id": "4e5f6a7",
+      "authorName": "Bob Schmidt",
+      "authorEmail": "bob.schmidt@jug-da.de",
+      "whenDate": "2025-04-08T16:10:00Z",
+      "message": "Bump ktor-client version to 2.3.9 to resolve connection leak"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["b1a2f3e", "d4c5b6a", "f7e8d9c", "2b3c4d5", "6e7f8a9", "0b1c2d3", "4e5f6a7"],
+      "forbiddenIds": [],
+      "notes": "Model should identify bug fix cluster (NPE, retry, flaky test), new feature (health endpoint), and refactoring/dependency update."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Bug Fixes", "Features", "Refactoring", "Testing"],
+      "expectedCommitCount": 7,
+      "notes": "Health endpoint is a feature. Retry logic and NPE fix are bug fixes. WireMock commits are testing. Config extraction is refactoring."
+    }
+  }
+}

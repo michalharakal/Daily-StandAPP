@@ -1,0 +1,41 @@
+{
+  "id": "case-14",
+  "description": "Long messages: 3 commits with very long multi-paragraph commit messages (each 4+ lines with details) — tests summarisation of verbose input",
+  "commits": [
+    {
+      "id": "ab1cd2e",
+      "authorName": "Elena Popov",
+      "authorEmail": "elena.popov@example.com",
+      "whenDate": "2025-04-08T09:30:00Z",
+      "message": "Redesign the caching layer to use Caffeine instead of Guava Cache\n\nThe previous Guava Cache implementation had several issues:\n- Memory consumption grew unbounded under high concurrency because\n  eviction was not triggered until GC pressure kicked in.\n- TTL was configured globally but some endpoints need different\n  expiration windows (e.g., user sessions = 30 min, product catalog = 24 h).\n\nThis commit replaces Guava Cache with Caffeine across all repository\nadapters. Each cache now declares its own maximumSize and expireAfterWrite\nvia a CacheConfig data class. Benchmarks on a 4-core dev machine show\n~18% lower p99 latency for the /api/v1/products endpoint under load."
+    },
+    {
+      "id": "3f4a5b6",
+      "authorName": "Elena Popov",
+      "authorEmail": "elena.popov@example.com",
+      "whenDate": "2025-04-08T13:00:00Z",
+      "message": "Migrate authentication from session-based to stateless JWT\n\nMotivation:\nOur horizontal scaling story was blocked by sticky sessions on the load\nbalancer. Moving to stateless JWT tokens allows any replica to validate\nrequests independently.\n\nChanges:\n- Remove HttpSession usage from SecurityConfig and all controllers.\n- Add JwtTokenProvider that issues RS256-signed access + refresh tokens.\n- Access tokens expire after 15 minutes; refresh tokens after 7 days.\n- Store refresh token family ID in Redis to support rotation and\n  revocation.\n- Update all integration tests to use Bearer token auth.\n\nRisks:\n- Token size (~800 bytes) increases every request header. Monitored\n  via Content-Length histogram in Grafana."
+    },
+    {
+      "id": "c7d8e9a",
+      "authorName": "Elena Popov",
+      "authorEmail": "elena.popov@example.com",
+      "whenDate": "2025-04-08T16:45:00Z",
+      "message": "Implement event-driven order processing with Kotlin coroutines and Kafka\n\nPreviously, order placement was a synchronous chain of service calls:\nOrderController -> OrderService -> InventoryService -> PaymentService\n-> NotificationService. Any failure in the chain rolled back everything\nand the user saw a 500 error.\n\nThis commit decouples the pipeline:\n1. OrderService publishes an OrderCreatedEvent to Kafka topic 'orders'.\n2. InventoryConsumer reserves stock and emits StockReservedEvent.\n3. PaymentConsumer charges the customer and emits PaymentCompletedEvent.\n4. NotificationConsumer sends confirmation email.\n\nEach consumer is a Kotlin coroutine-based Kafka listener using\nreactor-kafka. Failures at any stage emit a compensating event so the\nsaga can roll back gracefully.\n\nTesting: added docker-compose.kafka.yml with Redpanda for local\nintegration tests. CI pipeline updated to start Redpanda before the\ntest phase."
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["ab1cd2e", "3f4a5b6", "c7d8e9a"],
+      "forbiddenIds": [],
+      "notes": "Model must distil each long message into a concise bullet. Should not reproduce the full message text. Key concepts: Caffeine cache, JWT migration, Kafka event-driven orders."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Features", "Infrastructure", "Refactoring"],
+      "expectedCommitCount": 3,
+      "notes": "Despite verbose messages, each commit should map to exactly one JSON entry. Summaries should be concise, not echoing full paragraphs."
+    }
+  }
+}

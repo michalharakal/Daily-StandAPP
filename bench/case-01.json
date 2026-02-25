@@ -1,0 +1,62 @@
+{
+  "id": "case-01",
+  "description": "Normal: Typical day with 6 commits across 2-3 topics from a single author (Alice Mueller). Covers Gradle build improvements, Kotlin serialization work, and a minor README update.",
+  "commits": [
+    {
+      "id": "a1b2c3d",
+      "authorName": "Alice Mueller",
+      "authorEmail": "alice.mueller@jug-da.de",
+      "whenDate": "2025-03-12T08:15:00Z",
+      "message": "Upgrade Gradle wrapper to 8.6 and align plugin versions"
+    },
+    {
+      "id": "e4f5a6b",
+      "authorName": "Alice Mueller",
+      "authorEmail": "alice.mueller@jug-da.de",
+      "whenDate": "2025-03-12T09:42:00Z",
+      "message": "Add kotlinx-serialization-json dependency to data module"
+    },
+    {
+      "id": "c7d8e9f",
+      "authorName": "Alice Mueller",
+      "authorEmail": "alice.mueller@jug-da.de",
+      "whenDate": "2025-03-12T10:30:00Z",
+      "message": "Implement GitInfo serialization with custom date adapter"
+    },
+    {
+      "id": "1a2b3c4",
+      "authorName": "Alice Mueller",
+      "authorEmail": "alice.mueller@jug-da.de",
+      "whenDate": "2025-03-12T11:55:00Z",
+      "message": "Add unit tests for GitInfo JSON round-trip serialization"
+    },
+    {
+      "id": "5d6e7f8",
+      "authorName": "Alice Mueller",
+      "authorEmail": "alice.mueller@jug-da.de",
+      "whenDate": "2025-03-12T14:10:00Z",
+      "message": "Fix Gradle build cache invalidation for commonMain sourceSet"
+    },
+    {
+      "id": "9a0b1c2",
+      "authorName": "Alice Mueller",
+      "authorEmail": "alice.mueller@jug-da.de",
+      "whenDate": "2025-03-12T15:20:00Z",
+      "message": "Update README with build instructions for new serialization module"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["a1b2c3d", "e4f5a6b", "c7d8e9f", "1a2b3c4", "5d6e7f8", "9a0b1c2"],
+      "forbiddenIds": [],
+      "notes": "Model should group commits into build/infra, serialization feature, and documentation topics. No blockers expected."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Features", "Bug Fixes", "Documentation", "Build/Infra"],
+      "expectedCommitCount": 6,
+      "notes": "Serialization commits should cluster under Features; Gradle commits under Build/Infra; README under Documentation."
+    }
+  }
+}

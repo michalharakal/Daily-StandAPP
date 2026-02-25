@@ -25,12 +25,12 @@ dependencyResolutionManagement {
             }
         }
         mavenCentral()
-        mavenLocal()
     }
 }
 
-include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server")
+include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server", ":benchmark")
 include("StandAPP-cli")
+
 
 check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
     """

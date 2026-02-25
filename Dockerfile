@@ -80,7 +80,7 @@ ENV MCP_LOG_FILE_ENABLED=true
 ENV MCP_LOG_FILE_PATH=/app/logs/mcp-server.log
 ENV MCP_PERFORMANCE_METRICS_ENABLED=true
 ENV MCP_PERFORMANCE_METRICS_PORT=9090
-ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:+UseStringDeduplication"
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:+UseStringDeduplication --enable-preview --add-modules jdk.incubator.vector -Xmx6g"
 
 # Volumes for persistent data
 VOLUME ["/app/config", "/app/logs", "/app/data", "/app/models"]

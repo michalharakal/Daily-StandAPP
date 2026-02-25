@@ -1,0 +1,48 @@
+{
+  "id": "case-12",
+  "description": "CI/config only: 4 commits modifying CI pipeline, Dockerfile, and build config — no application logic changes",
+  "commits": [
+    {
+      "id": "c9d0e1f",
+      "authorName": "Priya Sharma",
+      "authorEmail": "priya.sharma@example.com",
+      "whenDate": "2025-09-22T08:45:00Z",
+      "message": "Update .github/workflows/ci.yml to use JDK 21 and Gradle 8.5"
+    },
+    {
+      "id": "2a3b4c5",
+      "authorName": "Priya Sharma",
+      "authorEmail": "priya.sharma@example.com",
+      "whenDate": "2025-09-22T10:00:00Z",
+      "message": "Add multi-stage Dockerfile with distroless runtime base image"
+    },
+    {
+      "id": "d6e7f8a",
+      "authorName": "Priya Sharma",
+      "authorEmail": "priya.sharma@example.com",
+      "whenDate": "2025-09-22T11:30:00Z",
+      "message": "Configure build.gradle.kts to enable Kotlin K2 compiler and add explicit API mode"
+    },
+    {
+      "id": "9b0c1d2",
+      "authorName": "Priya Sharma",
+      "authorEmail": "priya.sharma@example.com",
+      "whenDate": "2025-09-22T14:00:00Z",
+      "message": "Add .github/workflows/release.yml for automated GitHub Releases on tag push"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["c9d0e1f", "2a3b4c5", "d6e7f8a", "9b0c1d2"],
+      "forbiddenIds": [],
+      "notes": "Summary should reflect infrastructure and build improvements only. No feature or bugfix work."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["CI/CD", "Infrastructure", "Build"],
+      "expectedCommitCount": 4,
+      "notes": "All commits are CI, Docker, or build config. Model should not categorize these as Features."
+    }
+  }
+}

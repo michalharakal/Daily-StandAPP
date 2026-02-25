@@ -1,0 +1,19 @@
+{
+  "id": "case-03",
+  "description": "Empty input: Zero commits. Model must produce a meaningful response indicating there is nothing to report rather than hallucinating work.",
+  "commits": [],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": [],
+      "forbiddenIds": [],
+      "notes": "Model should state there are no commits and nothing to report. Must NOT invent any commit IDs, tasks, or work items. Each heading section should acknowledge the absence of data."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": [],
+      "expectedCommitCount": 0,
+      "notes": "JSON output must parse correctly with an empty categories array and zero commits. Blockers array may be empty or contain a note about no activity."
+    }
+  }
+}

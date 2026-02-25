@@ -1,0 +1,48 @@
+{
+  "id": "case-06",
+  "description": "Ambiguous: 4 commits referencing GitHub issue IDs where the open/closed status is unclear from commit messages alone. Model must handle uncertainty without fabricating resolution status.",
+  "commits": [
+    {
+      "id": "1f2e3d4",
+      "authorName": "Eva Green",
+      "authorEmail": "eva.braun@jug-da.de",
+      "whenDate": "2025-07-14T08:20:00Z",
+      "message": "WIP on #42: partial fix for model loading race condition"
+    },
+    {
+      "id": "5c6b7a8",
+      "authorName": "Eva Green",
+      "authorEmail": "eva.braun@jug-da.de",
+      "whenDate": "2025-07-14T10:45:00Z",
+      "message": "Related to #42 and #57: add synchronization to model init path"
+    },
+    {
+      "id": "9d0e1f2",
+      "authorName": "Eva Green",
+      "authorEmail": "eva.braun@jug-da.de",
+      "whenDate": "2025-07-14T13:30:00Z",
+      "message": "Addresses #57: improve error message when model file not found"
+    },
+    {
+      "id": "3a4b5c6",
+      "authorName": "Eva Green",
+      "authorEmail": "eva.braun@jug-da.de",
+      "whenDate": "2025-07-14T15:00:00Z",
+      "message": "See #42 — still investigating intermittent deadlock on multi-core"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["1f2e3d4", "5c6b7a8", "9d0e1f2", "3a4b5c6"],
+      "forbiddenIds": [],
+      "notes": "Model must reference issues #42 and #57 but should NOT claim either is resolved. #42 is explicitly still open (WIP, still investigating). #57 status is ambiguous (addressed but not closed). Blockers should mention the ongoing deadlock investigation."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Bug Fixes"],
+      "expectedCommitCount": 4,
+      "notes": "All commits relate to bug fixing. Status for #42 commits should be in-progress or unknown. Status for #57 commit could be done or unknown."
+    }
+  }
+}

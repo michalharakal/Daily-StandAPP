@@ -1,0 +1,244 @@
+{
+  "id": "case-08",
+  "description": "Large volume: 32 commits from one author covering a full busy day. Tests summarization under high input volume across build, features, bug fixes, testing, documentation, and refactoring.",
+  "commits": [
+    {
+      "id": "a001b02",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T07:30:00Z",
+      "message": "Fix broken CI pipeline after Kotlin 2.0.20 upgrade"
+    },
+    {
+      "id": "c003d04",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T07:45:00Z",
+      "message": "Pin JVM toolchain to JDK 21 in all subprojects"
+    },
+    {
+      "id": "e005f06",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T08:00:00Z",
+      "message": "Update Gradle wrapper to 8.10"
+    },
+    {
+      "id": "a007b08",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T08:15:00Z",
+      "message": "Add version catalog entry for ktor 3.0.0-beta1"
+    },
+    {
+      "id": "c009d10",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T08:30:00Z",
+      "message": "Migrate REST API client from ktor 2.x to ktor 3.x API"
+    },
+    {
+      "id": "e011f12",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T08:50:00Z",
+      "message": "Fix ktor 3.x content negotiation plugin registration"
+    },
+    {
+      "id": "a013b14",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T09:10:00Z",
+      "message": "Add structured logging with kotlin-logging to llm module"
+    },
+    {
+      "id": "c015d16",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T09:30:00Z",
+      "message": "Replace println calls with logger.info in LLMServiceFactory"
+    },
+    {
+      "id": "e017f18",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T09:50:00Z",
+      "message": "Add debug-level logging for prompt template expansion"
+    },
+    {
+      "id": "a019b20",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T10:05:00Z",
+      "message": "Implement prompt template registry with named templates"
+    },
+    {
+      "id": "c021d22",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T10:25:00Z",
+      "message": "Add summary prompt template to registry"
+    },
+    {
+      "id": "e023f24",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T10:40:00Z",
+      "message": "Add JSON output prompt template to registry"
+    },
+    {
+      "id": "a025b26",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T11:00:00Z",
+      "message": "Write unit tests for prompt template variable substitution"
+    },
+    {
+      "id": "c027d28",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T11:20:00Z",
+      "message": "Fix off-by-one in template placeholder index parsing"
+    },
+    {
+      "id": "e029f30",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T11:40:00Z",
+      "message": "Add edge-case tests for empty and malformed templates"
+    },
+    {
+      "id": "a031b32",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T12:00:00Z",
+      "message": "Refactor LLMBackendType enum to support display names"
+    },
+    {
+      "id": "c033d34",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T13:00:00Z",
+      "message": "Implement benchmark runner skeleton with JUnit5 parameterized tests"
+    },
+    {
+      "id": "e035f36",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T13:20:00Z",
+      "message": "Add test-case JSON loader for bench/ directory"
+    },
+    {
+      "id": "a037b38",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T13:40:00Z",
+      "message": "Wire benchmark runner to LLMServiceFactory.create(backendType, config)"
+    },
+    {
+      "id": "c039d40",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T14:00:00Z",
+      "message": "Add latency measurement wrapper around LLMService.generate()"
+    },
+    {
+      "id": "e041f42",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T14:15:00Z",
+      "message": "Implement throughput calculation as chars per second"
+    },
+    {
+      "id": "a043b44",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T14:30:00Z",
+      "message": "Add JVM memory sampling via MemoryMXBean during benchmark runs"
+    },
+    {
+      "id": "c045d46",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T14:50:00Z",
+      "message": "Fix race condition in memory sampler thread shutdown"
+    },
+    {
+      "id": "e047f48",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T15:10:00Z",
+      "message": "Implement Markdown comparison table generator for benchmark results"
+    },
+    {
+      "id": "a049b50",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T15:30:00Z",
+      "message": "Add CSV exporter for per-case benchmark data"
+    },
+    {
+      "id": "c051d52",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T15:45:00Z",
+      "message": "Implement automated JSON parseability check in scoring"
+    },
+    {
+      "id": "e053f54",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T16:00:00Z",
+      "message": "Add heading-presence regex validator for summary outputs"
+    },
+    {
+      "id": "a055b56",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T16:15:00Z",
+      "message": "Implement hallucination detector: compare output IDs against input set"
+    },
+    {
+      "id": "c057d58",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T16:30:00Z",
+      "message": "Fix false positive in hallucination detector for hex-like words"
+    },
+    {
+      "id": "e059f60",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T16:45:00Z",
+      "message": "Add Gradle task :benchmark:run with backend and case-filter CLI args"
+    },
+    {
+      "id": "a061b62",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T17:00:00Z",
+      "message": "Write KDoc for all public benchmark module classes"
+    },
+    {
+      "id": "c063d64",
+      "authorName": "Greta Fischer",
+      "authorEmail": "greta.fischer@jug-da.de",
+      "whenDate": "2025-09-22T17:15:00Z",
+      "message": "Update settings.gradle.kts to include :benchmark module"
+    }
+  ],
+  "expectations": {
+    "summary": {
+      "requiredHeadings": ["## Yesterday", "## Today", "## Blockers"],
+      "mustMentionIds": ["a001b02", "c009d10", "a013b14", "a019b20", "c033d34", "c039d40", "a055b56", "e059f60"],
+      "forbiddenIds": [],
+      "notes": "Model must summarize 32 commits into coherent themes rather than listing each one. Key themes: CI/build fixes, ktor 3.x migration, structured logging, prompt template system, benchmark runner implementation, scoring/validation, and reporting. Should highlight the major arcs of work."
+    },
+    "json": {
+      "mustParseAsJson": true,
+      "expectedCategories": ["Build/Infra", "Features", "Bug Fixes", "Refactoring", "Testing", "Documentation"],
+      "expectedCommitCount": 32,
+      "notes": "All 32 commits must be accounted for. Major clusters: build/CI (4), ktor migration (3), logging (3), prompt templates (4+tests), benchmark runner (5), metrics (4), scoring/validation (4), reporting (2), docs (2)."
+    }
+  }
+}
