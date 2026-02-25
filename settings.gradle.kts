@@ -17,6 +17,9 @@ dependencyResolutionManagement {
 include(":data", ":domain", ":llm", ":mcp-server", ":benchmark")
 include("StandAPP-cli")
 
+// Cloud API - OpenAI-compatible REST API modules
+include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-api:agent")
+
 
 check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
     """

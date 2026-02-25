@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    kotlin("plugin.serialization") version "2.1.20"
+    alias(libs.plugins.kotlinSerialization)
 }
 
 kotlin {
@@ -16,7 +16,11 @@ kotlin {
         }
         // Enable preview features for JDK 21
         compilations.all {
-            kotlinOptions.freeCompilerArgs += "-Xadd-modules=jdk.incubator.vector"
+            compileTaskProvider.configure {
+                compilerOptions {
+                    freeCompilerArgs.add("-Xadd-modules=jdk.incubator.vector")
+                }
+            }
         }
         
     }

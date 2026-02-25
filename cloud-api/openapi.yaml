@@ -1,0 +1,277 @@
+openapi: 3.1.0
+info:
+  title: Local LLM Server API
+  description: >
+    OpenAI-compatible local LLM stub server.
+    Implements the Chat Completions and Models endpoints following the OpenAI API
+    contract, backed by a local stub that echoes user messages.
+  version: 1.0.0
+  contact:
+    name: JavaLand 2026 Cloud API Demo
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /v1/chat/completions:
+    post:
+      operationId: createChatCompletion
+      summary: Create a chat completion
+      description: >
+        Generates a model response for the given chat conversation.
+        Compatible with the OpenAI Chat Completions API format.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCompletionRequest"
+            example:
+              model: gpt-4o
+              messages:
+                - role: system
+                  content: You are a helpful assistant.
+                - role: user
+                  content: What is Kotlin Multiplatform?
+      responses:
+        "200":
+          description: Successful chat completion response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatCompletionResponse"
+              example:
+                id: chatcmpl-local-1738100000000
+                object: chat.completion
+                created: 1738100000
+                model: gpt-4o
+                choices:
+                  - index: 0
+                    message:
+                      role: assistant
+                      content: "This is a local stub response to: What is Kotlin Multiplatform?"
+                    finish_reason: stop
+                usage:
+                  prompt_tokens: 28
+                  completion_tokens: 65
+                  total_tokens: 93
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  message: "Unexpected parsing error"
+                  type: server_error
+
+  /v1/models:
+    get:
+      operationId: listModels
+      summary: List available models
+      description: Returns a list of models available on the local server.
+      responses:
+        "200":
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelsResponse"
+              example:
+                data:
+                  - id: local-stub
+                    object: model
+
+components:
+  schemas:
+    ChatCompletionRequest:
+      type: object
+      required:
+        - model
+        - messages
+      properties:
+        model:
+          type: string
+          description: ID of the model to use.
+          example: gpt-4o
+        messages:
+          type: array
+          description: A list of messages comprising the conversation so far.
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+        temperature:
+          type: number
+          description: Sampling temperature between 0 and 2.
+          minimum: 0
+          maximum: 2
+          default: 1.0
+        max_tokens:
+          type: integer
+          description: Maximum number of tokens to generate.
+        top_p:
+          type: number
+          description: Nucleus sampling parameter.
+          minimum: 0
+          maximum: 1
+        n:
+          type: integer
+          description: Number of completions to generate.
+          default: 1
+        stream:
+          type: boolean
+          description: Whether to stream partial responses. (Not supported by this stub.)
+          default: false
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          description: The role of the message author.
+          enum:
+            - system
+            - user
+            - assistant
+        content:
+          type: string
+          description: The content of the message.
+
+    ChatCompletionResponse:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - model
+        - choices
+        - usage
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the completion.
+          example: chatcmpl-local-1738100000000
+        object:
+          type: string
+          description: Object type, always `chat.completion`.
+          const: chat.completion
+        created:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the completion was created.
+        model:
+          type: string
+          description: The model used for the completion.
+        choices:
+          type: array
+          description: List of completion choices.
+          items:
+            $ref: "#/components/schemas/Choice"
+        usage:
+          $ref: "#/components/schemas/Usage"
+
+    Choice:
+      type: object
+      required:
+        - index
+        - message
+        - finish_reason
+      properties:
+        index:
+          type: integer
+          description: Index of this choice in the list.
+          default: 0
+        message:
+          $ref: "#/components/schemas/ResponseMessage"
+        finish_reason:
+          type: string
+          description: The reason the model stopped generating.
+          enum:
+            - stop
+            - length
+            - content_filter
+          default: stop
+
+    ResponseMessage:
+      type: object
+      required:
+        - role
+      properties:
+        role:
+          type: string
+          description: The role of the message author.
+          default: assistant
+        content:
+          type: string
+          nullable: true
+          description: The content of the message.
+
+    Usage:
+      type: object
+      required:
+        - prompt_tokens
+        - completion_tokens
+        - total_tokens
+      properties:
+        prompt_tokens:
+          type: integer
+          description: Number of tokens in the prompt.
+          default: 0
+        completion_tokens:
+          type: integer
+          description: Number of tokens in the generated completion.
+          default: 0
+        total_tokens:
+          type: integer
+          description: Total tokens used (prompt + completion).
+          default: 0
+
+    ModelsResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          description: List of available models.
+          items:
+            $ref: "#/components/schemas/Model"
+
+    Model:
+      type: object
+      required:
+        - id
+        - object
+      properties:
+        id:
+          type: string
+          description: The model identifier.
+          example: local-stub
+        object:
+          type: string
+          description: Object type, always `model`.
+          const: model
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - type
+          properties:
+            message:
+              type: string
+              description: Human-readable error message.
+            type:
+              type: string
+              description: Error type classification.
+              example: server_error

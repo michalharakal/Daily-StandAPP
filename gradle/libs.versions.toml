@@ -3,6 +3,8 @@ kotlin = "2.2.20"
 kotlinx-coroutines = "1.10.2"
 kotlinxDatetimeVersion = "0.7.1"
 kotlinxIo = "0.8.0"
+kotlinx-serialization = "1.8.1"
+koog = "0.6.1"
 mcp-kotlin = "0.7.2"
 orgEclipseJgit = "7.1.0.202411261347-r"
 skainet = "0.13.0"
@@ -22,12 +24,18 @@ mcp-kotlin-server = { group = "io.modelcontextprotocol", name = "kotlin-sdk-serv
 eclipse-jgit = { module = "org.eclipse.jgit:org.eclipse.jgit", version.ref = "orgEclipseJgit" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4jSimple" }
 
+ktor-server-core = { group = "io.ktor", name = "ktor-server-core", version.ref = "ktor" }
 ktor-server-cio = { group = "io.ktor", name = "ktor-server-cio", version.ref = "ktor" }
 ktor-server-sse = { group = "io.ktor", name = "ktor-server-sse", version.ref = "ktor" }
+ktor-server-content-negotiation = { group = "io.ktor", name = "ktor-server-content-negotiation", version.ref = "ktor" }
 
+ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { group = "io.ktor", name = "ktor-client-cio", version.ref = "ktor" }
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
 
 # SKaiNET
 skainet-apps-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }
@@ -44,3 +52,5 @@ skainet-llm = { module = "sk.ainet.core:skainet-llm", version.ref = "skainet" }
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
