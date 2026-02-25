@@ -3,13 +3,6 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
     repositories {
-        google {
-            mavenContent {
-                includeGroupAndSubgroups("androidx")
-                includeGroupAndSubgroups("com.android")
-                includeGroupAndSubgroups("com.google")
-            }
-        }
         mavenCentral()
         gradlePluginPortal()
     }
@@ -17,18 +10,11 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
-        google {
-            mavenContent {
-                includeGroupAndSubgroups("androidx")
-                includeGroupAndSubgroups("com.android")
-                includeGroupAndSubgroups("com.google")
-            }
-        }
         mavenCentral()
     }
 }
 
-include(":composeApp", ":shared", ":data", ":domain", ":llm", ":mcp-server", ":benchmark")
+include(":data", ":domain", ":llm", ":mcp-server", ":benchmark")
 include("StandAPP-cli")
 
 
