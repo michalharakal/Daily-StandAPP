@@ -4,6 +4,9 @@ import de.jug_da.standapp.llm.LLMBackendType
 import de.jug_da.standapp.llm.LLMConfig
 import de.jug_da.standapp.llm.LLMService
 import de.jug_da.standapp.llm.LLMServiceFactory
+import dev.standapp.engine.control.PromptBuilder
+import dev.standapp.engine.control.QualityScorer
+import dev.standapp.engine.entity.PromptType
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
@@ -23,6 +26,7 @@ class BenchmarkRunner(
         .filter { caseFilter == null || it.id in caseFilter }
     private val results = mutableListOf<Reporting.CaseResult>()
     private val allOutputs = mutableMapOf<String, MutableList<String>>() // backend -> outputs for determinism
+    private val promptBuilder = PromptBuilder()
 
     suspend fun run() {
         println("Loaded ${cases.size} benchmark cases from ${benchDir.absolutePath}")
@@ -50,12 +54,10 @@ class BenchmarkRunner(
             var errorCount = 0
 
             for (case in cases) {
+                val commitInfos = case.commits.map { it.toCommitInfo() }
+
                 for (promptType in promptTypes) {
-                    val formatted = CommitFormatter.format(case.commits)
-                    val prompt = when (promptType) {
-                        PromptType.SUMMARY -> PromptTemplates.summaryPrompt(formatted)
-                        PromptType.JSON -> PromptTemplates.jsonPrompt(formatted)
-                    }
+                    val prompt = promptBuilder.buildUserPrompt(commitInfos, promptType)
 
                     for (runIdx in 1..runsPerCase) {
                         val heapBefore = Metrics.heapUsageMb()
@@ -92,7 +94,7 @@ class BenchmarkRunner(
                         backendOutputs.add(output)
 
                         val inputIds = case.commits.map { it.id }.toSet()
-                        val autoScore = Scoring.score(output, promptType, inputIds)
+                        val autoScore = QualityScorer.score(output, promptType, inputIds)
 
                         results.add(
                             Reporting.CaseResult(

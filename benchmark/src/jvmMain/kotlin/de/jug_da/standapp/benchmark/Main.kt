@@ -2,25 +2,28 @@ package de.jug_da.standapp.benchmark
 
 import de.jug_da.standapp.llm.LLMBackendType
 import de.jug_da.standapp.llm.LLMConfig
+import dev.standapp.engine.entity.PromptType
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
- * CLI entry point: `./gradlew :benchmark:run`
+ * CLI entry point: `./gradlew :benchmark:jvmRun`
  *
  * Environment variables:
- * - BENCH_DIR           — path to bench/ directory (default: ./bench)
- * - BENCH_BACKENDS      — comma-separated backend names to test (default: all)
- * - BENCH_RUNS          — number of runs per case (default: 5)
- * - BENCH_CASES         — comma-separated case ids to run (default: all)
- * - BENCH_PROMPTS       — comma-separated prompt types: SUMMARY,JSON (default: both)
- * - BENCH_LOCAL_URL     — local REST endpoint URL (default: http://localhost:1234)
- * - BENCH_LOCAL_MODEL   — local REST model name (default: tinyllama-1.1b-chat-v1.0)
- * - BENCH_LOCAL_API_KEY — optional Bearer token for local REST endpoint
- * - BENCH_CLOUD_URL     — cloud REST endpoint URL (required for cloud baseline)
- * - BENCH_CLOUD_MODEL   — cloud model name (default: gpt-4o-mini)
- * - BENCH_CLOUD_API_KEY — optional cloud Bearer token (falls back to OPENAI_API_KEY)
- * - MCP_LLM_MODEL_PATH  — GGUF model path for SKAINET backend
+ * - BENCH_DIR               — path to bench/ directory (default: ./bench)
+ * - BENCH_BACKENDS          — comma-separated backend names to test (default: all)
+ * - BENCH_RUNS              — number of runs per case (default: 5)
+ * - BENCH_CASES             — comma-separated case ids to run (default: all)
+ * - BENCH_PROMPTS           — comma-separated prompt types: SUMMARY,JSON (default: both)
+ * - BENCH_LOCAL_URL         — local REST endpoint URL (default: http://localhost:1234)
+ * - BENCH_LOCAL_MODEL       — local REST model name (default: tinyllama-1.1b-chat-v1.0)
+ * - BENCH_LOCAL_API_KEY     — optional Bearer token for local REST endpoint
+ * - BENCH_CLOUD_URL         — cloud REST endpoint URL (required for cloud baseline)
+ * - BENCH_CLOUD_MODEL       — cloud model name (default: gpt-4o-mini)
+ * - BENCH_CLOUD_API_KEY     — optional cloud Bearer token (falls back to OPENAI_API_KEY)
+ * - BENCH_DELIVERANCE_URL   — Deliverance REST endpoint (default: http://localhost:8080)
+ * - BENCH_DELIVERANCE_MODEL — Deliverance model name (default: TinyLlama-1.1B-Chat-v1.0-Jlama-Q4)
+ * - MCP_LLM_MODEL_PATH      — GGUF model path for SKAINET backend
  */
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
@@ -51,6 +54,10 @@ fun main() {
     val modelPath = System.getenv("MCP_LLM_MODEL_PATH") ?: ""
     val outputDir = File(System.getenv("BENCH_OUTPUT_DIR") ?: "benchmark-results")
 
+    // Deliverance config
+    val deliveranceUrl = System.getenv("BENCH_DELIVERANCE_URL") ?: "http://localhost:8080"
+    val deliveranceModel = System.getenv("BENCH_DELIVERANCE_MODEL") ?: "TinyLlama-1.1B-Chat-v1.0-Jlama-Q4"
+
     val requestedBackends = System.getenv("BENCH_BACKENDS")
         ?.split(",")
         ?.map { it.trim().uppercase() }
@@ -74,6 +81,14 @@ fun main() {
         )
     }
 
+    // Deliverance — via REST API on separate JVM (Java 25)
+    if (requestedBackends == null || "DELIVERANCE" in requestedBackends) {
+        backends["DELIVERANCE"] = LLMBackendType.REST_API to LLMConfig(
+            baseUrl = "$deliveranceUrl/chat/completions",
+            modelName = deliveranceModel,
+        )
+    }
+
     // Mandatory cloud baseline
     if (cloudUrl != null) {
         backends["REST_API (cloud)"] = LLMBackendType.REST_API to LLMConfig(
@@ -90,8 +105,8 @@ fun main() {
         println("ERROR: No backends configured. Set environment variables and retry.")
         println()
         println("Usage examples:")
-        println("  BENCH_BACKENDS=REST_API BENCH_LOCAL_URL=http://192.168.1.100:1234 BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 java -jar benchmark-jvm.jar")
-        println("  BENCH_BACKENDS=REST_API BENCH_LOCAL_URL=http://localhost:11434 BENCH_LOCAL_MODEL=llama3.2:3b java -jar benchmark-jvm.jar")
+        println("  BENCH_BACKENDS=REST_API BENCH_LOCAL_URL=http://192.168.1.100:1234 BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 ./gradlew :benchmark:jvmRun")
+        println("  BENCH_BACKENDS=DELIVERANCE BENCH_DELIVERANCE_URL=http://localhost:8080 ./gradlew :benchmark:jvmRun")
         return
     }
 
