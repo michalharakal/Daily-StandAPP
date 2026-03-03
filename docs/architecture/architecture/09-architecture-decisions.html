@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>9. Architecture Decisions :: DailyStandApp Documentation</title>
+    <link rel="canonical" href="https://jug-da.github.io/DailyStandApp-MCP/architecture/architecture/09-architecture-decisions.html">
+    <link rel="prev" href="08-crosscutting-concepts.html">
+    <link rel="next" href="10-quality-requirements.html">
+    <meta name="generator" content="Antora 3.1.14">
+    <link rel="stylesheet" href="../../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://jug-da.github.io/DailyStandApp-MCP">DailyStandApp Documentation</a>
+      <button class="navbar-burger" aria-controls="topbar-nav" aria-expanded="false" aria-label="Toggle main menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="#">Home</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Products</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Product A</a>
+            <a class="navbar-item" href="#">Product B</a>
+            <a class="navbar-item" href="#">Product C</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Services</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Service A</a>
+            <a class="navbar-item" href="#">Service B</a>
+            <a class="navbar-item" href="#">Service C</a>
+          </div>
+        </div>
+        <div class="navbar-item">
+          <span class="control">
+            <a class="button is-primary" href="#">Download</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="architecture" data-version="">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <button class="nav-menu-toggle" aria-label="Toggle expand/collapse all" style="display: none"></button>
+    <h3 class="title"><a href="index.html">Architecture Documentation</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+    <button class="nav-item-toggle"></button>
+    <span class="nav-text">Architecture</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="index.html">Overview</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="01-introduction-goals.html">1. Introduction and Goals</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="02-constraints.html">2. Constraints</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="03-context-scope.html">3. Context and Scope</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="04-solution-strategy.html">4. Solution Strategy</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="05-building-block-view.html">5. Building Block View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="06-runtime-view.html">6. Runtime View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="07-deployment-view.html">7. Deployment View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="08-crosscutting-concepts.html">8. Crosscutting Concepts</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <a class="nav-link" href="09-architecture-decisions.html">9. Architecture Decisions</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="10-quality-requirements.html">10. Quality Requirements</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="11-risks-technical-debt.html">11. Risks and Technical Debt</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="12-glossary.html">12. Glossary</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="nav-panel-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Architecture Documentation</span>
+    <span class="version"></span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <div class="title"><a href="index.html">Architecture Documentation</a></div>
+    </li>
+    <li class="component">
+      <div class="title"><a href="../../daily-standapp/index.html">Dialy-StandAPP</a></div>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="../../daily-standapp/index.html" class="home-link"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Architecture Documentation</a></li>
+    <li>Architecture</li>
+    <li><a href="09-architecture-decisions.html">9. Architecture Decisions</a></li>
+  </ul>
+</nav>
+<div class="edit-this-page"><a href="https://github.com/michalharakal/Daily-StandAPP/edit/develop/docs/modules/architecture/pages/09-architecture-decisions.adoc">Edit this Page</a></div>
+</div>
+  <div class="content">
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+<article class="doc">
+<h1 class="page">9. Architecture Decisions</h1>
+<div id="toc" class="toc">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#adr-001-privacy-first-architecture-foundational">ADR-001: Privacy-First Architecture (Foundational)</a>
+<ul class="sectlevel2">
+<li><a href="#status">Status</a></li>
+<li><a href="#context">Context</a></li>
+<li><a href="#decision">Decision</a></li>
+<li><a href="#consequences">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-002-kotlin-multiplatform-for-cross-platform-support">ADR-002: Kotlin Multiplatform for Cross-Platform Support</a>
+<ul class="sectlevel2">
+<li><a href="#status-2">Status</a></li>
+<li><a href="#context-2">Context</a></li>
+<li><a href="#decision-2">Decision</a></li>
+<li><a href="#consequences-2">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-003-pluggable-llm-architecture-with-skainet-kllama">ADR-003: Pluggable LLM Architecture with SKaiNET kllama</a>
+<ul class="sectlevel2">
+<li><a href="#status-3">Status</a></li>
+<li><a href="#context-3">Context</a></li>
+<li><a href="#decision-3">Decision</a></li>
+<li><a href="#current-implementations">Current Implementations</a></li>
+<li><a href="#rationale">Rationale</a></li>
+<li><a href="#consequences-3">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-004-mcp-protocol-for-ai-assistant-integration">ADR-004: MCP Protocol for AI Assistant Integration</a>
+<ul class="sectlevel2">
+<li><a href="#status-4">Status</a></li>
+<li><a href="#context-4">Context</a></li>
+<li><a href="#decision-4">Decision</a></li>
+<li><a href="#rationale-2">Rationale</a></li>
+<li><a href="#consequences-4">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-005-eclipse-jgit-for-git-operations">ADR-005: Eclipse JGit for Git Operations</a>
+<ul class="sectlevel2">
+<li><a href="#status-5">Status</a></li>
+<li><a href="#context-5">Context</a></li>
+<li><a href="#decision-5">Decision</a></li>
+<li><a href="#rationale-3">Rationale</a></li>
+<li><a href="#consequences-5">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-006-gradle-version-catalogs-for-dependency-management">ADR-006: Gradle Version Catalogs for Dependency Management</a>
+<ul class="sectlevel2">
+<li><a href="#status-6">Status</a></li>
+<li><a href="#context-6">Context</a></li>
+<li><a href="#decision-6">Decision</a></li>
+<li><a href="#consequences-6">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-007-fat-jar-for-mcp-server-deployment">ADR-007: Fat JAR for MCP Server Deployment</a>
+<ul class="sectlevel2">
+<li><a href="#status-7">Status</a></li>
+<li><a href="#context-7">Context</a></li>
+<li><a href="#decision-7">Decision</a></li>
+<li><a href="#configuration">Configuration</a></li>
+<li><a href="#consequences-7">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-009-openai-compatible-cloud-api-module">ADR-009: OpenAI-Compatible Cloud API Module</a>
+<ul class="sectlevel2">
+<li><a href="#status-8">Status</a></li>
+<li><a href="#context-8">Context</a></li>
+<li><a href="#decision-8">Decision</a></li>
+<li><a href="#rationale-4">Rationale</a></li>
+<li><a href="#consequences-8">Consequences</a></li>
+</ul>
+</li>
+<li><a href="#adr-008-environment-variables-for-configuration">ADR-008: Environment Variables for Configuration</a>
+<ul class="sectlevel2">
+<li><a href="#status-9">Status</a></li>
+<li><a href="#context-9">Context</a></li>
+<li><a href="#decision-9">Decision</a></li>
+<li><a href="#environment-variables">Environment Variables</a></li>
+<li><a href="#consequences-9">Consequences</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="sect1">
+<h2 id="adr-001-privacy-first-architecture-foundational"><a class="anchor" href="#adr-001-privacy-first-architecture-foundational"></a>ADR-001: Privacy-First Architecture (Foundational)</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status"><a class="anchor" href="#status"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted (Non-negotiable)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context"><a class="anchor" href="#context"></a>Context</h3>
+<div class="paragraph">
+<p>Git commits contain highly sensitive information:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p>Code changes revealing proprietary algorithms</p>
+</li>
+<li>
+<p>Commit messages referencing security issues, customer names, internal projects</p>
+</li>
+<li>
+<p>Author information (PII)</p>
+</li>
+<li>
+<p>Project structure and business logic</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>Many developers and enterprises cannot send this data to cloud services.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision"><a class="anchor" href="#decision"></a>Decision</h3>
+<div class="paragraph">
+<p><strong>All AI processing must run locally. No data leaves the machine.</strong></p>
+</div>
+<div class="paragraph">
+<p>This is the foundational architectural constraint that drives all other decisions.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences"><a class="anchor" href="#consequences"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Complete privacy - zero external data transmission</p>
+</li>
+<li>
+<p>(+) Compliant with enterprise security policies</p>
+</li>
+<li>
+<p>(+) Works offline</p>
+</li>
+<li>
+<p>(+) No vendor lock-in or API costs</p>
+</li>
+<li>
+<p>(-) Requires local compute resources</p>
+</li>
+<li>
+<p>(-) Model download needed for first use</p>
+</li>
+</ul>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-002-kotlin-multiplatform-for-cross-platform-support"><a class="anchor" href="#adr-002-kotlin-multiplatform-for-cross-platform-support"></a>ADR-002: Kotlin Multiplatform for Cross-Platform Support</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-2"><a class="anchor" href="#status-2"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-2"><a class="anchor" href="#context-2"></a>Context</h3>
+<div class="paragraph">
+<p>The application needs to run on multiple platforms (desktop, potentially mobile) while sharing business logic.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-2"><a class="anchor" href="#decision-2"></a>Decision</h3>
+<div class="paragraph">
+<p>Use Kotlin Multiplatform with expect/actual pattern for platform-specific implementations.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-2"><a class="anchor" href="#consequences-2"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Single codebase for shared logic</p>
+</li>
+<li>
+<p>(+) Type-safe platform abstraction</p>
+</li>
+<li>
+<p>(+) Native performance on each platform</p>
+</li>
+<li>
+<p>(-) Some platforms have stub implementations only</p>
+</li>
+<li>
+<p>(-) Build complexity with multiple source sets</p>
+</li>
+</ul>
+</div>
+<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 335.25px; background-color: transparent;" viewBox="0 0 335.25 350" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#333;color:#333;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#333333;stroke-width:2.0px;}#my-svg .flowchart-link{stroke:#333333;fill:none;}#my-svg .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#my-svg .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#my-svg .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#my-svg .icon-shape rect,#my-svg .image-shape rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"/><g class="edgePaths"><path d="M122.846,136L135.268,121.167C147.689,106.333,172.532,76.667,189.5,61.833C206.469,47,215.563,47,220.109,47L224.656,47" id="L_COMMON_JVM_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_COMMON_JVM_0" data-points="W3sieCI6MTIyLjg0NjE5MTQwNjI1LCJ5IjoxMzZ9LHsieCI6MTk3LjM3NSwieSI6NDd9LHsieCI6MjI4LjY1NjI1LCJ5Ijo0N31d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M172.375,175L176.542,175C180.708,175,189.042,175,196.708,175C204.375,175,211.375,175,214.875,175L218.375,175" id="L_COMMON_NATIVE_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_COMMON_NATIVE_0" data-points="W3sieCI6MTcyLjM3NSwieSI6MTc1fSx7IngiOjE5Ny4zNzUsInkiOjE3NX0seyJ4IjoyMjIuMzc1LCJ5IjoxNzV9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M122.846,214L135.268,228.833C147.689,243.667,172.532,273.333,188.48,288.167C204.427,303,211.479,303,215.005,303L218.531,303" id="L_COMMON_WASM_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_COMMON_WASM_0" data-points="W3sieCI6MTIyLjg0NjE5MTQwNjI1LCJ5IjoyMTR9LHsieCI6MTk3LjM3NSwieSI6MzAzfSx7IngiOjIyMi41MzEyNSwieSI6MzAzfV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" data-id="L_COMMON_JVM_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_COMMON_NATIVE_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_COMMON_WASM_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="flowchart-COMMON-0" transform="translate(90.1875, 175)"><rect class="basic label-container" style="" x="-82.1875" y="-39" width="164.375" height="78"/><g class="label" style="" transform="translate(-52.1875, -24)"><rect/><foreignObject width="104.375" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Common Code<br />~80%</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-JVM-1" transform="translate(274.8125, 47)"><rect class="basic label-container" style="" x="-46.15625" y="-39" width="92.3125" height="78"/><g class="label" style="" transform="translate(-16.15625, -24)"><rect/><foreignObject width="32.3125" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>JVM<br />Full</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-NATIVE-3" transform="translate(274.8125, 175)"><rect class="basic label-container" style="" x="-52.4375" y="-39" width="104.875" height="78"/><g class="label" style="" transform="translate(-22.4375, -24)"><rect/><foreignObject width="44.875" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Native<br />Partial</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-WASM-5" transform="translate(274.8125, 303)"><rect class="basic label-container" style="" x="-52.28125" y="-39" width="104.5625" height="78"/><g class="label" style="" transform="translate(-22.28125, -24)"><rect/><foreignObject width="44.5625" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Wasm<br />Stub</p></span></div></foreignObject></g></g></g></g></g></svg>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-003-pluggable-llm-architecture-with-skainet-kllama"><a class="anchor" href="#adr-003-pluggable-llm-architecture-with-skainet-kllama"></a>ADR-003: Pluggable LLM Architecture with SKaiNET kllama</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-3"><a class="anchor" href="#status-3"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-3"><a class="anchor" href="#context-3"></a>Context</h3>
+<div class="paragraph">
+<p>Need local LLM inference without cloud dependencies. Options considered:
+* llama.cpp (C++ with JNI bindings)
+* JLama (Pure Java)
+* SKaiNET kllama (Pure Kotlin)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-3"><a class="anchor" href="#decision-3"></a>Decision</h3>
+<div class="paragraph">
+<p>Define <code>LLMService</code> interface for pluggable LLM backends. Use <code>LLMServiceFactory</code> to instantiate backends based on the <code>MCP_LLM_BACKEND</code> environment variable.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="current-implementations"><a class="anchor" href="#current-implementations"></a>Current Implementations</h3>
+<div class="ulist">
+<ul>
+<li>
+<p><strong>SKaiNET kllama</strong> (<code>SKaiNetLLMService</code>) - Pure Kotlin, GGUF model loading, SIMD via Vector API</p>
+</li>
+<li>
+<p><strong>REST API</strong> (<code>RestApiLLMService</code>) - OpenAI-compatible HTTP endpoints (Ollama, llama.cpp server, LM Studio, vLLM)</p>
+</li>
+<li>
+<p><strong>JLama</strong> (<code>JLamaService</code>) - Pure Java LLM inference</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="rationale"><a class="anchor" href="#rationale"></a>Rationale</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Pluggable architecture enables comparing multiple backends</p>
+</li>
+<li>
+<p>SKaiNET: Pure Kotlin, no native dependencies, SIMD acceleration via Java Vector API</p>
+</li>
+<li>
+<p>REST API: Leverage existing local inference servers</p>
+</li>
+<li>
+<p>JLama: Pure Java alternative for environments where Kotlin is not preferred</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-3"><a class="anchor" href="#consequences-3"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Three production backends available</p>
+</li>
+<li>
+<p>(+) Benchmark module can compare backends side-by-side</p>
+</li>
+<li>
+<p>(+) No native library management with SKaiNET/JLama</p>
+</li>
+<li>
+<p>(+) REST API allows using Ollama and other local servers</p>
+</li>
+<li>
+<p>(-) Requires JDK 21+ for Vector API (SKaiNET)</p>
+</li>
+</ul>
+</div>
+<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 412.75px; background-color: transparent;" viewBox="0 0 412.75 278" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#333;color:#333;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#333333;stroke-width:2.0px;}#my-svg .flowchart-link{stroke:#333333;fill:none;}#my-svg .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#my-svg .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#my-svg .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#my-svg .icon-shape rect,#my-svg .image-shape rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"/><g class="edgePaths"><path d="M116.504,100L126.618,89.167C136.732,78.333,156.96,56.667,170.574,45.833C184.188,35,191.188,35,194.688,35L198.188,35" id="L_IFACE_SKAINET_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_IFACE_SKAINET_0" data-points="W3sieCI6MTE2LjUwMzkwNjI1LCJ5IjoxMDB9LHsieCI6MTc3LjE4NzUsInkiOjM1fSx7IngiOjIwMi4xODc1LCJ5IjozNX1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M152.188,139L156.354,139C160.521,139,168.854,139,176.77,139C184.685,139,192.182,139,195.931,139L199.68,139" id="L_IFACE_REST_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_IFACE_REST_0" data-points="W3sieCI6MTUyLjE4NzUsInkiOjEzOX0seyJ4IjoxNzcuMTg3NSwieSI6MTM5fSx7IngiOjIwMy42Nzk2ODc1LCJ5IjoxMzl9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M116.504,178L126.618,188.833C136.732,199.667,156.96,221.333,174.083,232.167C191.206,243,205.224,243,212.233,243L219.242,243" id="L_IFACE_JLAMA_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_IFACE_JLAMA_0" data-points="W3sieCI6MTE2LjUwMzkwNjI1LCJ5IjoxNzh9LHsieCI6MTc3LjE4NzUsInkiOjI0M30seyJ4IjoyMjMuMjQyMTg3NSwieSI6MjQzfV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" data-id="L_IFACE_SKAINET_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_IFACE_REST_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_IFACE_JLAMA_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="flowchart-IFACE-0" transform="translate(80.09375, 139)"><rect class="basic label-container" style="" x="-72.09375" y="-39" width="144.1875" height="78"/><g class="label" style="" transform="translate(-42.09375, -24)"><rect/><foreignObject width="84.1875" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>LLMService<br />interface</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-SKAINET-1" transform="translate(303.46875, 35)"><rect class="basic label-container" style="fill:#c8e6c9 !important" x="-101.28125" y="-27" width="202.5625" height="54"/><g class="label" style="" transform="translate(-71.28125, -12)"><rect/><foreignObject width="142.5625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>SKaiNetLLMService</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-REST-3" transform="translate(303.46875, 139)"><rect class="basic label-container" style="fill:#e3f2fd !important" x="-99.7890625" y="-27" width="199.578125" height="54"/><g class="label" style="" transform="translate(-69.7890625, -12)"><rect/><foreignObject width="139.578125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>RestApiLLMService</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-JLAMA-5" transform="translate(303.46875, 243)"><rect class="basic label-container" style="fill:#fff3e0 !important" x="-80.2265625" y="-27" width="160.453125" height="54"/><g class="label" style="" transform="translate(-50.2265625, -12)"><rect/><foreignObject width="100.453125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>JLamaService</p></span></div></foreignObject></g></g></g></g></g></svg>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-004-mcp-protocol-for-ai-assistant-integration"><a class="anchor" href="#adr-004-mcp-protocol-for-ai-assistant-integration"></a>ADR-004: MCP Protocol for AI Assistant Integration</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-4"><a class="anchor" href="#status-4"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-4"><a class="anchor" href="#context-4"></a>Context</h3>
+<div class="paragraph">
+<p>Need to integrate with AI assistants like Claude for intelligent standup preparation.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-4"><a class="anchor" href="#decision-4"></a>Decision</h3>
+<div class="paragraph">
+<p>Implement Model Context Protocol (MCP) server using the official Kotlin SDK.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="rationale-2"><a class="anchor" href="#rationale-2"></a>Rationale</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Standard protocol supported by Anthropic</p>
+</li>
+<li>
+<p>Structured tool definitions</p>
+</li>
+<li>
+<p>JSON-RPC over stdio is simple and secure</p>
+</li>
+<li>
+<p>No network exposure required</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-4"><a class="anchor" href="#consequences-4"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Direct integration with Claude Desktop</p>
+</li>
+<li>
+<p>(+) Standardized tool schema definitions</p>
+</li>
+<li>
+<p>(+) Secure - no network ports opened</p>
+</li>
+<li>
+<p>(-) Limited to stdio transport currently</p>
+</li>
+<li>
+<p>(-) Requires Claude Desktop configuration</p>
+</li>
+</ul>
+</div>
+<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 672.625px; background-color: transparent;" viewBox="0 0 672.625 84" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#333;color:#333;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#333333;stroke-width:2.0px;}#my-svg .flowchart-link{stroke:#333333;fill:none;}#my-svg .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#my-svg .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#my-svg .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#my-svg .icon-shape rect,#my-svg .image-shape rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"/><g class="edgePaths"><path d="M179.297,28.802L188.816,27.335C198.336,25.868,217.375,22.934,235.757,22.967C254.138,23.001,271.863,26.001,280.725,27.502L289.587,29.002" id="L_CLAUDE_MCP_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_CLAUDE_MCP_0" data-points="W3sieCI6MTc5LjI5Njg3NSwieSI6MjguODAxNjg1NDU0NzQ0NDQ0fSx7IngiOjIzNi40MTQwNjI1LCJ5IjoyMH0seyJ4IjoyOTMuNTMxMjUsInkiOjI5LjY2OTQ3MjE2NTQ0NDI3fV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M439.203,29.093L447.755,27.577C456.307,26.062,473.411,23.031,489.861,23.057C506.311,23.083,522.107,26.166,530.004,27.708L537.902,29.249" id="L_MCP_TOOLS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_MCP_TOOLS_0" data-points="W3sieCI6NDM5LjIwMzEyNSwieSI6MjkuMDkyOTQ1NjkyNTMwMzY0fSx7IngiOjQ5MC41MTU2MjUsInkiOjIwfSx7IngiOjU0MS44MjgxMjUsInkiOjMwLjAxNTY2NTA3MjQzMzYzfV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M541.828,53.984L533.276,55.654C524.724,57.323,507.62,60.661,491.172,60.932C474.724,61.202,458.933,58.403,451.037,57.004L443.142,55.605" id="L_TOOLS_MCP_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_TOOLS_MCP_0" data-points="W3sieCI6NTQxLjgyODEyNSwieSI6NTMuOTg0MzM0OTI3NTY2MzY2fSx7IngiOjQ5MC41MTU2MjUsInkiOjY0fSx7IngiOjQzOS4yMDMxMjUsInkiOjU0LjkwNzA1NDMwNzQ2OTYzNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M293.531,54.331L284.012,55.942C274.492,57.554,255.453,60.777,237.073,61.023C218.693,61.269,200.971,58.538,192.111,57.173L183.25,55.808" id="L_MCP_CLAUDE_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_MCP_CLAUDE_0" data-points="W3sieCI6MjkzLjUzMTI1LCJ5Ijo1NC4zMzA1Mjc4MzQ1NTU3M30seyJ4IjoyMzYuNDE0MDYyNSwieSI6NjR9LHsieCI6MTc5LjI5Njg3NSwieSI6NTUuMTk4MzE0NTQ1MjU1NTU2fV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel" transform="translate(236.4140625, 20)"><g class="label" data-id="L_CLAUDE_MCP_0" transform="translate(-16.7109375, -12)"><foreignObject width="33.421875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>stdio</p></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(490.59851, 20.01618)"><g class="label" data-id="L_MCP_TOOLS_0" transform="translate(-26.3125, -12)"><foreignObject width="52.625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>tool call</p></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(490.515625, 64)"><g class="label" data-id="L_TOOLS_MCP_0" transform="translate(-19.1171875, -12)"><foreignObject width="38.234375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>result</p></span></div></foreignObject></g></g><g class="edgeLabel" transform="translate(236.48235, 63.98844)"><g class="label" data-id="L_MCP_CLAUDE_0" transform="translate(-32.1171875, -12)"><foreignObject width="64.234375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"><p>response</p></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="flowchart-CLAUDE-0" transform="translate(93.6484375, 42)"><rect class="basic label-container" style="" x="-85.6484375" y="-27" width="171.296875" height="54"/><g class="label" style="" transform="translate(-55.6484375, -12)"><rect/><foreignObject width="111.296875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Claude Desktop</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-MCP-1" transform="translate(366.3671875, 42)"><rect class="basic label-container" style="" x="-72.8359375" y="-27" width="145.671875" height="54"/><g class="label" style="" transform="translate(-42.8359375, -12)"><rect/><foreignObject width="85.671875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>MCP Server</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-TOOLS-3" transform="translate(603.2265625, 42)"><rect class="basic label-container" style="" x="-61.3984375" y="-27" width="122.796875" height="54"/><g class="label" style="" transform="translate(-31.3984375, -12)"><rect/><foreignObject width="62.796875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Git Tools</p></span></div></foreignObject></g></g></g></g></g></svg>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-005-eclipse-jgit-for-git-operations"><a class="anchor" href="#adr-005-eclipse-jgit-for-git-operations"></a>ADR-005: Eclipse JGit for Git Operations</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-5"><a class="anchor" href="#status-5"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-5"><a class="anchor" href="#context-5"></a>Context</h3>
+<div class="paragraph">
+<p>Need to read git commit history from local repositories.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-5"><a class="anchor" href="#decision-5"></a>Decision</h3>
+<div class="paragraph">
+<p>Use Eclipse JGit library for all git operations.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="rationale-3"><a class="anchor" href="#rationale-3"></a>Rationale</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>Pure Java - no native git installation required</p>
+</li>
+<li>
+<p>Mature and well-tested</p>
+</li>
+<li>
+<p>Full git protocol support</p>
+</li>
+<li>
+<p>Apache 2.0 license</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-5"><a class="anchor" href="#consequences-5"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) No external dependencies</p>
+</li>
+<li>
+<p>(+) Cross-platform consistency</p>
+</li>
+<li>
+<p>(+) Programmatic access to all git data</p>
+</li>
+<li>
+<p>(-) JVM-only (hence stubs on other platforms)</p>
+</li>
+<li>
+<p>(-) Large library size</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-006-gradle-version-catalogs-for-dependency-management"><a class="anchor" href="#adr-006-gradle-version-catalogs-for-dependency-management"></a>ADR-006: Gradle Version Catalogs for Dependency Management</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-6"><a class="anchor" href="#status-6"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-6"><a class="anchor" href="#context-6"></a>Context</h3>
+<div class="paragraph">
+<p>Managing dependencies across multiple modules and platforms.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-6"><a class="anchor" href="#decision-6"></a>Decision</h3>
+<div class="paragraph">
+<p>Use Gradle Version Catalogs (<code>libs.versions.toml</code>).</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-6"><a class="anchor" href="#consequences-6"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Centralized version management</p>
+</li>
+<li>
+<p>(+) Type-safe dependency references</p>
+</li>
+<li>
+<p>(+) Easy to update versions</p>
+</li>
+<li>
+<p>(+) Single catalog file for all dependencies including SKaiNET</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-007-fat-jar-for-mcp-server-deployment"><a class="anchor" href="#adr-007-fat-jar-for-mcp-server-deployment"></a>ADR-007: Fat JAR for MCP Server Deployment</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-7"><a class="anchor" href="#status-7"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-7"><a class="anchor" href="#context-7"></a>Context</h3>
+<div class="paragraph">
+<p>MCP server needs simple deployment for end users.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-7"><a class="anchor" href="#decision-7"></a>Decision</h3>
+<div class="paragraph">
+<p>Build fat JAR with all dependencies bundled.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="configuration"><a class="anchor" href="#configuration"></a>Configuration</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-kotlin hljs" data-lang="kotlin">tasks.named&lt;Jar&gt;("jvmJar") {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes["Main-Class"] = "de.jug_da.standapp.mcp.MCPServerKt"
+    }
+    from({
+        configurations.getByName("jvmRuntimeClasspath").map { file -&gt;
+            if (file.isDirectory) file else zipTree(file)
+        }
+    })
+}</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-7"><a class="anchor" href="#consequences-7"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Single file deployment</p>
+</li>
+<li>
+<p>(+) No classpath management</p>
+</li>
+<li>
+<p>(-) Larger file size (~50MB+)</p>
+</li>
+<li>
+<p>(-) Duplicate class handling required</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-009-openai-compatible-cloud-api-module"><a class="anchor" href="#adr-009-openai-compatible-cloud-api-module"></a>ADR-009: OpenAI-Compatible Cloud API Module</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-8"><a class="anchor" href="#status-8"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-8"><a class="anchor" href="#context-8"></a>Context</h3>
+<div class="paragraph">
+<p>The existing LLM integration options (SKaiNET kllama, JLama, REST API client) are tightly coupled to the application&#8217;s internal <code>LLMService</code> interface. External tools and standard OpenAI-compatible clients cannot interact with the system directly.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-8"><a class="anchor" href="#decision-8"></a>Decision</h3>
+<div class="paragraph">
+<p>Add a separate <code>cloud-api</code> module group providing an OpenAI-compatible REST API server, client, model DTOs, and Koog agent integration. The modules are:</p>
+</div>
+<div class="ulist">
+<ul>
+<li>
+<p><strong><code>cloud-api:model</code></strong> - Shared <code>ChatCompletionRequest</code>/<code>ChatCompletionResponse</code> DTOs with Kotlin Serialization</p>
+</li>
+<li>
+<p><strong><code>cloud-api:server</code></strong> - Ktor CIO server exposing <code>/v1/chat/completions</code> and <code>/v1/models</code></p>
+</li>
+<li>
+<p><strong><code>cloud-api:client</code></strong> - <code>LlmClient</code> HTTP client for calling the API</p>
+</li>
+<li>
+<p><strong><code>cloud-api:agent</code></strong> - Koog <code>AIAgent</code> that starts the local server and runs agent interactions</p>
+</li>
+</ul>
+</div>
+<div class="paragraph">
+<p>The API contract is documented in <code>cloud-api/openapi.yaml</code> (OpenAPI 3.1).</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="rationale-4"><a class="anchor" href="#rationale-4"></a>Rationale</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>OpenAI API is the de facto standard for LLM interaction</p>
+</li>
+<li>
+<p>Enables any OpenAI-compatible tool to use local inference</p>
+</li>
+<li>
+<p>Koog agent framework provides structured agent workflows</p>
+</li>
+<li>
+<p>Separate module group keeps cloud-api concerns isolated from core modules</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-8"><a class="anchor" href="#consequences-8"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Standard API compatible with a wide ecosystem of tools</p>
+</li>
+<li>
+<p>(+) Clean separation from core modules</p>
+</li>
+<li>
+<p>(+) Can be deployed independently as a standalone server</p>
+</li>
+<li>
+<p>(+) Koog agent integration for advanced agent workflows</p>
+</li>
+<li>
+<p>(-) Currently uses a stub backend (echoes user messages)</p>
+</li>
+<li>
+<p>(-) Additional dependencies (Ktor server, Koog agents)</p>
+</li>
+</ul>
+</div>
+<hr>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="adr-008-environment-variables-for-configuration"><a class="anchor" href="#adr-008-environment-variables-for-configuration"></a>ADR-008: Environment Variables for Configuration</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="status-9"><a class="anchor" href="#status-9"></a>Status</h3>
+<div class="paragraph">
+<p>Accepted (supersedes previous system-properties-only approach)</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="context-9"><a class="anchor" href="#context-9"></a>Context</h3>
+<div class="paragraph">
+<p>Need runtime configuration for LLM engine selection, model paths, and REST API endpoints. Environment variables work better with Docker, CI/CD, and MCP server stdio transport.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="decision-9"><a class="anchor" href="#decision-9"></a>Decision</h3>
+<div class="paragraph">
+<p>Use environment variables as the primary configuration mechanism via <code>LLMServiceFactory</code>. System properties remain supported for <code>getLLMSummarizer()</code>.</p>
+</div>
+</div>
+<div class="sect2">
+<h3 id="environment-variables"><a class="anchor" href="#environment-variables"></a>Environment Variables</h3>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-bash hljs" data-lang="bash">MCP_LLM_BACKEND=SKAINET          # or REST_API, JLAMA
+MCP_LLM_MODEL_PATH=/path/to/model.gguf
+MCP_LLM_REST_BASE_URL=http://localhost:11434
+MCP_LLM_REST_MODEL=llama3.2:3b
+MCP_LLM_REST_API_KEY=optional-key</code></pre>
+</div>
+</div>
+</div>
+<div class="sect2">
+<h3 id="consequences-9"><a class="anchor" href="#consequences-9"></a>Consequences</h3>
+<div class="ulist">
+<ul>
+<li>
+<p>(+) Zero dependencies</p>
+</li>
+<li>
+<p>(+) Works well with Docker and container orchestration</p>
+</li>
+<li>
+<p>(+) Easy to configure in Claude Desktop MCP config</p>
+</li>
+<li>
+<p>(+) <code>LLMBackendType.fromEnv()</code> provides validation at startup</p>
+</li>
+<li>
+<p>(-) Two configuration paths coexist (env vars and system properties)</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<nav class="pagination">
+  <span class="prev"><a href="08-crosscutting-concepts.html">8. Crosscutting Concepts</a></span>
+  <span class="next"><a href="10-quality-requirements.html">10. Quality Requirements</a></span>
+</nav>
+</article>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script id="site-script" src="../../_/js/site.js" data-ui-root-path="../../_"></script>
+<script async src="../../_/js/vendor/highlight.js"></script>
+  </body>
+</html>

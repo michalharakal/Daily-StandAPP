@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>11. Risks and Technical Debt :: DailyStandApp Documentation</title>
+    <link rel="canonical" href="https://jug-da.github.io/DailyStandApp-MCP/architecture/architecture/11-risks-technical-debt.html">
+    <link rel="prev" href="10-quality-requirements.html">
+    <link rel="next" href="12-glossary.html">
+    <meta name="generator" content="Antora 3.1.14">
+    <link rel="stylesheet" href="../../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://jug-da.github.io/DailyStandApp-MCP">DailyStandApp Documentation</a>
+      <button class="navbar-burger" aria-controls="topbar-nav" aria-expanded="false" aria-label="Toggle main menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="#">Home</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Products</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Product A</a>
+            <a class="navbar-item" href="#">Product B</a>
+            <a class="navbar-item" href="#">Product C</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Services</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Service A</a>
+            <a class="navbar-item" href="#">Service B</a>
+            <a class="navbar-item" href="#">Service C</a>
+          </div>
+        </div>
+        <div class="navbar-item">
+          <span class="control">
+            <a class="button is-primary" href="#">Download</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="architecture" data-version="">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <button class="nav-menu-toggle" aria-label="Toggle expand/collapse all" style="display: none"></button>
+    <h3 class="title"><a href="index.html">Architecture Documentation</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+    <button class="nav-item-toggle"></button>
+    <span class="nav-text">Architecture</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="index.html">Overview</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="01-introduction-goals.html">1. Introduction and Goals</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="02-constraints.html">2. Constraints</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="03-context-scope.html">3. Context and Scope</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="04-solution-strategy.html">4. Solution Strategy</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="05-building-block-view.html">5. Building Block View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="06-runtime-view.html">6. Runtime View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="07-deployment-view.html">7. Deployment View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="08-crosscutting-concepts.html">8. Crosscutting Concepts</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="09-architecture-decisions.html">9. Architecture Decisions</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="10-quality-requirements.html">10. Quality Requirements</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <a class="nav-link" href="11-risks-technical-debt.html">11. Risks and Technical Debt</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="12-glossary.html">12. Glossary</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="nav-panel-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Architecture Documentation</span>
+    <span class="version"></span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <div class="title"><a href="index.html">Architecture Documentation</a></div>
+    </li>
+    <li class="component">
+      <div class="title"><a href="../../daily-standapp/index.html">Dialy-StandAPP</a></div>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="../../daily-standapp/index.html" class="home-link"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Architecture Documentation</a></li>
+    <li>Architecture</li>
+    <li><a href="11-risks-technical-debt.html">11. Risks and Technical Debt</a></li>
+  </ul>
+</nav>
+<div class="edit-this-page"><a href="https://github.com/michalharakal/Daily-StandAPP/edit/develop/docs/modules/architecture/pages/11-risks-technical-debt.adoc">Edit this Page</a></div>
+</div>
+  <div class="content">
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+<article class="doc">
+<h1 class="page">11. Risks and Technical Debt</h1>
+<div id="toc" class="toc">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#11-1-technical-risks">11.1 Technical Risks</a></li>
+<li><a href="#11-2-technical-debt">11.2 Technical Debt</a>
+<ul class="sectlevel2">
+<li><a href="#current-technical-debt">Current Technical Debt</a></li>
+<li><a href="#debt-details">Debt Details</a></li>
+</ul>
+</li>
+<li><a href="#11-3-risk-matrix">11.3 Risk Matrix</a></li>
+<li><a href="#11-4-improvement-roadmap">11.4 Improvement Roadmap</a>
+<ul class="sectlevel2">
+<li><a href="#short-term-next-release">Short Term (Next Release)</a></li>
+<li><a href="#medium-term">Medium Term</a></li>
+<li><a href="#long-term">Long Term</a></li>
+</ul>
+</li>
+<li><a href="#11-5-dependencies-risk">11.5 Dependencies Risk</a></li>
+</ul>
+</div>
+<div class="sect1">
+<h2 id="11-1-technical-risks"><a class="anchor" href="#11-1-technical-risks"></a>11.1 Technical Risks</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 12.5%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+<col style="width: 12.5%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">ID</th>
+<th class="tableblock halign-left valign-top">Risk</th>
+<th class="tableblock halign-left valign-top">Impact</th>
+<th class="tableblock halign-left valign-top">Mitigation</th>
+<th class="tableblock halign-left valign-top">Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TR-01</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>JDK 21+ Requirement</strong>
+Java Vector API is incubator module, may change</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Breaking changes in future JDK versions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Abstract SIMD operations, monitor JDK roadmap</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TR-02</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Model Compatibility</strong>
+GGUF format evolves, new quantization methods</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Models may not load correctly</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Pin tested model versions, version detection</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TR-03</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MCP Protocol Changes</strong>
+MCP is relatively new, spec may evolve</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Integration breaks with Claude updates</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Use official SDK, monitor protocol changes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TR-04</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance on Low-End Hardware</strong>
+LLM inference is CPU-intensive</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unusable on older machines</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Document requirements, provide lightweight mode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TR-05</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Large Model Downloads</strong>
+Models are 4-8GB</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Poor first-run experience</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Provide download scripts, progress indicators</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="11-2-technical-debt"><a class="anchor" href="#11-2-technical-debt"></a>11.2 Technical Debt</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="current-technical-debt"><a class="anchor" href="#current-technical-debt"></a>Current Technical Debt</h3>
+<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 1034.33px; background-color: transparent;" viewBox="0 0 1034.328125 348" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#333;color:#333;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#333333;stroke-width:2.0px;}#my-svg .flowchart-link{stroke:#333333;fill:none;}#my-svg .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#my-svg .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#my-svg .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#my-svg .icon-shape rect,#my-svg .image-shape rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"/><g class="edgePaths"/><g class="edgeLabels"/><g class="nodes"><g class="root" transform="translate(0, 0)"><g class="clusters"><g class="cluster" id="subGraph2" data-look="classic"><rect style="" x="8" y="8" width="300.421875" height="332"/><g class="cluster-label" transform="translate(117.203125, 8)"><foreignObject width="82.015625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Low Priority</p></span></div></foreignObject></g></g></g><g class="edgePaths"/><g class="edgeLabels"/><g class="nodes"><g class="node default" id="flowchart-TD5-3" transform="translate(158.2109375, 70)"><rect class="basic label-container" style="" x="-108.671875" y="-27" width="217.34375" height="54"/><g class="label" style="" transform="translate(-78.671875, -12)"><rect/><foreignObject width="157.34375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>No Structured Logging</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-TD6-4" transform="translate(158.2109375, 174)"><rect class="basic label-container" style="" x="-104.8125" y="-27" width="209.625" height="54"/><g class="label" style="" transform="translate(-74.8125, -12)"><rect/><foreignObject width="149.625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>No Metrics/Telemetry</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-TD7-5" transform="translate(158.2109375, 278)"><rect class="basic label-container" style="" x="-112.7109375" y="-27" width="225.421875" height="54"/><g class="label" style="" transform="translate(-82.7109375, -12)"><rect/><foreignObject width="165.421875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Limited Error Messages</p></span></div></foreignObject></g></g></g></g><g class="root" transform="translate(350.421875, 16)"><g class="clusters"><g class="cluster" id="subGraph1" data-look="classic"><rect style="" x="8" y="8" width="335" height="300"/><g class="cluster-label" transform="translate(120.9765625, 8)"><foreignObject width="109.046875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Medium Priority</p></span></div></foreignObject></g></g></g><g class="edgePaths"/><g class="edgeLabels"/><g class="nodes"><g class="node default" id="flowchart-TD3-1" transform="translate(175.5, 94)"><rect class="basic label-container" style="fill:#fff9c4 !important" x="-130" y="-51" width="260" height="102"/><g class="label" style="" transform="translate(-100, -36)"><rect/><foreignObject width="200" height="72"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;"><span class="nodeLabel"><p>No Summarization Tool<br />MCP missing standup_summary</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-TD4-2" transform="translate(175.5, 234)"><rect class="basic label-container" style="fill:#fff9c4 !important" x="-110.4375" y="-39" width="220.875" height="78"/><g class="label" style="" transform="translate(-80.4375, -24)"><rect/><foreignObject width="160.875" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Platform Stubs<br />Android, Wasm, Native</p></span></div></foreignObject></g></g></g></g><g class="root" transform="translate(735.421875, 92)"><g class="clusters"><g class="cluster" id="subGraph0" data-look="classic"><rect style="" x="8" y="8" width="282.90625" height="148"/><g class="cluster-label" transform="translate(106.765625, 8)"><foreignObject width="85.375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>High Priority</p></span></div></foreignObject></g></g></g><g class="edgePaths"/><g class="edgeLabels"/><g class="nodes"><g class="node default" id="flowchart-TD1-0" transform="translate(149.453125, 82)"><rect class="basic label-container" style="fill:#ffcdd2 !important" x="-103.953125" y="-39" width="207.90625" height="78"/><g class="label" style="" transform="translate(-73.953125, -24)"><rect/><foreignObject width="147.90625" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>CLI Not Implemented<br />Stub only</p></span></div></foreignObject></g></g></g></g></g></g></g></svg>
+</div>
+<div class="sect2">
+<h3 id="debt-details"><a class="anchor" href="#debt-details"></a>Debt Details</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 14.2857%;">
+<col style="width: 28.5714%;">
+<col style="width: 28.5714%;">
+<col style="width: 28.5715%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">ID</th>
+<th class="tableblock halign-left valign-top">Debt Item</th>
+<th class="tableblock halign-left valign-top">Current State</th>
+<th class="tableblock halign-left valign-top">Remediation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TD-01</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>CLI Implementation</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>Main.java</code> prints "Hello, World!"</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implement argument parsing, wire to GitClient and LLMSummarizer</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TD-03</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>MCP standup_summary Tool</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Not implemented</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Add tool combining commits + LLM summarization</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TD-04</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Platform Implementations</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Return empty lists</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Implement or clearly document as unsupported</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TD-05</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Logging</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Minimal, inconsistent</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Add SLF4J throughout with configurable levels</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TD-06</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Error Handling</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Silent failures in GitClient</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Add proper error propagation and user-friendly messages</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">TD-07</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Cloud API Stub Backend</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Server echoes user messages instead of running real inference</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Wire cloud-api server to an actual LLM backend (e.g., <code>LLMService</code> from llm module)</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="11-3-risk-matrix"><a class="anchor" href="#11-3-risk-matrix"></a>11.3 Risk Matrix</h2>
+<div class="sectionbody">
+<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="max-width: 500px; background-color: transparent;" viewBox="0 0 500 500" role="graphics-document document" aria-roledescription="quadrantChart"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g/><g class="main"><g class="quadrants"><g class="quadrant"><rect x="263" y="45" width="232" height="212" fill="#ECECFF"/><text x="0" y="0" fill="#131300" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(379, 50) rotate(0)">Monitor</text></g><g class="quadrant"><rect x="31" y="45" width="232" height="212" fill="#f1f1ff"/><text x="0" y="0" fill="#0e0e00" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(147, 50) rotate(0)">Mitigate</text></g><g class="quadrant"><rect x="31" y="257" width="232" height="212" fill="#f6f6ff"/><text x="0" y="0" fill="#090900" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(147, 262) rotate(0)">Accept</text></g><g class="quadrant"><rect x="263" y="257" width="232" height="212" fill="#fbfbff"/><text x="0" y="0" fill="#040400" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(379, 262) rotate(0)">Address</text></g></g><g class="border"><line x1="30" y1="45" x2="496" y2="45" style="stroke: rgb(199, 199, 241); stroke-width: 2;"/><line x1="495" y1="46" x2="495" y2="468" style="stroke: rgb(199, 199, 241); stroke-width: 2;"/><line x1="30" y1="469" x2="496" y2="469" style="stroke: rgb(199, 199, 241); stroke-width: 2;"/><line x1="31" y1="46" x2="31" y2="468" style="stroke: rgb(199, 199, 241); stroke-width: 2;"/><line x1="263" y1="46" x2="263" y2="468" style="stroke: rgb(199, 199, 241); stroke-width: 1;"/><line x1="32" y1="257" x2="494" y2="257" style="stroke: rgb(199, 199, 241); stroke-width: 1;"/></g><g class="data-points"><g class="data-point"><circle cx="170.2" cy="214.60000000000002" r="5" fill="hsl(240, 100%, NaN%)" stroke="hsl(240, 100%, NaN%)" stroke-width="0px"/><text x="0" y="0" fill="#131300" font-size="12" dominant-baseline="hanging" text-anchor="middle" transform="translate(170.2, 219.60000000000002) rotate(0)">Downloads</text></g><g class="data-point"><circle cx="355.8" cy="341.79999999999995" r="5" fill="hsl(240, 100%, NaN%)" stroke="hsl(240, 100%, NaN%)" stroke-width="0px"/><text x="0" y="0" fill="#131300" font-size="12" dominant-baseline="hanging" text-anchor="middle" transform="translate(355.8, 346.79999999999995) rotate(0)">Performance</text></g><g class="data-point"><circle cx="216.6" cy="384.20000000000005" r="5" fill="hsl(240, 100%, NaN%)" stroke="hsl(240, 100%, NaN%)" stroke-width="0px"/><text x="0" y="0" fill="#131300" font-size="12" dominant-baseline="hanging" text-anchor="middle" transform="translate(216.6, 389.20000000000005) rotate(0)">MCP Changes</text></g><g class="data-point"><circle cx="263" cy="299.4" r="5" fill="hsl(240, 100%, NaN%)" stroke="hsl(240, 100%, NaN%)" stroke-width="0px"/><text x="0" y="0" fill="#131300" font-size="12" dominant-baseline="hanging" text-anchor="middle" transform="translate(263, 304.4) rotate(0)">Model Compat</text></g><g class="data-point"><circle cx="309.4" cy="341.79999999999995" r="5" fill="hsl(240, 100%, NaN%)" stroke="hsl(240, 100%, NaN%)" stroke-width="0px"/><text x="0" y="0" fill="#131300" font-size="12" dominant-baseline="hanging" text-anchor="middle" transform="translate(309.4, 346.79999999999995) rotate(0)">JDK Changes</text></g></g><g class="labels"><g class="label"><text x="0" y="0" fill="#131300" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(147, 479) rotate(0)">Low Impact</text></g><g class="label"><text x="0" y="0" fill="#131300" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(379, 479) rotate(0)">High Impact</text></g><g class="label"><text x="0" y="0" fill="#131300" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(5, 363) rotate(-90)">Low Probability</text></g><g class="label"><text x="0" y="0" fill="#131300" font-size="16" dominant-baseline="hanging" text-anchor="middle" transform="translate(5, 151) rotate(-90)">High Probability</text></g></g><g class="title"><text x="0" y="0" fill="#131300" font-size="20" dominant-baseline="hanging" text-anchor="middle" transform="translate(250, 10) rotate(0)">Risk Assessment Matrix</text></g></g></svg>
+</div>
+</div>
+<div class="sect1">
+<h2 id="11-4-improvement-roadmap"><a class="anchor" href="#11-4-improvement-roadmap"></a>11.4 Improvement Roadmap</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="short-term-next-release"><a class="anchor" href="#short-term-next-release"></a>Short Term (Next Release)</h3>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p><i class="fa fa-square-o"></i> Implement <code>standup_summary</code> MCP tool</p>
+</li>
+<li>
+<p><i class="fa fa-square-o"></i> Add streaming support to MCP responses</p>
+</li>
+<li>
+<p><i class="fa fa-square-o"></i> Improve error messages</p>
+</li>
+<li>
+<p><i class="fa fa-square-o"></i> Wire cloud-api server to real LLM backend</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="medium-term"><a class="anchor" href="#medium-term"></a>Medium Term</h3>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p><i class="fa fa-square-o"></i> Complete CLI implementation</p>
+</li>
+<li>
+<p><i class="fa fa-square-o"></i> Add integration tests</p>
+</li>
+<li>
+<p><i class="fa fa-square-o"></i> Unify configuration approach (env vars vs system properties)</p>
+</li>
+</ul>
+</div>
+</div>
+<div class="sect2">
+<h3 id="long-term"><a class="anchor" href="#long-term"></a>Long Term</h3>
+<div class="ulist checklist">
+<ul class="checklist">
+<li>
+<p><i class="fa fa-square-o"></i> Native platform support (beyond stubs)</p>
+</li>
+<li>
+<p><i class="fa fa-square-o"></i> HTTP transport option for MCP</p>
+</li>
+<li>
+<p><i class="fa fa-square-o"></i> Model management tooling</p>
+</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="11-5-dependencies-risk"><a class="anchor" href="#11-5-dependencies-risk"></a>11.5 Dependencies Risk</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 16.6666%;">
+<col style="width: 33.3333%;">
+<col style="width: 16.6666%;">
+<col style="width: 33.3335%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Dependency</th>
+<th class="tableblock halign-left valign-top">Version</th>
+<th class="tableblock halign-left valign-top">Risk Level</th>
+<th class="tableblock halign-left valign-top">Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SKaiNET</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0.13.0</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Active development, API may change (migrated from 0.8.3)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">MCP Kotlin SDK</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0.7.2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">New library, expect updates</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Eclipse JGit</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7.1.0</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Mature, stable API</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kotlin</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2.2.20</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stable releases, good compatibility</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Ktor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3.3.0</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Low</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Mature, stable API (used by cloud-api modules)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Koog Agents</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">0.6.1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Medium</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Early-stage framework, API may change</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<nav class="pagination">
+  <span class="prev"><a href="10-quality-requirements.html">10. Quality Requirements</a></span>
+  <span class="next"><a href="12-glossary.html">12. Glossary</a></span>
+</nav>
+</article>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script id="site-script" src="../../_/js/site.js" data-ui-root-path="../../_"></script>
+<script async src="../../_/js/vendor/highlight.js"></script>
+  </body>
+</html>

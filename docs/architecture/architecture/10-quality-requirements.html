@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>10. Quality Requirements :: DailyStandApp Documentation</title>
+    <link rel="canonical" href="https://jug-da.github.io/DailyStandApp-MCP/architecture/architecture/10-quality-requirements.html">
+    <link rel="prev" href="09-architecture-decisions.html">
+    <link rel="next" href="11-risks-technical-debt.html">
+    <meta name="generator" content="Antora 3.1.14">
+    <link rel="stylesheet" href="../../_/css/site.css">
+  </head>
+  <body class="article">
+<header class="header">
+  <nav class="navbar">
+    <div class="navbar-brand">
+      <a class="navbar-item" href="https://jug-da.github.io/DailyStandApp-MCP">DailyStandApp Documentation</a>
+      <button class="navbar-burger" aria-controls="topbar-nav" aria-expanded="false" aria-label="Toggle main menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div id="topbar-nav" class="navbar-menu">
+      <div class="navbar-end">
+        <a class="navbar-item" href="#">Home</a>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Products</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Product A</a>
+            <a class="navbar-item" href="#">Product B</a>
+            <a class="navbar-item" href="#">Product C</a>
+          </div>
+        </div>
+        <div class="navbar-item has-dropdown is-hoverable">
+          <a class="navbar-link" href="#">Services</a>
+          <div class="navbar-dropdown">
+            <a class="navbar-item" href="#">Service A</a>
+            <a class="navbar-item" href="#">Service B</a>
+            <a class="navbar-item" href="#">Service C</a>
+          </div>
+        </div>
+        <div class="navbar-item">
+          <span class="control">
+            <a class="button is-primary" href="#">Download</a>
+          </span>
+        </div>
+      </div>
+    </div>
+  </nav>
+</header>
+<div class="body">
+<div class="nav-container" data-component="architecture" data-version="">
+  <aside class="nav">
+    <div class="panels">
+<div class="nav-panel-menu is-active" data-panel="menu">
+  <nav class="nav-menu">
+    <button class="nav-menu-toggle" aria-label="Toggle expand/collapse all" style="display: none"></button>
+    <h3 class="title"><a href="index.html">Architecture Documentation</a></h3>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="0">
+    <button class="nav-item-toggle"></button>
+    <span class="nav-text">Architecture</span>
+<ul class="nav-list">
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="index.html">Overview</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="01-introduction-goals.html">1. Introduction and Goals</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="02-constraints.html">2. Constraints</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="03-context-scope.html">3. Context and Scope</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="04-solution-strategy.html">4. Solution Strategy</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="05-building-block-view.html">5. Building Block View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="06-runtime-view.html">6. Runtime View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="07-deployment-view.html">7. Deployment View</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="08-crosscutting-concepts.html">8. Crosscutting Concepts</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="09-architecture-decisions.html">9. Architecture Decisions</a>
+  </li>
+  <li class="nav-item is-current-page" data-depth="1">
+    <a class="nav-link" href="10-quality-requirements.html">10. Quality Requirements</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="11-risks-technical-debt.html">11. Risks and Technical Debt</a>
+  </li>
+  <li class="nav-item" data-depth="1">
+    <a class="nav-link" href="12-glossary.html">12. Glossary</a>
+  </li>
+</ul>
+  </li>
+</ul>
+  </nav>
+</div>
+<div class="nav-panel-explore" data-panel="explore">
+  <div class="context">
+    <span class="title">Architecture Documentation</span>
+    <span class="version"></span>
+  </div>
+  <ul class="components">
+    <li class="component is-current">
+      <div class="title"><a href="index.html">Architecture Documentation</a></div>
+    </li>
+    <li class="component">
+      <div class="title"><a href="../../daily-standapp/index.html">Dialy-StandAPP</a></div>
+    </li>
+  </ul>
+</div>
+    </div>
+  </aside>
+</div>
+<main class="article">
+<div class="toolbar" role="navigation">
+<button class="nav-toggle"></button>
+  <a href="../../daily-standapp/index.html" class="home-link"></a>
+<nav class="breadcrumbs" aria-label="breadcrumbs">
+  <ul>
+    <li><a href="index.html">Architecture Documentation</a></li>
+    <li>Architecture</li>
+    <li><a href="10-quality-requirements.html">10. Quality Requirements</a></li>
+  </ul>
+</nav>
+<div class="edit-this-page"><a href="https://github.com/michalharakal/Daily-StandAPP/edit/develop/docs/modules/architecture/pages/10-quality-requirements.adoc">Edit this Page</a></div>
+</div>
+  <div class="content">
+<aside class="toc sidebar" data-title="Contents" data-levels="2">
+  <div class="toc-menu"></div>
+</aside>
+<article class="doc">
+<h1 class="page">10. Quality Requirements</h1>
+<div id="toc" class="toc">
+<div id="toctitle">Table of Contents</div>
+<ul class="sectlevel1">
+<li><a href="#10-1-quality-tree">10.1 Quality Tree</a></li>
+<li><a href="#10-2-quality-scenarios">10.2 Quality Scenarios</a>
+<ul class="sectlevel2">
+<li><a href="#10-2-1-privacy-scenarios">10.2.1 Privacy Scenarios</a></li>
+<li><a href="#10-2-2-performance-scenarios">10.2.2 Performance Scenarios</a></li>
+<li><a href="#10-2-3-portability-scenarios">10.2.3 Portability Scenarios</a></li>
+<li><a href="#10-2-4-usability-scenarios">10.2.4 Usability Scenarios</a></li>
+</ul>
+</li>
+<li><a href="#10-3-quality-requirements-table">10.3 Quality Requirements Table</a></li>
+<li><a href="#10-4-performance-characteristics">10.4 Performance Characteristics</a>
+<ul class="sectlevel2">
+<li><a href="#llm-inference-performance">LLM Inference Performance</a></li>
+<li><a href="#expected-performance-ranges">Expected Performance Ranges</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="sect1">
+<h2 id="10-1-quality-tree"><a class="anchor" href="#10-1-quality-tree"></a>10.1 Quality Tree</h2>
+<div class="sectionbody">
+<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 2521.7px; background-color: transparent;" viewBox="0 0 2521.703125 278" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#333;color:#333;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#333333;stroke-width:2.0px;}#my-svg .flowchart-link{stroke:#333333;fill:none;}#my-svg .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#my-svg .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#my-svg .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#my-svg .icon-shape rect,#my-svg .image-shape rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"/><g class="edgePaths"><path d="M1400.203,37.26L1200.399,45.55C1000.595,53.84,600.987,70.42,401.183,82.21C201.379,94,201.379,101,201.379,104.5L201.379,108" id="L_QUALITY_PRIVACY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_QUALITY_PRIVACY_0" data-points="W3sieCI6MTQwMC4yMDMxMjUsInkiOjM3LjI1OTk0NjQ1MzU2MTR9LHsieCI6MjAxLjM3ODkwNjI1LCJ5Ijo4N30seyJ4IjoyMDEuMzc4OTA2MjUsInkiOjExMn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1400.203,39.547L1305.471,47.456C1210.74,55.365,1021.276,71.182,926.544,82.591C831.813,94,831.813,101,831.813,104.5L831.813,108" id="L_QUALITY_PERFORMANCE_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_QUALITY_PERFORMANCE_0" data-points="W3sieCI6MTQwMC4yMDMxMjUsInkiOjM5LjU0NzM3NDc1ODU0ODAyNH0seyJ4Ijo4MzEuODEyNSwieSI6ODd9LHsieCI6ODMxLjgxMjUsInkiOjExMn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1454.672,62L1454.672,66.167C1454.672,70.333,1454.672,78.667,1454.672,86.333C1454.672,94,1454.672,101,1454.672,104.5L1454.672,108" id="L_QUALITY_PORTABILITY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_QUALITY_PORTABILITY_0" data-points="W3sieCI6MTQ1NC42NzE4NzUsInkiOjYyfSx7IngiOjE0NTQuNjcxODc1LCJ5Ijo4N30seyJ4IjoxNDU0LjY3MTg3NSwieSI6MTEyfV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1509.141,41.131L1577.057,48.776C1644.973,56.421,1780.805,71.71,1848.721,82.855C1916.637,94,1916.637,101,1916.637,104.5L1916.637,108" id="L_QUALITY_USABILITY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_QUALITY_USABILITY_0" data-points="W3sieCI6MTUwOS4xNDA2MjUsInkiOjQxLjEzMTE0ODM3MjY5NDc1fSx7IngiOjE5MTYuNjM2NzE4NzUsInkiOjg3fSx7IngiOjE5MTYuNjM2NzE4NzUsInkiOjExMn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1509.141,38.2L1647.599,46.333C1786.057,54.466,2062.974,70.733,2201.432,82.367C2339.891,94,2339.891,101,2339.891,104.5L2339.891,108" id="L_QUALITY_MAINTAINABILITY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_QUALITY_MAINTAINABILITY_0" data-points="W3sieCI6MTUwOS4xNDA2MjUsInkiOjM4LjE5OTYzMjg1OTEwOTY4NH0seyJ4IjoyMzM5Ljg5MDYyNSwieSI6ODd9LHsieCI6MjMzOS44OTA2MjUsInkiOjExMn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M145.512,165.791L136.751,169.993C127.99,174.194,110.467,182.597,101.706,190.299C92.945,198,92.945,205,92.945,208.5L92.945,212" id="L_PRIVACY_P1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PRIVACY_P1_0" data-points="W3sieCI6MTQ1LjUxMTcxODc1LCJ5IjoxNjUuNzkxNDU1MDIzNTk1OTR9LHsieCI6OTIuOTQ1MzEyNSwieSI6MTkxfSx7IngiOjkyLjk0NTMxMjUsInkiOjIxNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M257.246,165.791L266.007,169.993C274.768,174.194,292.29,182.597,301.051,190.299C309.813,198,309.813,205,309.813,208.5L309.813,212" id="L_PRIVACY_P2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PRIVACY_P2_0" data-points="W3sieCI6MjU3LjI0NjA5Mzc1LCJ5IjoxNjUuNzkxNDU1MDIzNTk1OTR9LHsieCI6MzA5LjgxMjUsInkiOjE5MX0seyJ4IjozMDkuODEyNSwieSI6MjE2fV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M757.023,152.747L722.337,159.122C687.651,165.498,618.279,178.249,583.592,188.124C548.906,198,548.906,205,548.906,208.5L548.906,212" id="L_PERFORMANCE_PERF1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PERFORMANCE_PERF1_0" data-points="W3sieCI6NzU3LjAyMzQzNzUsInkiOjE1Mi43NDY3MTM3OTY1MzE1NH0seyJ4Ijo1NDguOTA2MjUsInkiOjE5MX0seyJ4Ijo1NDguOTA2MjUsInkiOjIxNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M831.813,166L831.813,170.167C831.813,174.333,831.813,182.667,831.813,190.333C831.813,198,831.813,205,831.813,208.5L831.813,212" id="L_PERFORMANCE_PERF2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PERFORMANCE_PERF2_0" data-points="W3sieCI6ODMxLjgxMjUsInkiOjE2Nn0seyJ4Ijo4MzEuODEyNSwieSI6MTkxfSx7IngiOjgzMS44MTI1LCJ5IjoyMTZ9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M906.602,153.356L939.286,159.63C971.971,165.904,1037.341,178.452,1070.026,188.226C1102.711,198,1102.711,205,1102.711,208.5L1102.711,212" id="L_PERFORMANCE_PERF3_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PERFORMANCE_PERF3_0" data-points="W3sieCI6OTA2LjYwMTU2MjUsInkiOjE1My4zNTYwNDkwMjY2NzYzfSx7IngiOjExMDIuNzEwOTM3NSwieSI6MTkxfSx7IngiOjExMDIuNzEwOTM3NSwieSI6MjE2fV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1390.109,165.981L1380.132,170.151C1370.154,174.321,1350.198,182.66,1340.22,190.33C1330.242,198,1330.242,205,1330.242,208.5L1330.242,212" id="L_PORTABILITY_PORT1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PORTABILITY_PORT1_0" data-points="W3sieCI6MTM5MC4xMDkzNzUsInkiOjE2NS45ODExMDEyNzQ1NjUyMn0seyJ4IjoxMzMwLjI0MjE4NzUsInkiOjE5MX0seyJ4IjoxMzMwLjI0MjE4NzUsInkiOjIxNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1519.234,165.981L1529.212,170.151C1539.19,174.321,1559.146,182.66,1569.124,190.33C1579.102,198,1579.102,205,1579.102,208.5L1579.102,212" id="L_PORTABILITY_PORT2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PORTABILITY_PORT2_0" data-points="W3sieCI6MTUxOS4yMzQzNzUsInkiOjE2NS45ODExMDEyNzQ1NjUyMn0seyJ4IjoxNTc5LjEwMTU2MjUsInkiOjE5MX0seyJ4IjoxNTc5LjEwMTU2MjUsInkiOjIxNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1863.373,166L1855.153,170.167C1846.934,174.333,1830.494,182.667,1822.274,190.333C1814.055,198,1814.055,205,1814.055,208.5L1814.055,212" id="L_USABILITY_USE1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_USABILITY_USE1_0" data-points="W3sieCI6MTg2My4zNzI5NzE3NTQ4MDc2LCJ5IjoxNjZ9LHsieCI6MTgxNC4wNTQ2ODc1LCJ5IjoxOTF9LHsieCI6MTgxNC4wNTQ2ODc1LCJ5IjoyMTZ9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M1969.9,166L1978.12,170.167C1986.34,174.333,2002.779,182.667,2010.999,190.333C2019.219,198,2019.219,205,2019.219,208.5L2019.219,212" id="L_USABILITY_USE2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_USABILITY_USE2_0" data-points="W3sieCI6MTk2OS45MDA0NjU3NDUxOTI0LCJ5IjoxNjZ9LHsieCI6MjAxOS4yMTg3NSwieSI6MTkxfSx7IngiOjIwMTkuMjE4NzUsInkiOjIxNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M2286.957,166L2278.789,170.167C2270.62,174.333,2254.283,182.667,2246.114,190.333C2237.945,198,2237.945,205,2237.945,208.5L2237.945,212" id="L_MAINTAINABILITY_MAIN1_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_MAINTAINABILITY_MAIN1_0" data-points="W3sieCI6MjI4Ni45NTc0ODE5NzExNTQsInkiOjE2Nn0seyJ4IjoyMjM3Ljk0NTMxMjUsInkiOjE5MX0seyJ4IjoyMjM3Ljk0NTMxMjUsInkiOjIxNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M2392.824,166L2400.992,170.167C2409.161,174.333,2425.499,182.667,2433.667,190.333C2441.836,198,2441.836,205,2441.836,208.5L2441.836,212" id="L_MAINTAINABILITY_MAIN2_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_MAINTAINABILITY_MAIN2_0" data-points="W3sieCI6MjM5Mi44MjM3NjgwMjg4NDYsInkiOjE2Nn0seyJ4IjoyNDQxLjgzNTkzNzUsInkiOjE5MX0seyJ4IjoyNDQxLjgzNTkzNzUsInkiOjIxNn1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" data-id="L_QUALITY_PRIVACY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_QUALITY_PERFORMANCE_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_QUALITY_PORTABILITY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_QUALITY_USABILITY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_QUALITY_MAINTAINABILITY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PRIVACY_P1_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PRIVACY_P2_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PERFORMANCE_PERF1_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PERFORMANCE_PERF2_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PERFORMANCE_PERF3_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PORTABILITY_PORT1_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PORTABILITY_PORT2_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_USABILITY_USE1_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_USABILITY_USE2_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_MAINTAINABILITY_MAIN1_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_MAINTAINABILITY_MAIN2_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="flowchart-QUALITY-0" transform="translate(1454.671875, 35)"><rect class="basic label-container" style="" x="-54.46875" y="-27" width="108.9375" height="54"/><g class="label" style="" transform="translate(-24.46875, -12)"><rect/><foreignObject width="48.9375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Quality</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PRIVACY-2" transform="translate(201.37890625, 139)"><rect class="basic label-container" style="fill:#c8e6c9 !important" x="-55.8671875" y="-27" width="111.734375" height="54"/><g class="label" style="" transform="translate(-25.8671875, -12)"><rect/><foreignObject width="51.734375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Privacy</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PERFORMANCE-4" transform="translate(831.8125, 139)"><rect class="basic label-container" style="fill:#fff3e0 !important" x="-74.7890625" y="-27" width="149.578125" height="54"/><g class="label" style="" transform="translate(-44.7890625, -12)"><rect/><foreignObject width="89.578125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Performance</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PORTABILITY-6" transform="translate(1454.671875, 139)"><rect class="basic label-container" style="fill:#e3f2fd !important" x="-64.5625" y="-27" width="129.125" height="54"/><g class="label" style="" transform="translate(-34.5625, -12)"><rect/><foreignObject width="69.125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Portability</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-USABILITY-8" transform="translate(1916.63671875, 139)"><rect class="basic label-container" style="fill:#f3e5f5 !important" x="-59.8515625" y="-27" width="119.703125" height="54"/><g class="label" style="" transform="translate(-29.8515625, -12)"><rect/><foreignObject width="59.703125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Usability</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-MAINTAINABILITY-10" transform="translate(2339.890625, 139)"><rect class="basic label-container" style="fill:#fce4ec !important" x="-79.984375" y="-27" width="159.96875" height="54"/><g class="label" style="" transform="translate(-49.984375, -12)"><rect/><foreignObject width="99.96875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Maintainability</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-P1-12" transform="translate(92.9453125, 243)"><rect class="basic label-container" style="" x="-84.9453125" y="-27" width="169.890625" height="54"/><g class="label" style="" transform="translate(-54.9453125, -12)"><rect/><foreignObject width="109.890625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Local Execution</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-P2-14" transform="translate(309.8125, 243)"><rect class="basic label-container" style="" x="-81.921875" y="-27" width="163.84375" height="54"/><g class="label" style="" transform="translate(-51.921875, -12)"><rect/><foreignObject width="103.84375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>No Cloud Calls</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PERF1-16" transform="translate(548.90625, 243)"><rect class="basic label-container" style="" x="-107.171875" y="-27" width="214.34375" height="54"/><g class="label" style="" transform="translate(-77.171875, -12)"><rect/><foreignObject width="154.34375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Fast Commit Retrieval</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PERF2-18" transform="translate(831.8125, 243)"><rect class="basic label-container" style="" x="-125.734375" y="-27" width="251.46875" height="54"/><g class="label" style="" transform="translate(-95.734375, -12)"><rect/><foreignObject width="191.46875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Reasonable Inference Time</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PERF3-20" transform="translate(1102.7109375, 243)"><rect class="basic label-container" style="" x="-95.1640625" y="-27" width="190.328125" height="54"/><g class="label" style="" transform="translate(-65.1640625, -12)"><rect/><foreignObject width="130.328125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>SIMD Acceleration</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PORT1-22" transform="translate(1330.2421875, 243)"><rect class="basic label-container" style="" x="-82.3671875" y="-27" width="164.734375" height="54"/><g class="label" style="" transform="translate(-52.3671875, -12)"><rect/><foreignObject width="104.734375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Cross-Platform</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PORT2-24" transform="translate(1579.1015625, 243)"><rect class="basic label-container" style="" x="-116.4921875" y="-27" width="232.984375" height="54"/><g class="label" style="" transform="translate(-86.4921875, -12)"><rect/><foreignObject width="172.984375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>No Native Dependencies</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-USE1-26" transform="translate(1814.0546875, 243)"><rect class="basic label-container" style="" x="-68.4609375" y="-27" width="136.921875" height="54"/><g class="label" style="" transform="translate(-38.4609375, -12)"><rect/><foreignObject width="76.921875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Simple CLI</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-USE2-28" transform="translate(2019.21875, 243)"><rect class="basic label-container" style="" x="-86.703125" y="-27" width="173.40625" height="54"/><g class="label" style="" transform="translate(-56.703125, -12)"><rect/><foreignObject width="113.40625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>MCP Integration</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-MAIN1-30" transform="translate(2237.9453125, 243)"><rect class="basic label-container" style="" x="-82.0234375" y="-27" width="164.046875" height="54"/><g class="label" style="" transform="translate(-52.0234375, -12)"><rect/><foreignObject width="104.046875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Clean Modules</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-MAIN2-32" transform="translate(2441.8359375, 243)"><rect class="basic label-container" style="" x="-71.8671875" y="-27" width="143.734375" height="54"/><g class="label" style="" transform="translate(-41.8671875, -12)"><rect/><foreignObject width="83.734375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Type Safety</p></span></div></foreignObject></g></g></g></g></g></svg>
+</div>
+</div>
+<div class="sect1">
+<h2 id="10-2-quality-scenarios"><a class="anchor" href="#10-2-quality-scenarios"></a>10.2 Quality Scenarios</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="10-2-1-privacy-scenarios"><a class="anchor" href="#10-2-1-privacy-scenarios"></a>10.2.1 Privacy Scenarios</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 12.5%;">
+<col style="width: 37.5%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">ID</th>
+<th class="tableblock halign-left valign-top">Scenario</th>
+<th class="tableblock halign-left valign-top">Response</th>
+<th class="tableblock halign-left valign-top">Measure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-P1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Developer requests commit summary for a private repository</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">All processing happens locally, no data transmitted</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Zero network calls for AI features</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-P2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">AI assistant queries commit history</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Data flows only between local MCP server and client</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Stdio transport, no network sockets</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="10-2-2-performance-scenarios"><a class="anchor" href="#10-2-2-performance-scenarios"></a>10.2.2 Performance Scenarios</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 12.5%;">
+<col style="width: 37.5%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">ID</th>
+<th class="tableblock halign-left valign-top">Scenario</th>
+<th class="tableblock halign-left valign-top">Response</th>
+<th class="tableblock halign-left valign-top">Measure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-PERF1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Fetch commits from repository with 10,000 commits</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Returns filtered results within acceptable time</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 5 seconds for date-filtered query</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-PERF2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Generate summary for 20 commits</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">LLM produces coherent summary</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 60 seconds on modern CPU (7B model)</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-PERF3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">First token generation</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Prompt processing completes</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Time to first token &lt; 10 seconds</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="10-2-3-portability-scenarios"><a class="anchor" href="#10-2-3-portability-scenarios"></a>10.2.3 Portability Scenarios</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 12.5%;">
+<col style="width: 37.5%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">ID</th>
+<th class="tableblock halign-left valign-top">Scenario</th>
+<th class="tableblock halign-left valign-top">Response</th>
+<th class="tableblock halign-left valign-top">Measure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-PORT1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Run MCP server on macOS, Linux, Windows</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Server starts and responds to tool calls</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Same JAR works on all platforms</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-PORT2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Use with different JDK 21+ distributions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Application runs correctly</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Tested on OpenJDK, Temurin, GraalVM</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="sect2">
+<h3 id="10-2-4-usability-scenarios"><a class="anchor" href="#10-2-4-usability-scenarios"></a>10.2.4 Usability Scenarios</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 12.5%;">
+<col style="width: 37.5%;">
+<col style="width: 25%;">
+<col style="width: 25%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">ID</th>
+<th class="tableblock halign-left valign-top">Scenario</th>
+<th class="tableblock halign-left valign-top">Response</th>
+<th class="tableblock halign-left valign-top">Measure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-USE1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Configure MCP server for Claude</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Add JSON config, server connects</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">&lt; 5 minutes setup time</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">QS-USE2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Query commits via AI assistant</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Natural language request returns formatted results</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Single tool call completes request</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div class="sect1">
+<h2 id="10-3-quality-requirements-table"><a class="anchor" href="#10-3-quality-requirements-table"></a>10.3 Quality Requirements Table</h2>
+<div class="sectionbody">
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 14.2857%;">
+<col style="width: 14.2857%;">
+<col style="width: 28.5714%;">
+<col style="width: 42.8572%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Quality</th>
+<th class="tableblock halign-left valign-top">Priority</th>
+<th class="tableblock halign-left valign-top">Requirement</th>
+<th class="tableblock halign-left valign-top">Verification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Privacy</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">1</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">No data leaves local machine</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Code review, network traffic analysis</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Performance</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Commit retrieval &lt; 5s</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Benchmark tests with large repos</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Portability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">2</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Works on JDK 21+ any OS</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">CI builds on multiple platforms</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Reliability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Graceful error handling</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Unit tests for error cases</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><strong>Maintainability</strong></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">3</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Modular codebase</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Dependency analysis, module boundaries</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="sect1">
+<h2 id="10-4-performance-characteristics"><a class="anchor" href="#10-4-performance-characteristics"></a>10.4 Performance Characteristics</h2>
+<div class="sectionbody">
+<div class="sect2">
+<h3 id="llm-inference-performance"><a class="anchor" href="#llm-inference-performance"></a>LLM Inference Performance</h3>
+<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 546.328px; background-color: transparent;" viewBox="0 0 546.328125 538" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#333;color:#333;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#333333;stroke-width:2.0px;}#my-svg .flowchart-link{stroke:#333333;fill:none;}#my-svg .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#my-svg .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#my-svg .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#my-svg .icon-shape rect,#my-svg .image-shape rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"><g class="cluster" id="subGraph1" data-look="classic"><rect style="" x="290.46875" y="31" width="247.859375" height="499"/><g class="cluster-label" transform="translate(343.7890625, 31)"><foreignObject width="141.21875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Performance Impact</p></span></div></foreignObject></g></g><g class="cluster" id="subGraph0" data-look="classic"><rect style="" x="8" y="8" width="232.46875" height="516"/><g class="cluster-label" transform="translate(24.234375, 8)"><foreignObject width="200" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table; white-space: break-spaces; line-height: 1.5; max-width: 200px; text-align: center; width: 200px;"><span class="nodeLabel"><p>Factors Affecting Performance</p></span></div></foreignObject></g></g></g><g class="edgePaths"><path d="M199.203,82L206.081,82C212.958,82,226.714,82,237.758,82C248.802,82,257.135,82,265.469,82C273.802,82,282.135,82,297.651,87.861C313.166,93.722,335.864,105.443,347.213,111.304L358.562,117.165" id="L_MODEL_TOKENS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_MODEL_TOKENS_0" data-points="W3sieCI6MTk5LjIwMzEyNSwieSI6ODJ9LHsieCI6MjQwLjQ2ODc1LCJ5Ijo4Mn0seyJ4IjoyNjUuNDY4NzUsInkiOjgyfSx7IngiOjI5MC40Njg3NSwieSI6ODJ9LHsieCI6MzYyLjExNTYwMDU4NTkzNzUsInkiOjExOX1d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M147.844,121L163.282,146.5C178.719,172,209.594,223,229.198,248.5C248.802,274,257.135,274,265.469,274C273.802,274,282.135,274,299.243,282.145C316.351,290.29,342.233,306.58,355.173,314.724L368.114,322.869" id="L_MODEL_MEMORY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_MODEL_MEMORY_0" data-points="W3sieCI6MTQ3Ljg0NDQ4MjQyMTg3NSwieSI6MTIxfSx7IngiOjI0MC40Njg3NSwieSI6Mjc0fSx7IngiOjI2NS40Njg3NSwieSI6Mjc0fSx7IngiOjI5MC40Njg3NSwieSI6Mjc0fSx7IngiOjM3MS40OTk2OTk1MTkyMzA4LCJ5IjozMjV9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M147.844,299L163.282,273.5C178.719,248,209.594,197,229.198,171.5C248.802,146,257.135,146,265.469,146C273.802,146,282.135,146,292.147,146C302.159,146,313.849,146,319.694,146L325.539,146" id="L_QUANT_TOKENS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_QUANT_TOKENS_0" data-points="W3sieCI6MTQ3Ljg0NDQ4MjQyMTg3NSwieSI6Mjk5fSx7IngiOjI0MC40Njg3NSwieSI6MTQ2fSx7IngiOjI2NS40Njg3NSwieSI6MTQ2fSx7IngiOjI5MC40Njg3NSwieSI6MTQ2fSx7IngiOjMyOS41MzkwNjI1LCJ5IjoxNDZ9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M198.281,340.548L205.313,340.79C212.344,341.032,226.406,341.516,237.604,341.758C248.802,342,257.135,342,265.469,342C273.802,342,282.135,342,292.46,342.497C302.786,342.994,315.102,343.988,321.261,344.485L327.419,344.982" id="L_QUANT_MEMORY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_QUANT_MEMORY_0" data-points="W3sieCI6MTk4LjI4MTI1LCJ5IjozNDAuNTQ4MTkxOTYxMjg1MX0seyJ4IjoyNDAuNDY4NzUsInkiOjM0Mn0seyJ4IjoyNjUuNDY4NzUsInkiOjM0Mn0seyJ4IjoyOTAuNDY4NzUsInkiOjM0Mn0seyJ4IjozMzEuNDA2MjUsInkiOjM0NS4zMDMyODQzNzI0Mzl9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M184.587,435L193.9,430.833C203.214,426.667,221.841,418.333,235.322,414.167C248.802,410,257.135,410,265.469,410C273.802,410,282.135,410,296.738,405.116C311.341,400.232,332.212,390.464,342.648,385.58L353.084,380.696" id="L_SEQ_MEMORY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_SEQ_MEMORY_0" data-points="W3sieCI6MTg0LjU4NjgzODk0MjMwNzY4LCJ5Ijo0MzV9LHsieCI6MjQwLjQ2ODc1LCJ5Ijo0MTB9LHsieCI6MjY1LjQ2ODc1LCJ5Ijo0MTB9LHsieCI6MjkwLjQ2ODc1LCJ5Ijo0MTB9LHsieCI6MzU2LjcwNzAzMTI1LCJ5IjozNzl9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M215.469,466.71L219.635,466.925C223.802,467.14,232.135,467.57,240.469,467.785C248.802,468,257.135,468,265.469,468C273.802,468,282.135,468,289.802,468C297.469,468,304.469,468,307.969,468L311.469,468" id="L_SEQ_LATENCY_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_SEQ_LATENCY_0" data-points="W3sieCI6MjE1LjQ2ODc1LCJ5Ijo0NjYuNzA5NTAzOTY1NTg2NzV9LHsieCI6MjQwLjQ2ODc1LCJ5Ijo0Njh9LHsieCI6MjY1LjQ2ODc1LCJ5Ijo0Njh9LHsieCI6MjkwLjQ2ODc1LCJ5Ijo0Njh9LHsieCI6MzE1LjQ2ODc1LCJ5Ijo0Njh9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M208.406,210L213.75,210C219.094,210,229.781,210,239.292,210C248.802,210,257.135,210,265.469,210C273.802,210,282.135,210,297.651,204.139C313.166,198.278,335.864,186.557,347.213,180.696L358.562,174.835" id="L_CPU_TOKENS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_CPU_TOKENS_0" data-points="W3sieCI6MjA4LjQwNjI1LCJ5IjoyMTB9LHsieCI6MjQwLjQ2ODc1LCJ5IjoyMTB9LHsieCI6MjY1LjQ2ODc1LCJ5IjoyMTB9LHsieCI6MjkwLjQ2ODc1LCJ5IjoyMTB9LHsieCI6MzYyLjExNTYwMDU4NTkzNzUsInkiOjE3M31d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" data-id="L_MODEL_TOKENS_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_MODEL_MEMORY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_QUANT_TOKENS_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_QUANT_MEMORY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_SEQ_MEMORY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_SEQ_LATENCY_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_CPU_TOKENS_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g class="node default" id="flowchart-MODEL-0" transform="translate(124.234375, 82)"><rect class="basic label-container" style="" x="-74.96875" y="-39" width="149.9375" height="78"/><g class="label" style="" transform="translate(-44.96875, -24)"><rect/><foreignObject width="89.9375" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Model Size<br />7B, 13B, etc.</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-QUANT-1" transform="translate(124.234375, 338)"><rect class="basic label-container" style="" x="-74.046875" y="-39" width="148.09375" height="78"/><g class="label" style="" transform="translate(-44.046875, -24)"><rect/><foreignObject width="88.09375" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Quantization<br />Q4, Q5, Q8</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-SEQ-2" transform="translate(124.234375, 462)"><rect class="basic label-container" style="" x="-91.234375" y="-27" width="182.46875" height="54"/><g class="label" style="" transform="translate(-61.234375, -12)"><rect/><foreignObject width="122.46875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Sequence Length</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-CPU-3" transform="translate(124.234375, 210)"><rect class="basic label-container" style="" x="-84.171875" y="-39" width="168.34375" height="78"/><g class="label" style="" transform="translate(-54.171875, -24)"><rect/><foreignObject width="108.34375" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>CPU Features<br />AVX2/AVX-512</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-TOKENS-4" transform="translate(414.3984375, 146)"><rect class="basic label-container" style="" x="-84.859375" y="-27" width="169.71875" height="54"/><g class="label" style="" transform="translate(-54.859375, -12)"><rect/><foreignObject width="109.71875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Tokens/Second</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-MEMORY-5" transform="translate(414.3984375, 352)"><rect class="basic label-container" style="" x="-82.9921875" y="-27" width="165.984375" height="54"/><g class="label" style="" transform="translate(-52.9921875, -12)"><rect/><foreignObject width="105.984375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Memory Usage</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-LATENCY-6" transform="translate(414.3984375, 468)"><rect class="basic label-container" style="" x="-98.9296875" y="-27" width="197.859375" height="54"/><g class="label" style="" transform="translate(-68.9296875, -12)"><rect/><foreignObject width="137.859375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>First Token Latency</p></span></div></foreignObject></g></g></g></g></g></svg>
+</div>
+<div class="sect2">
+<h3 id="expected-performance-ranges"><a class="anchor" href="#expected-performance-ranges"></a>Expected Performance Ranges</h3>
+<table class="tableblock frame-all grid-all stretch">
+<colgroup>
+<col style="width: 14.2857%;">
+<col style="width: 28.5714%;">
+<col style="width: 28.5714%;">
+<col style="width: 28.5715%;">
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Configuration</th>
+<th class="tableblock halign-left valign-top">Tokens/sec</th>
+<th class="tableblock halign-left valign-top">Memory</th>
+<th class="tableblock halign-left valign-top">First Token</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7B Q4_K_M</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">10-20 tok/s</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">~6GB</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5-10s</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">7B Q5_K_M</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">8-15 tok/s</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">~7GB</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5-10s</p></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">13B Q4_K_M</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">5-10 tok/s</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">~10GB</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">10-20s</p></td>
+</tr>
+</tbody>
+</table>
+<div class="paragraph">
+<p><em>Performance varies significantly based on CPU capabilities (AVX-512 &gt;&gt; AVX2 &gt;&gt; SSE)</em></p>
+</div>
+</div>
+</div>
+</div>
+<nav class="pagination">
+  <span class="prev"><a href="09-architecture-decisions.html">9. Architecture Decisions</a></span>
+  <span class="next"><a href="11-risks-technical-debt.html">11. Risks and Technical Debt</a></span>
+</nav>
+</article>
+  </div>
+</main>
+</div>
+<footer class="footer">
+  <p>This page was built using the Antora default UI.</p>
+  <p>The source code for this UI is licensed under the terms of the MPL-2.0 license.</p>
+</footer>
+<script id="site-script" src="../../_/js/site.js" data-ui-root-path="../../_"></script>
+<script async src="../../_/js/vendor/highlight.js"></script>
+  </body>
+</html>
