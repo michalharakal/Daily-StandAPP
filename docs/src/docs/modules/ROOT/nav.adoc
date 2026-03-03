@@ -2,3 +2,7 @@
 .Intro
 
 * xref:bios.adoc[]
+
+.See Also
+
+* xref:architecture::index.adoc[Architecture Documentation]

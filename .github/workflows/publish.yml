@@ -22,26 +22,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Configure Pages
-        uses: actions/configure-pages@v3
-      - name: Install Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '18'
-      - name: Install Antora
-        run: |
-          npm i antora
-          npm i asciidoctor-kroki && \
-          npm i asciidoctor-plantuml && \
-          npm i asciidoctor-external-callout && \
-          npm i @asciidoctor/tabs && \
-          npm i @antora/collector-extension && \
-          npm i yaml && \
-          npm i @antora/lunr-extension
-      - name: Generate Site
+          fetch-depth: 0
+      - name: Build docs with Docker
         run: |
           cd docs
-          npx antora antora-playbook.yml
+          docker build -t dailystandapp-docs .
+          docker run --rm \
+            -v "${{ github.workspace }}:/project" \
+            -w /project/docs \
+            dailystandapp-docs \
+            antora-playbook.yml
       - name: Upload Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
