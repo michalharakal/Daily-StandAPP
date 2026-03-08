@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTime::class)
+@file:Suppress("DEPRECATION")
 
 package de.jug_da.standapp.mcp
 
@@ -13,11 +13,10 @@ import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 import kotlinx.io.asSink
 import kotlinx.io.buffered
 import kotlinx.serialization.json.*
-import kotlin.time.ExperimentalTime
 
 // Main function to run the MCP server
 fun `run mcp server`() {
@@ -47,7 +46,7 @@ fun `run mcp server`() {
         val author = request.arguments["author"]?.jsonPrimitive?.content
         val startDateStr = request.arguments["startDate"]?.jsonPrimitive?.content
         val endDateStr = request.arguments["endDate"]?.jsonPrimitive?.content
-        
+
         if (repoDir == null || author == null || startDateStr == null || endDateStr == null) {
             return@addTool CallToolResult(
                 content = listOf(TextContent("All parameters (repoDir, author, startDate, endDate) are required."))
@@ -58,11 +57,11 @@ fun `run mcp server`() {
             val startDate = Instant.parse(startDateStr)
             val endDate = Instant.parse(endDateStr)
             val commits = commitsByAuthorAndPeriod(repoDir, author, startDate, endDate)
-            
+
             val commitList = commits.joinToString("\n") { commit ->
                 "ID: ${commit.id}\nAuthor: ${commit.authorName} <${commit.authorEmail}>\nDate: ${commit.whenDate}\nMessage: ${commit.message}\n---"
             }
-            
+
             CallToolResult(content = listOf(TextContent(
                 if (commits.isEmpty()) "No commits found for author '$author' in the specified period."
                 else "Found ${commits.size} commits:\n\n$commitList"
@@ -86,7 +85,7 @@ fun `run mcp server`() {
         val repoDir = request.arguments["repoDir"]?.jsonPrimitive?.content
         val startDateStr = request.arguments["startDate"]?.jsonPrimitive?.content
         val endDateStr = request.arguments["endDate"]?.jsonPrimitive?.content
-        
+
         if (repoDir == null || startDateStr == null || endDateStr == null) {
             return@addTool CallToolResult(
                 content = listOf(TextContent("All parameters (repoDir, startDate, endDate) are required."))
@@ -97,11 +96,11 @@ fun `run mcp server`() {
             val startDate = Instant.parse(startDateStr)
             val endDate = Instant.parse(endDateStr)
             val commits = getAllCommitsInPeriod(repoDir, startDate, endDate)
-            
+
             val commitList = commits.joinToString("\n") { commit ->
                 "ID: ${commit.id}\nAuthor: ${commit.authorName} <${commit.authorEmail}>\nDate: ${commit.whenDate}\nMessage: ${commit.message}\n---"
             }
-            
+
             CallToolResult(content = listOf(TextContent(
                 if (commits.isEmpty()) "No commits found in the specified period."
                 else "Found ${commits.size} commits:\n\n$commitList"

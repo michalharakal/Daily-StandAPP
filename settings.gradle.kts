@@ -23,9 +23,11 @@ include(":standapp-ai-engine")
 include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-api:agent")
 
 
-check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_24)) {
+val javaVersion = System.getProperty("java.version")?.substringBefore('.')?.toIntOrNull() ?: 0
+check(javaVersion >= 21) {
     """
-    Daily-StandApp requires JDK 25+ but it is currently using JDK ${JavaVersion.current()}.
+    Daily-StandApp requires JDK 21+ but it is currently using JDK $javaVersion.
     Java Home: [${System.getProperty("java.home")}]
+    JDK 25 is used via Gradle toolchain for compilation.
     """.trimIndent()
 }

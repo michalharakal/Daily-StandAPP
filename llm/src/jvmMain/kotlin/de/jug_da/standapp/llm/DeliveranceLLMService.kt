@@ -45,7 +45,7 @@ class DeliveranceLLMService private constructor(
             .withTemperature(temperature)
             .withNtokens(maxTokens)
 
-        val response = model.generate(UUID.randomUUID(), ctx, params) { _, _ -> }
+        val response = model.generate(UUID.randomUUID(), ctx, params) { _, _, _, _ -> }
         response.responseText
     }
 

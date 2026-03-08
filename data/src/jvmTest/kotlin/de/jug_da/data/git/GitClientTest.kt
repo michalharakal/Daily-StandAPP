@@ -1,8 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
+@file:Suppress("DEPRECATION")
 
 package de.jug_da.data.git
 
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.PersonIdent
 import kotlin.io.path.createTempDirectory
@@ -11,8 +11,6 @@ import kotlin.test.assertEquals
 import java.io.File
 import java.util.TimeZone
 import java.util.Date
-import kotlin.time.ExperimentalTime
-import kotlin.time.toJavaInstant
 
 class GitClientTest {
 
@@ -42,7 +40,7 @@ class GitClientTest {
         val file = File(dir, fileName)
         file.writeText(msg)
         git.add().addFilepattern(fileName).call()
-        val ident = PersonIdent(name, email, Date.from(time.toJavaInstant()), TimeZone.getTimeZone("UTC"))
+        val ident = PersonIdent(name, email, Date.from(java.time.Instant.ofEpochMilli(time.toEpochMilliseconds())), TimeZone.getTimeZone("UTC"))
         git.commit().setAuthor(ident).setCommitter(ident).setMessage(msg).call()
     }
 }

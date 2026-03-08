@@ -1,9 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
+@file:Suppress("DEPRECATION")
 
 package de.jug_da.data.git
 
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 actual fun commitsByAuthorAndPeriod(repoDir: String, author: String, start: Instant, end: Instant): List<GitInfo> {
     TODO("Not yet implemented")

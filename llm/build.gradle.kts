@@ -15,7 +15,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_25)
             freeCompilerArgs.addAll(
                 listOf(
-                    "-Xjvm-default=all",
+                    "-jvm-default=enable",
                     "-Xjdk-release=25",
                 )
             )
