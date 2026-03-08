@@ -22,6 +22,7 @@ kotlin {
 
             implementation(project(":llm"))
             implementation(project(":data"))
+            implementation(project(":standapp-ai-engine"))
         }
 
         jvmMain.dependencies {

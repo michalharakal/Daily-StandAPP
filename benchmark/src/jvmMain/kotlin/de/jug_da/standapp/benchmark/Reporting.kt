@@ -1,5 +1,7 @@
 package de.jug_da.standapp.benchmark
 
+import dev.standapp.engine.entity.PromptType
+import dev.standapp.engine.entity.QualityScores
 import java.io.File
 
 /**
@@ -14,7 +16,7 @@ object Reporting {
         val run: Int,
         val latencyMs: Long,
         val charCount: Int,
-        val autoScore: Scoring.AutoScoreResult,
+        val autoScore: QualityScores,
         val humanScore: HumanScore? = null,
     )
 

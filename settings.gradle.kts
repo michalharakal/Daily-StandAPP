@@ -16,6 +16,7 @@ dependencyResolutionManagement {
 
 include(":data", ":domain", ":llm", ":mcp-server", ":benchmark")
 include("StandAPP-cli")
+include(":standapp-ai-engine")
 
 // Cloud API - OpenAI-compatible REST API modules
 include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-api:agent")
