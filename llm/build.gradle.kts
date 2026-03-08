@@ -36,7 +36,6 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
         }
         jvmMain {
-            kotlin.srcDir("src/jvmMain/kotlin-skainet")
             dependencies {
                 // SKaiNET kllama - pure Kotlin LLM inference
                 implementation(libs.skainet.apps.kllama)

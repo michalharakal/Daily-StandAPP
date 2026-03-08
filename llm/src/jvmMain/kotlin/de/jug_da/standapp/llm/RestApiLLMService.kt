@@ -52,7 +52,7 @@ class RestApiLLMService(
             messages = listOf(
                 MessagePayload(
                     role = "system",
-                    content = "You are a helpful assistant that creates concise standup summaries from git commit data."
+                    content = LLMService.SYSTEM_PROMPT
                 ),
                 MessagePayload(role = "user", content = prompt)
             ),

@@ -34,7 +34,7 @@ class DeliveranceLLMService private constructor(
         val promptSupport = model.promptSupport()
         val ctx = if (promptSupport.isPresent) {
             promptSupport.get().builder()
-                .addSystemMessage("You are a helpful assistant that creates concise standup summaries from git commit data.")
+                .addSystemMessage(LLMService.SYSTEM_PROMPT)
                 .addUserMessage(prompt)
                 .build()
         } else {

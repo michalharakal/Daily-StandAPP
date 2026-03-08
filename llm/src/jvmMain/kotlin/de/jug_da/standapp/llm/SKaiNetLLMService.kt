@@ -39,7 +39,7 @@ class SKaiNetLLMService private constructor(
         val messages = listOf(
             ChatMessage(
                 role = ChatRole.SYSTEM,
-                content = "You are a helpful assistant that creates concise standup summaries from git commit data."
+                content = LLMService.SYSTEM_PROMPT
             ),
             ChatMessage(role = ChatRole.USER, content = prompt)
         )
