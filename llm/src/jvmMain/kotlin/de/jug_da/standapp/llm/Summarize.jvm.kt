@@ -21,7 +21,6 @@ class DefaultLLMSummarizer(private val service: LLMService) : LLMSummarizer {
 
     override suspend fun summarize(text: String): String = service.generate(
         prompt = text,
-        maxTokens = LLMService.DEFAULT_MAX_TOKENS,
         temperature = LLMService.DEFAULT_TEMPERATURE,
         topP = LLMService.DEFAULT_TOP_P,
     )

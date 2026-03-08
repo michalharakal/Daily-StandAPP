@@ -36,7 +36,7 @@ class RestApiLLMService(
             })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 120_000 // 2 min for slow local inference
+            requestTimeoutMillis = 600_000 // 10 min for slow local inference
             connectTimeoutMillis = 10_000
         }
     }
@@ -47,6 +47,20 @@ class RestApiLLMService(
         temperature: Float,
         topP: Float
     ): String {
+        val url = resolveCompletionsUrl(baseUrl)
+        val completion = callApi(url, prompt, maxTokens, temperature, topP)
+        val choice = completion.choices.firstOrNull()
+            ?: error("REST API returned empty choices")
+        return stripThinkingBlock(choice.message.content)
+    }
+
+    private suspend fun callApi(
+        url: String,
+        prompt: String,
+        maxTokens: Int,
+        temperature: Float,
+        topP: Float
+    ): ChatCompletionResponse {
         val request = ChatCompletionRequest(
             model = modelName,
             messages = listOf(
@@ -61,7 +75,6 @@ class RestApiLLMService(
             topP = topP
         )
 
-        val url = resolveCompletionsUrl(baseUrl)
         val response = client.post(url) {
             contentType(ContentType.Application.Json)
             if (!apiKey.isNullOrBlank()) {
@@ -75,9 +88,7 @@ class RestApiLLMService(
             error("REST API returned ${response.status}: $body")
         }
 
-        val completion: ChatCompletionResponse = response.body()
-        return completion.choices.firstOrNull()?.message?.content
-            ?: error("REST API returned empty choices")
+        return response.body()
     }
 
     private fun resolveCompletionsUrl(baseUrl: String): String {
@@ -88,6 +99,14 @@ class RestApiLLMService(
             normalized.endsWith("/v1") -> "$normalized/chat/completions"
             else -> "$normalized/v1/chat/completions"
         }
+    }
+
+    private fun stripThinkingBlock(text: String): String {
+        // Remove closed <think>…</think> blocks (Ollama, vLLM, llama.cpp)
+        var stripped = text.replace(Regex("(?s)<think>.*?</think>"), "").trim()
+        // Remove unclosed <think> block (model hit token limit while still thinking)
+        stripped = stripped.replace(Regex("(?s)<think>.*"), "").trim()
+        return stripped
     }
 
     // --- OpenAI chat completion request/response DTOs ---
@@ -114,6 +133,7 @@ class RestApiLLMService(
 
     @Serializable
     private data class Choice(
-        val message: MessagePayload
+        val message: MessagePayload,
+        @SerialName("finish_reason") val finishReason: String? = null
     )
 }

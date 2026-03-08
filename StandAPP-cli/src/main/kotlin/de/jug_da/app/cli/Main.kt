@@ -75,7 +75,6 @@ fun main(args: Array<String>) {
     val summary = runBlocking {
         service.generate(
             prompt = prompt,
-            maxTokens = LLMService.DEFAULT_MAX_TOKENS,
             temperature = LLMService.DEFAULT_TEMPERATURE,
             topP = LLMService.DEFAULT_TOP_P,
         )
