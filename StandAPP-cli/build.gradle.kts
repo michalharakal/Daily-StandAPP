@@ -20,10 +20,12 @@ repositories {
 dependencies {
     testImplementation(kotlin("test"))
 
-    // Use the llm module for SKaiNET kllama
     implementation(project(":llm"))
     implementation(project(":data"))
+    implementation(project(":standapp-ai-engine"))
 
+    implementation(libs.kotlinx.datetime)
+    implementation(libs.kotlinx.coroutines.core)
     implementation("org.slf4j:slf4j-simple:2.0.17")
 }
 
@@ -39,7 +41,7 @@ tasks.withType<JavaCompile>().configureEach {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_25)
-        freeCompilerArgs.addAll(listOf("-Xjvm-default=all"))
+        freeCompilerArgs.addAll(listOf("-jvm-default=enable"))
     }
 }
 
