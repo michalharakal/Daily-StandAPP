@@ -4,11 +4,13 @@ package de.jug_da.standapp.llm
  * Factory that instantiates the right [LLMService] based on environment variables.
  *
  * Environment variables:
- * - `MCP_LLM_BACKEND`       – "SKAINET" | "KLLAMA" | "REST" | "REST_API" | "OLLAMA" (required)
- * - `MCP_LLM_MODEL_PATH`    – Path to GGUF model file (SKAINET backend)
- * - `MCP_LLM_REST_BASE_URL` – Base URL for REST API backend (default: http://localhost:11434)
- * - `MCP_LLM_REST_MODEL`    – Model name for REST API backend (default: llama3.2:3b)
- * - `MCP_LLM_REST_API_KEY`  – Optional Bearer token for authenticated REST API endpoints
+ * - `MCP_LLM_BACKEND`            – "SKAINET" | "KLLAMA" | "DELIVERANCE" | "REST" | "REST_API" | "OLLAMA" (required)
+ * - `MCP_LLM_MODEL_PATH`         – Path to GGUF model file (SKAINET backend)
+ * - `MCP_LLM_DELIVERANCE_OWNER`  – HuggingFace model owner (DELIVERANCE backend, default: TinyLlama)
+ * - `MCP_LLM_DELIVERANCE_MODEL`  – HuggingFace model name (DELIVERANCE backend, default: TinyLlama-1.1B-Chat-v1.0)
+ * - `MCP_LLM_REST_BASE_URL`      – Base URL for REST API backend (default: http://localhost:11434)
+ * - `MCP_LLM_REST_MODEL`         – Model name for REST API backend (default: llama3.2:3b)
+ * - `MCP_LLM_REST_API_KEY`       – Optional Bearer token for authenticated REST API endpoints
  */
 object LLMServiceFactory {
 
@@ -22,6 +24,11 @@ object LLMServiceFactory {
             LLMBackendType.SKAINET -> {
                 require(config.modelPath.isNotBlank()) { "modelPath is required for SKAINET backend" }
                 SKaiNetLLMService.create(config.modelPath)
+            }
+            LLMBackendType.DELIVERANCE -> {
+                require(config.deliveranceModelOwner.isNotBlank()) { "deliveranceModelOwner is required for DELIVERANCE backend" }
+                require(config.deliveranceModelName.isNotBlank()) { "deliveranceModelName is required for DELIVERANCE backend" }
+                DeliveranceLLMService.create(config.deliveranceModelOwner, config.deliveranceModelName)
             }
             LLMBackendType.REST_API -> {
                 RestApiLLMService(
@@ -43,6 +50,13 @@ object LLMServiceFactory {
                     ?: error("MCP_LLM_MODEL_PATH is required for SKAINET backend")
                 println("[LLMServiceFactory] Loading SKaiNET model from: $modelPath")
                 SKaiNetLLMService.create(modelPath)
+            }
+
+            LLMBackendType.DELIVERANCE -> {
+                val owner = System.getenv("MCP_LLM_DELIVERANCE_OWNER") ?: "TinyLlama"
+                val model = System.getenv("MCP_LLM_DELIVERANCE_MODEL") ?: "TinyLlama-1.1B-Chat-v1.0"
+                println("[LLMServiceFactory] Deliverance model: $owner/$model")
+                DeliveranceLLMService.create(owner, model)
             }
 
             LLMBackendType.REST_API -> {

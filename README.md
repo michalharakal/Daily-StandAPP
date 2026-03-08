@@ -35,7 +35,7 @@ The `:benchmark` module evaluates local LLM backends for standup summary generat
 
 ### Prerequisites
 
-- JDK 21+
+- JDK 25+
 - At least one backend available:
   - **LM Studio** or **Ollama** running locally or on a remote machine, or
   - **SKAINET** with a GGUF model file on disk, or

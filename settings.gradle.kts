@@ -10,6 +10,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         mavenCentral()
     }
 }
@@ -22,10 +23,9 @@ include(":standapp-ai-engine")
 include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-api:agent")
 
 
-check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_21)) {
+check(JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_24)) {
     """
-    Daily-StandApp requires JDK 21+ but it is currently using JDK ${JavaVersion.current()}.
+    Daily-StandApp requires JDK 25+ but it is currently using JDK ${JavaVersion.current()}.
     Java Home: [${System.getProperty("java.home")}]
-    https://developer.android.com/build/jdks#jdk-config-in-studio
     """.trimIndent()
 }

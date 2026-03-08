@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.2.20"
+kotlin = "2.3.0"
 kotlinx-coroutines = "1.10.2"
 kotlinxDatetimeVersion = "0.7.1"
 kotlinxIo = "0.8.0"
@@ -7,6 +7,7 @@ kotlinx-serialization = "1.8.1"
 koog = "0.6.1"
 mcp-kotlin = "0.7.2"
 orgEclipseJgit = "7.1.0.202411261347-r"
+deliverance = "0.0.4-SNAPSHOT"
 skainet = "0.13.0"
 slf4jSimple = "2.0.17"
 ktor = "3.3.0"
@@ -36,6 +37,10 @@ ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serializatio
 
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
+
+# Deliverance - Java-native LLM inference
+deliverance-core = { module = "io.teknek.deliverance:core", version.ref = "deliverance" }
+deliverance-safetensors = { module = "io.teknek.deliverance:safetensors", version.ref = "deliverance" }
 
 # SKaiNET
 skainet-apps-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }

@@ -8,21 +8,21 @@ plugins {
 
 kotlin {
 
-    jvmToolchain(21)
+    jvmToolchain(25)
     jvm {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_21)
+            jvmTarget.set(JvmTarget.JVM_25)
             freeCompilerArgs.addAll(
                 listOf(
                     "-Xjvm-default=all",
-                    "-Xjdk-release=21",
+                    "-Xjdk-release=25",
                 )
             )
         }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
-            jvmArgs = listOf("--add-modules", "jdk.incubator.vector")
+            jvmArgs = listOf("--add-modules", "jdk.incubator.vector", "--enable-preview")
         }
     }
 
@@ -50,6 +50,10 @@ kotlin {
                 // SKaiNET LLM + Agent APIs (generateUntilStop, ChatMLTemplate, Tokenizer)
                 implementation(libs.skainet.llm)
                 implementation(libs.skainet.kllama.agents)
+
+                // Deliverance - Java-native LLM inference
+                implementation(libs.deliverance.core)
+                implementation(libs.deliverance.safetensors)
 
                 // Ktor HTTP client for REST API backend
                 implementation(libs.ktor.client.cio)
