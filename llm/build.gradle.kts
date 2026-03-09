@@ -44,6 +44,7 @@ kotlin {
                 implementation(libs.skainet.backend.cpu)
                 implementation(libs.skainet.io.core)
                 implementation(libs.skainet.io.gguf)
+                implementation(libs.skainet.io.safetensors)
 
                 implementation(libs.skainet.kllama)
                 // SKaiNET LLM + Agent APIs (generateUntilStop, ChatMLTemplate, Tokenizer)

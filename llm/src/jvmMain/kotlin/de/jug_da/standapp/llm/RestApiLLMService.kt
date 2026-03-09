@@ -48,7 +48,9 @@ class RestApiLLMService(
         topP: Float
     ): String {
         val url = resolveCompletionsUrl(baseUrl)
-        val completion = callApi(url, prompt, maxTokens, temperature, topP)
+        // REST servers manage their own context limits, so use a generous token budget
+        val effectiveMaxTokens = maxOf(maxTokens, REST_MAX_TOKENS)
+        val completion = callApi(url, prompt, effectiveMaxTokens, temperature, topP)
         val choice = completion.choices.firstOrNull()
             ?: error("REST API returned empty choices")
         return stripThinkingBlock(choice.message.content)
@@ -89,6 +91,10 @@ class RestApiLLMService(
         }
 
         return response.body()
+    }
+
+    companion object {
+        private const val REST_MAX_TOKENS = 4096
     }
 
     private fun resolveCompletionsUrl(baseUrl: String): String {

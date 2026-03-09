@@ -8,7 +8,7 @@ koog = "0.6.1"
 mcp-kotlin = "0.7.2"
 orgEclipseJgit = "7.1.0.202411261347-r"
 deliverance = "0.0.4-SNAPSHOT"
-skainet = "0.13.0"
+skainet = "0.15.3"
 slf4jSimple = "2.0.17"
 ktor = "3.3.0"
 
@@ -53,6 +53,7 @@ skainet-io-gguf = { module = "sk.ainet.core:skainet-io-gguf", version.ref = "ska
 skainet-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }
 skainet-kllama-agents = { module = "sk.ainet.core:skainet-kllama-agents", version.ref = "skainet" }
 skainet-llm = { module = "sk.ainet.core:skainet-llm", version.ref = "skainet" }
+skainet-io-safetensors = { module = "sk.ainet.core:skainet-io-safetensors", version.ref = "skainet" }
 
 
 [plugins]
