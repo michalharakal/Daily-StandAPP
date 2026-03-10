@@ -1,5 +1,9 @@
 package de.jug_da.standapp.llm
 
+// Commented out – Deliverance dependency removed, using local backends only.
+// To re-enable, uncomment the code below and restore the deliverance dependencies in build.gradle.kts.
+
+/*
 import com.codahale.metrics.MetricRegistry
 import io.teknek.deliverance.DType
 import io.teknek.deliverance.generator.GeneratorParameters
@@ -87,3 +91,4 @@ class DeliveranceLLMService private constructor(
         }
     }
 }
+*/
