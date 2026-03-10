@@ -17,3 +17,5 @@
 - Claude Code oder Codex installieren
 - MacOS: unbedingt JDK im ARM-Modus (AArch64) laufen lassen, ggf. Shell/Homebrew neu einrichten
 - für lokale LLMs ggf. https://lmstudio.ai/[LM-Studio] installieren, alternativ können Modelle auch einfach über https://huggingface.co/models heruntergeladen werden
+- Bootstrap Workspace clonen: https://github.com/sippsack/Daily-StandApp-javaland-2026/
+

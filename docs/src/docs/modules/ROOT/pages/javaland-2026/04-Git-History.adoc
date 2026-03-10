@@ -1,0 +1,26 @@
+= Git Historie einlesen
+
+```
+    static List<CommitSummary> sampleRepoHistory() {
+        if (!Files.exists(SAMPLE_REPO_PATH)) {
+            throw new IllegalStateException("Sample repo directory missing at " + SAMPLE_REPO_PATH);
+        }
+
+        try (Git git = Git.open(SAMPLE_REPO_PATH.toFile())) {
+            Iterable<RevCommit> commits = git.log().call();
+            List<CommitSummary> summaries = new ArrayList<>();
+            for (RevCommit commit : commits) {
+                String abbrev = commit.getName().substring(0, 7);
+                summaries.add(new CommitSummary(
+                        abbrev,
+                        commit.getShortMessage(),
+                        commit.getAuthorIdent().getName(),
+                        commit.getAuthorIdent().getWhen().toInstant()));
+            }
+            return summaries;
+        } catch (IOException | GitAPIException e) {
+            throw new IllegalStateException("Failed to read sample repo history at " + SAMPLE_REPO_PATH, e);
+        }
+    }
+
+```
