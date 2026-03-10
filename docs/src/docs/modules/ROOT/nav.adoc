@@ -8,6 +8,8 @@
 * xref:javaland-2026/00-index.adoc[]
 * xref:javaland-2026/01-was.adoc[1. Was machen wir?]
 * xref:javaland-2026/02-modell-laden.adoc[2. Modell lokal laden]
+* xref:javaland-2026/03-prompt-verbesserungen.adoc[3. Prompt-Engineering]
+* xref:javaland-2026/04-Git-History.adoc[4. Git Historie mit JGit auslesen ]
 
 
 .See Also
