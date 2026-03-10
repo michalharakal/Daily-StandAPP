@@ -3,10 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Agenda :: DailyStandApp Documentation</title>
-    <link rel="canonical" href="https://jug-da.github.io/DailyStandApp-MCP/daily-standapp/javaland-2026/00-index.html">
-    <link rel="prev" href="../bios.html">
-    <link rel="next" href="01-was.html">
+    <title>Git Historie einlesen :: DailyStandApp Documentation</title>
+    <link rel="canonical" href="https://jug-da.github.io/DailyStandApp-MCP/daily-standapp/javaland-2026/04-Git-History.html">
     <meta name="generator" content="Antora 3.1.14">
     <link rel="stylesheet" href="../../_/css/site.css">
   </head>
@@ -71,7 +69,7 @@
     <button class="nav-item-toggle"></button>
     <span class="nav-text">JavaLand 2026</span>
 <ul class="nav-list">
-  <li class="nav-item is-current-page" data-depth="1">
+  <li class="nav-item" data-depth="1">
     <a class="nav-link" href="00-index.html">Agenda</a>
   </li>
   <li class="nav-item" data-depth="1">
@@ -118,89 +116,42 @@
 <nav class="breadcrumbs" aria-label="breadcrumbs">
   <ul>
     <li><a href="../index.html">Dialy-StandAPP</a></li>
-    <li>JavaLand 2026</li>
-    <li><a href="00-index.html">Agenda</a></li>
+    <li><a href="04-Git-History.html">Git Historie einlesen</a></li>
   </ul>
 </nav>
-<div class="edit-this-page"><a href="file:///project//docs/src/docs/modules/ROOT/pages/javaland-2026/00-index.adoc">Edit this Page</a></div>
+<div class="edit-this-page"><a href="file:///project//docs/src/docs/modules/ROOT/pages/javaland-2026/04-Git-History.adoc">Edit this Page</a></div>
 </div>
   <div class="content">
 <aside class="toc sidebar" data-title="Contents" data-levels="2">
   <div class="toc-menu"></div>
 </aside>
 <article class="doc">
-<h1 class="page">Agenda</h1>
-<div id="preamble">
-<div class="sectionbody">
-<div class="olist arabic">
-<ol class="arabic">
-<li>
-<p>Was machen wir?</p>
-<div class="ulist">
-<ul>
-<li>
-<p>Fachlichkeit</p>
-</li>
-<li>
-<p>Architekturbild</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p>SKaiNET als LLM Inference Engine einbinden + Modell lokal laden</p>
-</li>
-<li>
-<p>Prompt-Engineering</p>
-<div class="ulist">
-<ul>
-<li>
-<p>manuell vs.  KI verbesserte Prompts generieren lassen</p>
-</li>
-</ul>
-</div>
-</li>
-<li>
-<p>Git Historie mit JGit auslesen und durch lokales LLM zusammenfassen lassen</p>
-</li>
-<li>
-<p>Tool-Call anstatt JGit</p>
-</li>
-<li>
-<p>LLM nutzt MCP-Server für das Auslesen der Git Historie</p>
-</li>
-</ol>
+<h1 class="page">Git Historie einlesen</h1>
+<div class="listingblock">
+<div class="content">
+<pre class="highlightjs highlight"><code class="language-none hljs">    static List&lt;CommitSummary&gt; sampleRepoHistory() {
+        if (!Files.exists(SAMPLE_REPO_PATH)) {
+            throw new IllegalStateException("Sample repo directory missing at " + SAMPLE_REPO_PATH);
+        }
+
+        try (Git git = Git.open(SAMPLE_REPO_PATH.toFile())) {
+            Iterable&lt;RevCommit&gt; commits = git.log().call();
+            List&lt;CommitSummary&gt; summaries = new ArrayList&lt;&gt;();
+            for (RevCommit commit : commits) {
+                String abbrev = commit.getName().substring(0, 7);
+                summaries.add(new CommitSummary(
+                        abbrev,
+                        commit.getShortMessage(),
+                        commit.getAuthorIdent().getName(),
+                        commit.getAuthorIdent().getWhen().toInstant()));
+            }
+            return summaries;
+        } catch (IOException | GitAPIException e) {
+            throw new IllegalStateException("Failed to read sample repo history at " + SAMPLE_REPO_PATH, e);
+        }
+    }</code></pre>
 </div>
 </div>
-</div>
-<div class="sect1">
-<h2 id="voraussetzungen"><a class="anchor" href="#voraussetzungen"></a>Voraussetzungen</h2>
-<div class="sectionbody">
-<div class="ulist">
-<ul>
-<li>
-<p>Java 21 + 25 vorinstallieren</p>
-</li>
-<li>
-<p>Claude Code oder Codex installieren</p>
-</li>
-<li>
-<p>MacOS: unbedingt JDK im ARM-Modus (AArch64) laufen lassen, ggf. Shell/Homebrew neu einrichten</p>
-</li>
-<li>
-<p>für lokale LLMs ggf. <a href="https://lmstudio.ai/">LM-Studio</a> installieren, alternativ können Modelle auch einfach über <a href="https://huggingface.co/models" class="bare">https://huggingface.co/models</a> heruntergeladen werden</p>
-</li>
-<li>
-<p>Bootstrap Workspace clonen: <a href="https://github.com/sippsack/Daily-StandApp-javaland-2026/" class="bare">https://github.com/sippsack/Daily-StandApp-javaland-2026/</a></p>
-</li>
-</ul>
-</div>
-</div>
-</div>
-<nav class="pagination">
-  <span class="prev"><a href="../bios.html">Wer wir sind</a></span>
-  <span class="next"><a href="01-was.html">1. Was machen wir?</a></span>
-</nav>
 </article>
   </div>
 </main>
