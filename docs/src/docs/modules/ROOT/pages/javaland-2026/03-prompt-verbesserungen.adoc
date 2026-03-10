@@ -1,0 +1,16 @@
+= Prompt verbessern mit KI-Unterstützung
+
+== Einfacher manueller Prompt
+
+Fragt das LLM, was 2 + 2 ergibt!
+
+Was ist das Ergebnis?
+
+Wenn das Ergebnis nicht 4 ist bzw. viel mehr Ausgaben erscheinen, wie kann man den Prompt verbessern oder an anderen Parametern drehen, damit einfach die Zahl 4 zurückgegeben wird?
+
+== Iterative Verbesserung des Prompts mit KI-Unterstützung
+
+Fragt ein öffentliches LLM, wie ihr für das lokale Modell den Prompt schreiben sollt, damit für 2 + 2 genaut die Zahl 4 zurückgegeben wird.
+
+Nutzt einen Coding Assistant bzw. Agents (Claude Code, Codex, ...), damit das Ergebnis iterativ und automatisch verbessert wird
+

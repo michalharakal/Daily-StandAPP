@@ -3,6 +3,13 @@
 
 * xref:bios.adoc[]
 
+.JavaLand 2026
+
+* xref:javaland-2026/00-index.adoc[]
+* xref:javaland-2026/01-was.adoc[1. Was machen wir?]
+* xref:javaland-2026/02-modell-laden.adoc[2. Modell lokal laden]
+
+
 .See Also
 
 * xref:architecture::index.adoc[Architecture Documentation]

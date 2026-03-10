@@ -1,0 +1,19 @@
+= Agenda
+
+1. Was machen wir?
+    * Fachlichkeit
+    * Architekturbild
+2. SKaiNET als LLM Inference Engine einbinden + Modell lokal laden
+3. Prompt-Engineering
+    * manuell vs.  KI verbesserte Prompts generieren lassen
+4. Git Historie mit JGit auslesen und durch lokales LLM zusammenfassen lassen
+5. Tool-Call anstatt JGit
+6. LLM nutzt MCP-Server für das Auslesen der Git Historie
+
+
+## Voraussetzungen
+
+- Java 21 + 25 vorinstallieren
+- Claude Code oder Codex installieren
+- MacOS: unbedingt JDK im ARM-Modus (AArch64) laufen lassen, ggf. Shell/Homebrew neu einrichten
+- für lokale LLMs ggf. https://lmstudio.ai/[LM-Studio] installieren, alternativ können Modelle auch einfach über https://huggingface.co/models heruntergeladen werden

@@ -1,0 +1,15 @@
+= Was machen wir?
+
+Wir erstellen eine Daily-StandAPP auf Basis eines lokalen LLM
+
+In diesem Hands-on-Workshop entwickeln wir eine kleine Anwendung mit Java/Kotlin. Sie soll agile Teams bei der Optimierung ihrer Daily Standups unterstützen, indem sie die jüngsten Entwicklungsaktivitäten analysiert und zusammenfasst. Mithilfe von lokal laufenden Large Language Models (LLMs) kombiniert mit Agenten und ergänzt durch API-Aufrufe holen wir die Informationen aus dem Issue-Tracker, die Commit-Informationen und lassen daraus eine Zusammenfassung vorlesen sowie die nächste Schritte vorschlagen. Durch den Einsatz des Model Context Protocol (MCP) binden wir standardisiert lokale Datenquellen und Tools ein. So entsteht eine modulare Architektur, die Datenschutz, Flexibilität und Zukunftssicherheit vereint.
+
+Teilnehmende lernen, wie man:
+
+LLMs lokal effizient betreibt,
+Agenten-Architekturen praktisch einsetzt,
+und MCP nutzt, um Apps offen und erweiterbar zu gestalten.
+
+== Architektur
+
+image::architecture.drawio.png[Architekturbild]
