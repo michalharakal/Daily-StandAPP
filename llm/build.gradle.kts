@@ -51,9 +51,9 @@ kotlin {
                 implementation(libs.skainet.llm)
                 implementation(libs.skainet.kllama.agents)
 
-                // Deliverance - Java-native LLM inference
-                implementation(libs.deliverance.core)
-                implementation(libs.deliverance.safetensors)
+                // Deliverance - Java-native LLM inference (commented out – using local backends)
+                // implementation(libs.deliverance.core)
+                // implementation(libs.deliverance.safetensors)
 
                 // Ktor HTTP client for REST API backend
                 implementation(libs.ktor.client.cio)

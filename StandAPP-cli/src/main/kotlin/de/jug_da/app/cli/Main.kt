@@ -65,9 +65,8 @@ fun main(args: Array<String>) {
     } catch (e: Exception) {
         System.err.println("Error: ${e.message}")
         System.err.println()
-        System.err.println("Set MCP_LLM_BACKEND to one of: SKAINET, DELIVERANCE, REST_API")
+        System.err.println("Set MCP_LLM_BACKEND to one of: SKAINET, REST_API")
         System.err.println("  SKAINET:     also set MCP_LLM_MODEL_PATH=/path/to/model.gguf")
-        System.err.println("  DELIVERANCE: optionally set MCP_LLM_DELIVERANCE_OWNER, MCP_LLM_DELIVERANCE_MODEL")
         System.err.println("  REST_API:    optionally set MCP_LLM_REST_BASE_URL, MCP_LLM_REST_MODEL")
         return
     }
@@ -130,7 +129,7 @@ private fun printUsage() {
           -h, --help            Show this help message
 
         Environment variables:
-          MCP_LLM_BACKEND       Required. One of: SKAINET, DELIVERANCE, REST_API
+          MCP_LLM_BACKEND       Required. One of: SKAINET, REST_API
           MCP_LLM_MODEL_PATH    GGUF model path (SKAINET backend)
           MCP_LLM_REST_BASE_URL REST API endpoint (default: http://localhost:11434)
           MCP_LLM_REST_MODEL    Model name for REST API (default: llama3.2:3b)
