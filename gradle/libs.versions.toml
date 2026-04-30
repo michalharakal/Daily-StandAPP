@@ -8,7 +8,7 @@ koog = "0.6.1"
 mcp-kotlin = "0.7.2"
 orgEclipseJgit = "7.1.0.202411261347-r"
 deliverance = "0.0.4-SNAPSHOT"
-skainet = "0.21.0"
+skainet = "0.22.0"
 skainet-transformers = "0.21.1"
 slf4jSimple = "2.0.17"
 ktor = "3.3.0"
@@ -48,6 +48,10 @@ deliverance-safetensors = { module = "io.teknek.deliverance:safetensors", versio
 skainet-bom = { module = "sk.ainet.core:skainet-bom", version.ref = "skainet" }
 skainet-lang-core = { module = "sk.ainet.core:skainet-lang-core" }
 skainet-backend-cpu = { module = "sk.ainet.core:skainet-backend-cpu" }
+# 0.22.0+: native FFM kernel provider (FP32 SGEMM + Q4_K matmul). Sibling to
+# skainet-backend-cpu — auto-discovered via the KernelProvider SPI; takes
+# priority over the Panama Vector kernel when its library loads.
+skainet-backend-native-cpu = { module = "sk.ainet.core:skainet-backend-native-cpu" }
 skainet-io-core = { module = "sk.ainet.core:skainet-io-core" }
 skainet-io-gguf = { module = "sk.ainet.core:skainet-io-gguf" }
 

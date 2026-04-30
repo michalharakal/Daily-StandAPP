@@ -37,15 +37,24 @@ kotlin {
         }
         jvmMain {
             dependencies {
-                // SKaiNET 0.21.0 (BOM-managed) + skainet-transformers 0.21.1 (per-artefact pinned).
+                // SKaiNET 0.22.0 (BOM-managed) + skainet-transformers 0.21.1 (per-artefact pinned).
                 // Transformers 0.21.1 BOM is currently broken: it imports an
                 // unpublished sk.ainet:skainet-bom:0.21.0 — see TR-08 in arc42 §11.
+                // Core 0.22.0 is wire-compatible with transformers 0.21.1's
+                // 0.21.0 transitive coordinates; gradle's resolution picks the
+                // higher version.
                 implementation(project.dependencies.platform(libs.skainet.bom))
 
-                // Core inference: DSL + CPU backend + GGUF I/O
+                // Core inference: DSL + Panama Vector CPU backend + GGUF I/O
                 implementation(libs.skainet.lang.core)
                 implementation(libs.skainet.backend.cpu)
                 implementation(libs.skainet.io.gguf)
+
+                // 0.22.0 native FFM CPU kernels (FP32 SGEMM + Q4_K matmul).
+                // Auto-registers via META-INF/services/sk.ainet.backend.api.kernel.KernelProvider
+                // and outranks the Panama Vector provider when its bundled
+                // platform shared library loads (Linux x64 in our case).
+                implementation(libs.skainet.backend.native.cpu)
 
                 // Agent loop + tool calling + Llama runtime
                 implementation(libs.skainet.tx.runtime.kllama)
