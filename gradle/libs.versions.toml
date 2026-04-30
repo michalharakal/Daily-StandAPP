@@ -8,9 +8,11 @@ koog = "0.6.1"
 mcp-kotlin = "0.7.2"
 orgEclipseJgit = "7.1.0.202411261347-r"
 deliverance = "0.0.4-SNAPSHOT"
-skainet = "0.15.3"
+skainet = "0.21.0"
+skainet-transformers = "0.21.1"
 slf4jSimple = "2.0.17"
 ktor = "3.3.0"
+shadow = "8.3.5"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -42,21 +44,24 @@ koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
 deliverance-core = { module = "io.teknek.deliverance:core", version.ref = "deliverance" }
 deliverance-safetensors = { module = "io.teknek.deliverance:safetensors", version.ref = "deliverance" }
 
-# SKaiNET
-skainet-apps-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }
-skainet-lang-core = { module = "sk.ainet.core:skainet-lang-core", version.ref = "skainet" }
-skainet-lang-models = { module = "sk.ainet.core:skainet-lang-models", version.ref = "skainet" }
-skainet-compile-core = { module = "sk.ainet.core:skainet-compile-core", version.ref = "skainet" }
-skainet-backend-cpu = { module = "sk.ainet.core:skainet-backend-cpu", version.ref = "skainet" }
-skainet-io-core = { module = "sk.ainet.core:skainet-io-core", version.ref = "skainet" }
-skainet-io-gguf = { module = "sk.ainet.core:skainet-io-gguf", version.ref = "skainet" }
-skainet-kllama = { module = "sk.ainet.core:skainet-apps-kllama", version.ref = "skainet" }
-skainet-kllama-agents = { module = "sk.ainet.core:skainet-kllama-agents", version.ref = "skainet" }
-skainet-llm = { module = "sk.ainet.core:skainet-llm", version.ref = "skainet" }
-skainet-io-safetensors = { module = "sk.ainet.core:skainet-io-safetensors", version.ref = "skainet" }
+# SKaiNET — BOM-managed. Both the BOM and libs are published under sk.ainet.core.
+skainet-bom = { module = "sk.ainet.core:skainet-bom", version.ref = "skainet" }
+skainet-lang-core = { module = "sk.ainet.core:skainet-lang-core" }
+skainet-backend-cpu = { module = "sk.ainet.core:skainet-backend-cpu" }
+skainet-io-core = { module = "sk.ainet.core:skainet-io-core" }
+skainet-io-gguf = { module = "sk.ainet.core:skainet-io-gguf" }
+
+# SKaiNET-transformers — agent loop + tool calling (sk.ainet.transformers group).
+# Note: the published 0.21.1 BOM references an unpublished sk.ainet:skainet-bom:0.21.0,
+# so we hard-pin per-artefact versions for transformers and rely solely on the
+# core BOM. Revisit when an upstream BOM fix ships.
+skainet-tx-runtime-kllama = { module = "sk.ainet.transformers:skainet-transformers-runtime-kllama", version.ref = "skainet-transformers" }
+skainet-tx-agent = { module = "sk.ainet.transformers:skainet-transformers-agent", version.ref = "skainet-transformers" }
+skainet-tx-inference-llama = { module = "sk.ainet.transformers:skainet-transformers-inference-llama", version.ref = "skainet-transformers" }
 
 
 [plugins]
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

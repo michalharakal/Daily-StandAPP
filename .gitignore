@@ -16,3 +16,6 @@ captures
 !*.xcodeproj/project.xcworkspace/
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
+
+# Embedded LLM weights — fetched on demand via `uv run scripts/download-model.py`
+llm/src/jvmMain/resources/models/*.gguf

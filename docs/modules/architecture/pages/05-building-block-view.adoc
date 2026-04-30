@@ -3,6 +3,11 @@
 :toclevels: 3
 :icons: font
 
+[IMPORTANT]
+====
+**Doc status (2026-04-30): §5.2 (LLM Module) describes a `JavaAgentLoop` + `JavaTool` tool-calling architecture that was rolled back during validation.** Llama 3.2 1B Q8_0 cannot reliably emit the strict tool-call JSON the Llama 3 chat template requires. The runtime now uses `KLlamaSession.generate()` directly with a manually-formatted Llama 3 turn prompt; commits are pre-fetched in the CLI. The three `JavaTool` wrapper classes shown in the diagrams below were deleted. Tool calling will be re-introduced when a stronger embedded model lands. See plan `continue-with-general-effort-groovy-coral.md` §V8.2 / §V8.3.
+====
+
 == 5.1 System Overview (Level 1)
 
 [mermaid]
@@ -70,8 +75,8 @@ graph TB
 |MCP Kotlin SDK, Ktor, Stdio transport
 
 |`llm`
-|LLM inference abstraction with pluggable backends
-|SKaiNET kllama, REST API (Ktor Client), JLama, Coroutines
+|LLM inference abstraction with pluggable backends. SKAINET path runs an embedded Llama 3.2 1B Instruct (Q8_0 GGUF) inside a `JavaAgentLoop` with tool calling.
+|skainet 0.21.0, skainet-transformers 0.21.1 (`JavaAgentLoop`, `JavaTool`), REST API (Ktor Client), Coroutines
 
 |`data`
 |Git repository access
@@ -104,59 +109,58 @@ graph TB
 
 == 5.2 Module: llm (Level 2)
 
-The LLM module provides AI inference capabilities with a pluggable architecture. Three backends are available, selected via the `MCP_LLM_BACKEND` environment variable.
+The LLM module provides AI inference with a pluggable architecture. Two backends are available, selected via the `MCP_LLM_BACKEND` environment variable (default: `SKAINET`). The SKAINET path drives a `JavaAgentLoop` from `skainet-transformers` 0.21.1 — the model itself calls registered `JavaTool` instances mid-conversation.
 
 [mermaid]
 ----
 graph TB
     subgraph "llm module"
-        subgraph "commonMain"
-            IFACE[LLMSummarizer<br/>interface]
-            EXPECT[expect fun<br/>getLLMSummarizer]
-        end
-
         subgraph "jvmMain"
-            ACTUAL[actual fun<br/>getLLMSummarizer]
             FACTORY[LLMServiceFactory]
-            BACKEND[LLMBackendType<br/>enum]
+            BACKEND[LLMBackendType<br/>enum: SKAINET, REST_API]
             LCONFIG[LLMConfig]
-            CONFIG[LLMEngineConfig]
-            MOCK[MockJvmLLMSummarizer]
-            SERVICE[LLMService<br/>interface - pluggable]
+            SERVICE[LLMService<br/>interface]
             REST[RestApiLLMService]
-            JLAMA[JLamaService]
+            SKLLM[SKaiNetLLMService]
+            EML[EmbeddedModelLoader]
         end
 
-        subgraph "jvmMain/kotlin-skainet"
-            SKAINET[SkainetKLlamaService]
-            SKSUM[SkainetLLMSummarizer]
-            SKLLM[SKaiNetLLMService]
+        subgraph "jvmMain / agent loop"
+            AGENT[JavaAgentLoop<br/>skainet-transformers]
+            SESS[KLlamaSession<br/>kllama runtime]
+            T1[GetCurrentDateTool]
+            T2[GitCommitsByAuthorTool]
+            T3[GitAllCommitsTool]
         end
     end
 
-    EXPECT --> ACTUAL
-    ACTUAL --> CONFIG
-    CONFIG --> SKSUM
-    ACTUAL -->|"test"| MOCK
+    subgraph "Resources"
+        GGUF[(Llama-3.2-1B-Instruct-Q8_0.gguf<br/>~1.3 GB JAR resource)]
+    end
 
-    SKSUM --> SKAINET
     FACTORY --> BACKEND
     FACTORY --> LCONFIG
     FACTORY --> SKLLM
     FACTORY --> REST
-    FACTORY --> JLAMA
-
+    FACTORY --> EML
+    EML --> GGUF
     SKLLM --> SERVICE
     REST --> SERVICE
-    JLAMA --> SERVICE
+    SKLLM --> AGENT
+    AGENT --> SESS
+    AGENT --> T1
+    AGENT --> T2
+    AGENT --> T3
 
-    style IFACE fill:#e1f5fe
     style SERVICE fill:#fff9c4
     style FACTORY fill:#e8f5e9
     style SKLLM fill:#fff3e0
     style REST fill:#fff3e0
-    style JLAMA fill:#fff3e0
-    style SKSUM fill:#c8e6c9
+    style AGENT fill:#c8e6c9
+    style T1 fill:#c8e6c9
+    style T2 fill:#c8e6c9
+    style T3 fill:#c8e6c9
+    style GGUF fill:#ffe0b2
 ----
 
 === Key Classes
@@ -165,41 +169,38 @@ graph TB
 |===
 |Class |Description
 
-|`LLMSummarizer`
-|Common interface: `summarize(text): String`, `summarizeStream(text): Flow<String>`
-
 |`LLMService`
 |JVM interface for pluggable backends: `generate(prompt, maxTokens, temperature, topP): String`
 
 |`LLMServiceFactory`
-|Factory that instantiates the right `LLMService` based on `MCP_LLM_BACKEND` environment variable or explicit `LLMConfig`
+|Factory that instantiates the right `LLMService` based on `MCP_LLM_BACKEND` (defaults to `SKAINET`). For `SKAINET` it calls `EmbeddedModelLoader.extract()` unless `MCP_LLM_MODEL_PATH` overrides.
 
 |`LLMBackendType`
-|Enum: `SKAINET`, `REST_API`, `JLAMA` - selectable via `MCP_LLM_BACKEND` env var
+|Enum: `SKAINET` (default), `REST_API`.
 
 |`LLMConfig`
 |Data class for programmatic backend configuration (modelPath, baseUrl, modelName, apiKey)
 
 |`SKaiNetLLMService`
-|SKaiNET kllama implementation with GGUF model loading, streaming mode, chat templates
+|Wraps a `KLlamaSession` + a `JavaAgentLoop`. `generate()` delegates to `agent.chat(prompt, tokenConsumer)`, which drives a tool-calling conversation. Implements `AutoCloseable` so the session is released cleanly.
+
+|`EmbeddedModelLoader`
+|Locates `models/Llama-3.2-1B-Instruct-Q8_0.gguf` on the classpath and extracts it to `~/.cache/standapp/models/` on first launch (idempotent — skipped when the cached file size matches the resource).
+
+|`GetCurrentDateTool`
+|`JavaTool` returning today's UTC date + current instant; lets the model resolve relative phrases ("yesterday", "last week") before computing a date window.
+
+|`GitCommitsByAuthorTool`
+|`JavaTool` wrapping `commitsByAuthorAndPeriod` from the `data` module. Schema: `{repoDir, author, startDate, endDate}` (ISO-8601 instants).
+
+|`GitAllCommitsTool`
+|`JavaTool` wrapping `getAllCommitsInPeriod`. Schema: `{repoDir, startDate, endDate}`.
 
 |`RestApiLLMService`
-|OpenAI-compatible REST endpoint client (works with Ollama, llama.cpp server, LM Studio, vLLM)
-
-|`JLamaService`
-|Pure Java LLM inference backend
-
-|`SkainetKLlamaService`
-|Lower-level SKaiNET kllama wrapper with Mutex-based thread safety
-
-|`SkainetLLMSummarizer`
-|Production summarizer wrapping SkainetKLlamaService (used via `getLLMSummarizer()`)
-
-|`LLMEngineConfig`
-|Configuration via system properties (`llm.model`, `llm.max.seq.len`) for `getLLMSummarizer()`
+|OpenAI-compatible REST endpoint client (works with Ollama, llama.cpp server, LM Studio, vLLM). Uses the legacy single-shot prompt path — no tool calling.
 |===
 
-NOTE: New backends can be added by implementing the `LLMService` interface and registering them in `LLMServiceFactory`.
+NOTE: New backends can be added by implementing the `LLMService` interface and registering them in `LLMServiceFactory`. New tools can be added by implementing `JavaTool` and inserting them into `SKaiNetLLMService.defaultTools()`.
 
 == 5.3 Module: data (Level 2)
 
@@ -264,7 +265,7 @@ data class GitInfo(
 
 == 5.4 Module: mcp-server (Level 2)
 
-The MCP server exposes git functionality to AI assistants via the Model Context Protocol.
+The MCP server exposes git functionality to *external* AI assistants via the Model Context Protocol. These MCP-protocol tools are distinct from the LLM agent-loop tools described in §5.2 — both surfaces use the same JGit functions (`commitsByAuthorAndPeriod`, `getAllCommitsInPeriod`) underneath, but `mcp-server` serialises them as JSON-RPC for remote clients while the `llm` module wraps them as `JavaTool` instances for the embedded model.
 
 [mermaid]
 ----

@@ -3,6 +3,11 @@
 :toclevels: 3
 :icons: font
 
+[IMPORTANT]
+====
+**Doc status (2026-04-30):** the SKAINET-backend sequence diagram further down (CLI → Service → JavaAgentLoop → tool calls → JGit) was rolled back during validation. The 1B model could not drive tool calls reliably; today the CLI pre-fetches commits and hands the model a fully-formed prompt, and `JavaAgentLoop` is not on the runtime path. The MCP-server flow (§6.1) is unaffected. See plan `continue-with-general-effort-groovy-coral.md` §V3 + §V7.2.
+====
+
 == 6.1 MCP Tool Call: Get Commits by Author
 
 This scenario shows how an AI assistant retrieves commits for a specific author.
@@ -40,81 +45,88 @@ sequenceDiagram
     Transport-->>Client: tool result
 ----
 
-== 6.2 LLM Summarization Flow
+== 6.2 LLM Standup Summary via Agent Loop (SKAINET path)
 
-This scenario shows the complete flow from commit fetching to AI summarization.
+This is the canonical SKAINET-backend flow. The CLI no longer pre-fetches commits — it hands the model a high-level task, and the model itself drives `JavaTool` calls until it has the data it needs.
 
 [mermaid]
 ----
 sequenceDiagram
     participant User
-    participant App as Application
-    participant Git as GitClient
-    participant LLM as LLMSummarizer
-    participant Engine as SkainetKLlamaService
-    participant Model as GGUF Model
+    participant CLI as StandAPP-cli
+    participant Factory as LLMServiceFactory
+    participant EML as EmbeddedModelLoader
+    participant Service as SKaiNetLLMService
+    participant Loop as JavaAgentLoop
+    participant Model as KLlamaSession<br/>(Llama 3.2 1B Q8_0)
+    participant T1 as GetCurrentDateTool
+    participant T2 as GitCommitsByAuthorTool
+    participant Git as JGit (data module)
 
-    User->>App: Request standup summary
-    App->>Git: getAllCommitsInPeriod()
-    Git-->>App: List<GitInfo>
+    User->>CLI: standapp --repo R --days 7
+    CLI->>Factory: create()
+    Factory->>EML: extract()
+    EML-->>Factory: ~/.cache/standapp/models/...gguf
+    Factory->>Service: SKaiNetLLMService.create(path)
+    Note over Service: builds JavaAgentLoop with<br/>3 JavaTools + llama3 template
 
-    App->>App: Format commits as prompt
-    App->>LLM: summarize(promptText)
+    CLI->>Service: generate("Summarise standup for repo R, last 7 days. Workflow: 1) get_current_date 2) compute window 3) call git tool 4) summarise.")
+    Service->>Loop: agent.chat(prompt)
 
-    LLM->>Engine: generate(prompt, maxTokens, temp)
+    Loop->>Model: render llama3 chat template with tool schemas
+    Model-->>Loop: <tool_call>{name:get_current_date,args:{}}
+    Loop->>T1: execute({})
+    T1-->>Loop: today=2026-04-30, now=...
 
-    Note over Engine: Thread-safe via Mutex
+    Loop->>Model: feed tool result + continue
+    Model-->>Loop: <tool_call>{name:get_commits_by_author, args:{repoDir,author,startDate,endDate}}
+    Loop->>T2: execute(args)
+    T2->>Git: commitsByAuthorAndPeriod(...)
+    Git-->>T2: List<GitInfo>
+    T2-->>Loop: "Found 12 commits: ..."
 
-    Engine->>Engine: tokenizer.encode(prompt)
-    Engine->>Engine: runtime.reset()
-
-    loop Token Generation
-        Engine->>Model: forward pass
-        Model-->>Engine: logits
-        Engine->>Engine: sample token
-        Engine->>Engine: tokenizer.decode(token)
-    end
-
-    Engine-->>LLM: generated text
-    LLM-->>App: summary
-    App-->>User: Standup summary
+    Loop->>Model: feed tool result + continue
+    Model-->>Loop: assistant message (final summary)
+    Loop-->>Service: final text
+    Service-->>CLI: summary
+    CLI-->>User: prints summary
 ----
 
-== 6.3 SKaiNET kllama Initialization
+NOTE: The `REST_API` backend still uses the legacy single-shot path: the CLI pre-fetches commits with JGit, builds a prompt via `PromptBuilder`, and calls `service.generate(prompt)` once.
 
-Shows the initialization sequence for the SKaiNET kllama service.
+== 6.3 SKaiNET Initialisation (Embedded Model Extraction)
+
+Shows the cold-start path the very first time the self-contained JAR runs.
 
 [mermaid]
 ----
 sequenceDiagram
-    participant Factory as SkainetKLlamaService.create()
-    participant Ctx as DirectCpuExecutionContext
-    participant Ingest as LlamaIngestion
-    participant FS as FileSystem
-    participant Tok as GGUFTokenizer
-    participant Cache as KvCache
-    participant Runtime as LlamaRuntime
+    participant Factory as LLMServiceFactory.create()
+    participant EML as EmbeddedModelLoader
+    participant CL as ClassLoader
+    participant FS as ~/.cache/standapp/models/
+    participant KLlama as KLlamaJava.loadGGUF
+    participant Builder as JavaAgentLoop.builder
 
-    Factory->>Ctx: new DirectCpuExecutionContext()
-    Note over Ctx: CPU backend with Vector API
+    Factory->>EML: extract()
+    EML->>CL: getResource("models/Llama-3.2-1B-Instruct-Q8_0.gguf")
+    CL-->>EML: jar:.../standapp-all.jar!/models/...gguf
 
-    Factory->>Ingest: new LlamaIngestion(ctx)
-    Factory->>FS: source(modelPath)
-    Factory->>Ingest: load(source)
-    Ingest-->>Factory: weights
+    alt cached file exists with matching size
+        EML->>FS: stat target
+        FS-->>EML: size matches resource length
+        EML-->>Factory: target Path (no extraction)
+    else first run
+        EML->>FS: copy(input, target, REPLACE_EXISTING)
+        Note over EML,FS: ~1.3 GB — takes 5–15s on local disk
+        EML-->>Factory: target Path
+    end
 
-    Factory->>FS: source(modelPath)
-    Factory->>Tok: fromSource(source)
-    Tok-->>Factory: tokenizer
-
-    Factory->>Cache: createOptimalKvCache()
-    Note over Cache: Off-heap memory<br/>nLayers, seqLen, kvDim
-    Cache-->>Factory: kvCache
-
-    Factory->>Runtime: new LlamaRuntime()
-    Note over Runtime: ctx, weights, kvCache<br/>ropeFreqBase, eps
-
-    Factory-->>Factory: SkainetKLlamaService instance
+    Factory->>KLlama: loadGGUF(target, systemPrompt)
+    KLlama-->>Factory: KLlamaSession
+    Factory->>Builder: session().tool(x3).template("llama3").build()
+    Builder-->>Factory: JavaAgentLoop
+    Factory-->>Factory: SKaiNetLLMService instance
 ----
 
 == 6.4 MCP Server Startup

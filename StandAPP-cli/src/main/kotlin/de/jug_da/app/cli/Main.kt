@@ -4,6 +4,7 @@ package de.jug_da.app.cli
 
 import de.jug_da.data.git.commitsByAuthorAndPeriod
 import de.jug_da.data.git.getAllCommitsInPeriod
+import de.jug_da.standapp.llm.LLMBackendType
 import de.jug_da.standapp.llm.LLMService
 import de.jug_da.standapp.llm.LLMServiceFactory
 import dev.standapp.engine.control.PromptBuilder
@@ -22,7 +23,43 @@ fun main(args: Array<String>) {
     if (config.author != null) println("Author:     ${config.author}")
     println()
 
-    // 1. Get commits from git repo
+    val backend = LLMBackendType.fromEnv()
+    println("Generating standup summary (backend: $backend)…")
+    println()
+
+    val service = try {
+        LLMServiceFactory.create()
+    } catch (e: Exception) {
+        System.err.println("Error: ${e.message}")
+        System.err.println()
+        System.err.println("Set MCP_LLM_BACKEND=REST_API to use a remote OpenAI-compatible endpoint.")
+        return
+    }
+
+    // STANDAPP_TINY_PROMPT=1 → bypass the heavy summarisation template
+    // and just send a one-line prompt. Useful for verifying the inference
+    // path is alive without paying the prefill cost of a 1700-token prompt.
+    val summaryPrompt = if (System.getenv("STANDAPP_TINY_PROMPT") == "1") {
+        "Say hello in three words."
+    } else {
+        buildSummarisationPrompt(config) ?: run {
+            println("No commits found in the last ${config.days} day(s).")
+            return
+        }
+    }
+
+    val summary = runBlocking {
+        service.generate(
+            prompt = summaryPrompt,
+            temperature = LLMService.DEFAULT_TEMPERATURE,
+            topP = LLMService.DEFAULT_TOP_P,
+        )
+    }
+
+    println(summary)
+}
+
+private fun buildSummarisationPrompt(config: CliConfig): String? {
     val nowMs = System.currentTimeMillis()
     val now = Instant.fromEpochMilliseconds(nowMs)
     val start = Instant.fromEpochMilliseconds(nowMs - config.days * 86_400_000L)
@@ -32,54 +69,20 @@ fun main(args: Array<String>) {
     } else {
         getAllCommitsInPeriod(config.repoDir, start, now)
     }
-
-    if (gitInfos.isEmpty()) {
-        println("No commits found in the last ${config.days} day(s).")
-        return
-    }
-
+    if (gitInfos.isEmpty()) return null
     println("Found ${gitInfos.size} commit(s).")
     println()
 
-    // 2. Map GitInfo -> CommitInfo for the prompt builder
-    val commits = gitInfos.map { git ->
+    val commits = gitInfos.map {
         CommitInfo(
-            id = git.id.take(7),
-            authorName = git.authorName,
-            authorEmail = git.authorEmail,
-            date = git.whenDate.toString(),
-            message = git.message,
+            id = it.id.take(7),
+            authorName = it.authorName,
+            authorEmail = it.authorEmail,
+            date = it.whenDate.toString(),
+            message = it.message,
         )
     }
-
-    // 3. Build prompt
-    val promptBuilder = PromptBuilder()
-    val prompt = promptBuilder.buildUserPrompt(commits, PromptType.SUMMARY)
-
-    // 4. Call LLM
-    println("Generating standup summary (backend: ${System.getenv("MCP_LLM_BACKEND") ?: "not set"})...")
-    println()
-
-    val service = try {
-        LLMServiceFactory.create()
-    } catch (e: Exception) {
-        System.err.println("Error: ${e.message}")
-        System.err.println()
-        System.err.println("Set MCP_LLM_BACKEND to one of: SKAINET, REST_API")
-        System.err.println("  SKAINET:     also set MCP_LLM_MODEL_PATH=/path/to/model.gguf")
-        System.err.println("  REST_API:    optionally set MCP_LLM_REST_BASE_URL, MCP_LLM_REST_MODEL")
-        return
-    }
-
-    val summary = runBlocking {
-        service.generate(
-            prompt = prompt,
-            temperature = LLMService.DEFAULT_TEMPERATURE,
-            topP = LLMService.DEFAULT_TOP_P,
-        )
-    }
-
-    println(summary)
+    return PromptBuilder().buildUserPrompt(commits, PromptType.SUMMARY)
 }
 
 private data class CliConfig(
@@ -129,12 +132,15 @@ private fun printUsage() {
           -h, --help            Show this help message
 
         Environment variables:
-          MCP_LLM_BACKEND       Required. One of: SKAINET, REST_API
-          MCP_LLM_MODEL_PATH    GGUF model path (SKAINET backend)
-          MCP_LLM_REST_BASE_URL REST API endpoint (default: http://localhost:11434)
+          MCP_LLM_BACKEND       Optional. SKAINET (default, embedded Llama 3.2 1B) or REST_API.
+          MCP_LLM_MODEL_PATH    Optional. Override the embedded GGUF (SKAINET only).
+          MCP_LLM_REST_BASE_URL REST endpoint (default: http://localhost:11434)
           MCP_LLM_REST_MODEL    Model name for REST API (default: llama3.2:3b)
 
-        Example:
+        Example (uses embedded model):
+          standapp --repo /path/to/repo --days 7
+
+        Example (REST backend):
           MCP_LLM_BACKEND=REST_API standapp --repo /path/to/repo --days 7
     """.trimIndent())
 }

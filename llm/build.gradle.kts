@@ -37,23 +37,24 @@ kotlin {
         }
         jvmMain {
             dependencies {
-                // SKaiNET kllama - pure Kotlin LLM inference
-                implementation(libs.skainet.apps.kllama)
+                // SKaiNET 0.21.0 (BOM-managed) + skainet-transformers 0.21.1 (per-artefact pinned).
+                // Transformers 0.21.1 BOM is currently broken: it imports an
+                // unpublished sk.ainet:skainet-bom:0.21.0 — see TR-08 in arc42 §11.
+                implementation(project.dependencies.platform(libs.skainet.bom))
+
+                // Core inference: DSL + CPU backend + GGUF I/O
                 implementation(libs.skainet.lang.core)
-                implementation(libs.skainet.lang.models)
                 implementation(libs.skainet.backend.cpu)
-                implementation(libs.skainet.io.core)
                 implementation(libs.skainet.io.gguf)
-                implementation(libs.skainet.io.safetensors)
 
-                implementation(libs.skainet.kllama)
-                // SKaiNET LLM + Agent APIs (generateUntilStop, ChatMLTemplate, Tokenizer)
-                implementation(libs.skainet.llm)
-                implementation(libs.skainet.kllama.agents)
+                // Agent loop + tool calling + Llama runtime
+                implementation(libs.skainet.tx.runtime.kllama)
+                implementation(libs.skainet.tx.agent)
+                implementation(libs.skainet.tx.inference.llama)
 
-                // Deliverance - Java-native LLM inference (commented out – using local backends)
-                // implementation(libs.deliverance.core)
-                // implementation(libs.deliverance.safetensors)
+                // JGit-backed tools need the data module
+                implementation(project(":data"))
+                implementation(libs.kotlinx.datetime)
 
                 // Ktor HTTP client for REST API backend
                 implementation(libs.ktor.client.cio)
@@ -66,4 +67,23 @@ kotlin {
 
 tasks.withType<Test> {
     systemProperty("test.mode", "true")
+}
+
+// Embed the Llama 3.2 1B Instruct GGUF as a JAR resource. Pulled via
+// `uv run scripts/download-model.py` — runs once, idempotent.
+val embeddedModelFile = layout.projectDirectory.file(
+    "src/jvmMain/resources/models/Llama-3.2-1B-Instruct-Q8_0.gguf"
+).asFile
+
+val prepareModel = tasks.register<Exec>("prepareModel") {
+    description = "Download Llama-3.2-1B-Instruct-Q8_0.gguf into jvmMain resources via uv."
+    workingDir = rootDir
+    commandLine("uv", "run", "scripts/download-model.py")
+    inputs.file(rootDir.resolve("scripts/download-model.py"))
+    outputs.file(embeddedModelFile)
+    onlyIf { !embeddedModelFile.exists() }
+}
+
+tasks.named("jvmProcessResources").configure {
+    dependsOn(prepareModel)
 }

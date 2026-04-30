@@ -51,7 +51,6 @@ fun main() {
     val cloudModel = System.getenv("BENCH_CLOUD_MODEL") ?: "gpt-4o-mini"
     val cloudApiKey = System.getenv("BENCH_CLOUD_API_KEY") ?: System.getenv("OPENAI_API_KEY")
     val modelPath = System.getenv("MCP_LLM_MODEL_PATH") ?: ""
-    val jlamaModel = System.getenv("BENCH_JLAMA_MODEL") ?: ""
     val outputDir = File(System.getenv("BENCH_OUTPUT_DIR") ?: "benchmark-results")
 
     val requestedBackends = System.getenv("BENCH_BACKENDS")
@@ -62,15 +61,8 @@ fun main() {
     val backends = mutableMapOf<String, Pair<LLMBackendType, LLMConfig>>()
 
     if (requestedBackends == null || "SKAINET" in requestedBackends) {
-        if (modelPath.isNotBlank()) {
-            backends["SKAINET"] = LLMBackendType.SKAINET to LLMConfig(modelPath = modelPath)
-        } else {
-            println("WARN: Skipping SKAINET — MCP_LLM_MODEL_PATH not set")
-        }
-    }
-
-    if (requestedBackends == null || "JLAMA" in requestedBackends) {
-        backends["JLAMA"] = LLMBackendType.JLAMA to LLMConfig(modelPath = jlamaModel)
+        // SKAINET: empty modelPath now means "use the embedded Llama 3.2 1B GGUF resource".
+        backends["SKAINET"] = LLMBackendType.SKAINET to LLMConfig(modelPath = modelPath)
     }
 
     if (requestedBackends == null || "REST_API" in requestedBackends) {

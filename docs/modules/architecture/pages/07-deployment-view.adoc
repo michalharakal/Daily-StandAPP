@@ -5,20 +5,22 @@
 
 == 7.1 Infrastructure Overview
 
+The CLI is now a *self-contained* fat JAR: the Llama 3.2 1B Instruct (Q8_0, ~1.3 GB) GGUF is embedded as a JAR resource, so end-users do not need to manage external model files. On first run, `EmbeddedModelLoader` extracts the GGUF to `~/.cache/standapp/models/` (idempotent — extraction is skipped when the cached file size matches the resource).
+
 [mermaid]
 ----
 graph TB
     subgraph "Developer Machine"
-        subgraph "JVM Runtime (JDK 21+)"
+        subgraph "JVM Runtime (JDK 21+, Panama Vector enabled)"
+            CLI_JAR[standapp-1.0-SNAPSHOT-all.jar<br/>~2.0 GB self-contained]
             MCP[mcp-server-jvm.jar]
-            CLI[StandAPP-cli]
             BENCH[benchmark]
             CLOUDAPI[cloud-api:server<br/>port 8080]
         end
 
         subgraph "File System"
             REPOS[(Git Repositories)]
-            MODELS[(GGUF Models<br/>~4GB)]
+            CACHE[(~/.cache/standapp/models/<br/>extracted GGUF, ~1.3 GB)]
         end
 
         subgraph "AI Assistant"
@@ -28,17 +30,16 @@ graph TB
 
     CLAUDE -->|"stdio"| MCP
     MCP --> REPOS
-    MCP --> MODELS
-    CLI --> REPOS
-    CLI --> MODELS
-    BENCH --> MODELS
+    CLI_JAR --> REPOS
+    CLI_JAR -->|"first run only"| CACHE
+    BENCH --> CACHE
 
-    style MCP fill:#c8e6c9
-    style CLI fill:#bbdefb
+    style CLI_JAR fill:#c8e6c9
+    style MCP fill:#bbdefb
     style BENCH fill:#bbdefb
     style CLOUDAPI fill:#e3f2fd
     style REPOS fill:#fff9c4
-    style MODELS fill:#fce4ec
+    style CACHE fill:#fce4ec
 ----
 
 == 7.2 Deployment Artifacts
@@ -52,10 +53,10 @@ graph TB
 |`./gradlew :mcp-server:jvmJar`
 |`mcp-server/build/libs/mcp-server-jvm.jar`
 
-|CLI
-|JAR
-|`./gradlew :StandAPP-cli:jar`
-|`StandAPP-cli/build/libs/*.jar`
+|CLI (self-contained)
+|Shadow fat JAR (~2.0 GB, embeds Llama 3.2 1B Q8_0)
+|`uv run scripts/download-model.py && ./gradlew :StandAPP-cli:shadowJar`
+|`StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar`
 
 |Benchmark
 |Fat JAR
@@ -145,19 +146,19 @@ The Docker image uses a multi-stage build with JDK 21 and packages the MCP serve
 
 == 7.5 Environment Variable Configuration
 
-The application is primarily configured via environment variables:
+End users do not need any environment variables — `SKAINET` is the default backend and the model is embedded. Variables exist only as overrides.
 
 [cols="1,2,2"]
 |===
 |Variable |Default |Description
 
 |`MCP_LLM_BACKEND`
-|_(required)_
-|Backend selection: `SKAINET`, `REST_API`, or `JLAMA`
+|`SKAINET`
+|Backend selection: `SKAINET` (embedded Llama 3.2 1B) or `REST_API`.
 
 |`MCP_LLM_MODEL_PATH`
-|_(required for SKAINET)_
-|Path to GGUF model file
+|_(unset → use embedded resource)_
+|Optional override. Set to an absolute GGUF path to use a different model on the SKAINET backend. The embedded model wins when this is unset.
 
 |`MCP_LLM_REST_BASE_URL`
 |`http://localhost:11434`
@@ -172,9 +173,15 @@ The application is primarily configured via environment variables:
 |Bearer token for authenticated REST API endpoints
 |===
 
-== 7.6 Model Deployment
+== 7.6 Embedded Model
 
-=== GGUF Model Requirements
+The repo ships a build-time hook that downloads the GGUF *into the source tree* before the JAR is assembled.
+
+* Source: `bartowski/Llama-3.2-1B-Instruct-GGUF` on Hugging Face (filename `Llama-3.2-1B-Instruct-Q8_0.gguf`).
+* Build script: `scripts/download-model.py` (PEP 723 inline-deps; runs as `uv run scripts/download-model.py`).
+* Drop location: `llm/src/jvmMain/resources/models/Llama-3.2-1B-Instruct-Q8_0.gguf` (gitignored).
+* Gradle wiring: a `prepareModel` `Exec` task in `llm/build.gradle.kts` invokes the uv script and is a dependency of `jvmProcessResources`. `onlyIf { !modelFile.exists() }` keeps reruns cheap.
+* Runtime: `EmbeddedModelLoader.extract()` copies the resource to `~/.cache/standapp/models/` (random-access on disk is required by `KLlamaJava.loadGGUF`).
 
 [cols="1,2,3"]
 |===
@@ -182,34 +189,20 @@ The application is primarily configured via environment variables:
 
 |Format
 |GGUF
-|Quantized models (Q4_K_M, Q5_K_M recommended)
+|Q8_0 chosen for size/quality trade-off (~1.3 GB).
 
-|Size
-|~4GB for 7B models
-|Smaller quantizations use less RAM
+|Architecture
+|Llama 3.2
+|Auto-detected by skainet-transformers; chat template is `llama3`.
 
-|Location
-|Local file system
-|Configure via `llm.skainet.model` property
+|First-run extraction
+|`~/.cache/standapp/models/`
+|~5-15 s on local disk; idempotent on subsequent runs.
 
-|Compatibility
-|LLaMA architecture
-|Tested with Mistral, LLaMA 2/3
+|Override
+|`MCP_LLM_MODEL_PATH=/path/to/other.gguf`
+|Lets power users swap in a larger model without rebuilding the JAR.
 |===
-
-=== Recommended Models
-
-[source,bash]
-----
-# Download example (using huggingface-cli or manual download)
-# Mistral 7B Instruct - Q4_K_M quantization
-wget https://huggingface.co/.../mistral-7b-instruct-v0.3.Q4_K_M.gguf
-
-# Set model path
-java -Dllm.skainet.model=./models/mistral-7b-instruct-v0.3.Q4_K_M.gguf \
-     --add-modules jdk.incubator.vector \
-     -jar mcp-server-jvm.jar
-----
 
 == 7.7 Deployment Diagram
 

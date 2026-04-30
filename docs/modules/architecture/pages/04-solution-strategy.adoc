@@ -3,6 +3,11 @@
 :toclevels: 3
 :icons: font
 
+[IMPORTANT]
+====
+**Doc status (2026-04-30):** the `skainet-transformers` `JavaAgentLoop` + `JavaTool` tool-calling pattern described in this page was rolled back during validation. Llama 3.2 1B Q8_0 could not reliably emit the tool-call JSON the Llama 3 chat template requires. The SKAINET runtime path now uses `KLlamaSession.generate()` directly with a manually-formatted Llama 3 turn prompt; the CLI pre-fetches commits via JGit. Tool-calling references in this page are aspirational, not the current shape. See plan `continue-with-general-effort-groovy-coral.md` §V3 + §V7.2.
+====
+
 == 4.1 Technology Decisions
 
 [cols="1,2,3"]
@@ -22,16 +27,24 @@
 |Pure Java, no native dependencies, mature and stable
 
 |*LLM Engine*
-|SKaiNET kllama
-|Pure Kotlin, no Python/native deps, SIMD via Vector API
+|SKaiNET 0.21.0 + skainet-transformers 0.21.1
+|Pure Kotlin, no Python/native deps, SIMD via Vector API. The `skainet-transformers` agent loop adds tool calling on top of the kllama runtime.
+
+|*LLM Inference Pattern*
+|Agent loop with tool calling
+|`JavaAgentLoop` drives a multi-turn conversation: the model emits `<tool_call>` blocks, the loop dispatches to registered `JavaTool` implementations, and the loop terminates on a plain assistant message. Replaces the previous single-shot `session.generate(prompt)` path.
 
 |*Protocol*
 |Model Context Protocol (MCP)
-|Standard for AI assistant integration, supported by Claude
+|Standard for AI assistant integration, supported by Claude. Note: the *MCP* tools (consumed by external assistants) and the *agent-loop* tools (consumed by our own embedded LLM) are now distinct surfaces with the same JGit backend.
 
 |*Model Format*
-|GGUF
-|Efficient quantization, widely supported, good performance
+|GGUF (Llama 3.2 1B Instruct, Q8_0)
+|~1.3 GB embedded as a JAR resource so the CLI runs self-contained — no `MCP_LLM_MODEL_PATH` required, no external download at install time.
+
+|*Distribution*
+|Self-contained shadow JAR (`StandAPP-cli/build/libs/standapp-*-all.jar`)
+|`com.gradleup.shadow` packages all dependencies plus the embedded GGUF into a single ~2.0 GB JAR. `mergeServiceFiles()` preserves skainet 0.21's `KernelProvider` SPI registrations.
 |===
 
 == 4.2 Architecture Approach
@@ -80,20 +93,12 @@ graph TB
 
 [source,kotlin]
 ----
-// Common interface (commonMain)
-interface LLMSummarizer {
-    suspend fun summarize(text: String): String
-}
-
-expect fun getLLMSummarizer(): LLMSummarizer
-
-// JVM implementation (jvmMain)
-actual fun getLLMSummarizer(): LLMSummarizer = when {
-    System.getProperty("test.mode") == "true" -> MockJvmLLMSummarizer()
-    else -> SkainetLLMSummarizer(SkainetKLlamaService.create(config))
-}
-
-// Other platforms return stubs or mock implementations
+// JVM (jvmMain) — the agent loop replaces the legacy single-shot summarizer.
+val modelPath = EmbeddedModelLoader.extract()  // ~/.cache/standapp/models/...
+val service = SKaiNetLLMService.create(modelPath, SKaiNetLLMService.defaultTools())
+val summary = service.generate(prompt = "Summarise the standup for repo X for the last 7 days.", ...)
+// The model itself calls get_current_date / get_commits_by_author / get_all_commits
+// via JavaAgentLoop, so the CLI never pre-fetches commits on this path.
 ----
 
 == 4.3 Key Design Decisions
@@ -117,15 +122,14 @@ actual fun getLLMSummarizer(): LLMSummarizer = when {
 * (-) Requires JDK 21+ for Vector API
 * (-) One-time model download required (~4GB for 7B models)
 
-=== Decision 2: Pluggable LLM Architecture with SKaiNET kllama
+=== Decision 2: Pluggable LLM Architecture with skainet-transformers Agent Loop
 
-*Problem*: Need local LLM inference without cloud dependencies, with flexibility to swap implementations.
+*Problem*: Need local LLM inference that can dynamically pull data (git history) instead of relying on a pre-built prompt, while keeping the option to fall back to a remote endpoint for development.
 
-*Solution*: Define `LLMService` interface for pluggable backends. Currently implemented with three backends, selectable via `MCP_LLM_BACKEND` environment variable:
+*Solution*: Define `LLMService` interface for pluggable backends. Two backends, selectable via `MCP_LLM_BACKEND` environment variable (default: `SKAINET`):
 
-* **SKaiNET kllama** - Pure Kotlin LLM with SIMD acceleration via Java Vector API
-* **REST API** - OpenAI-compatible HTTP endpoint (Ollama, llama.cpp server, LM Studio, etc.)
-* **JLama** - Pure Java LLM inference
+* **SKAINET** (default) — `skainet-transformers` `JavaAgentLoop` over the kllama runtime, with three `JavaTool` implementations exposed to the model: `get_current_date`, `get_commits_by_author`, `get_all_commits`. Runs the embedded Llama 3.2 1B Instruct (Q8_0).
+* **REST_API** — OpenAI-compatible HTTP endpoint (Ollama, llama.cpp server, LM Studio, etc.). Uses the legacy single-shot prompt path because remote tool calling is not wired through this wrapper.
 
 [mermaid]
 ----
@@ -136,9 +140,10 @@ classDiagram
     }
 
     class SKaiNetLLMService {
-        -runtime: LlamaRuntime
-        -tokenizer: GGUFTokenizer
+        -session: KLlamaSession
+        -agent: JavaAgentLoop
         +generate()
+        +close()
     }
 
     class RestApiLLMService {
@@ -148,8 +153,18 @@ classDiagram
         +generate()
     }
 
-    class JLamaService {
-        +generate()
+    class JavaTool {
+        <<interface>>
+        +getDefinition() ToolDefinition
+        +execute(args) String
+    }
+
+    class GetCurrentDateTool
+    class GitCommitsByAuthorTool
+    class GitAllCommitsTool
+
+    class EmbeddedModelLoader {
+        +extract() Path
     }
 
     class LLMServiceFactory {
@@ -159,16 +174,20 @@ classDiagram
 
     LLMService <|.. SKaiNetLLMService
     LLMService <|.. RestApiLLMService
-    LLMService <|.. JLamaService
+    JavaTool <|.. GetCurrentDateTool
+    JavaTool <|.. GitCommitsByAuthorTool
+    JavaTool <|.. GitAllCommitsTool
+    SKaiNetLLMService o-- JavaTool : drives via JavaAgentLoop
     LLMServiceFactory ..> LLMService : creates
+    LLMServiceFactory ..> EmbeddedModelLoader : extracts on first run
 ----
 
 *Consequences*:
-* (+) Pluggable architecture - easy to add new backends
-* (+) Pure Kotlin with SKaiNET - no native library management
-* (+) Same language as the rest of the project
-* (+) Works on any JDK 21+ platform with Vector API
-* (-) Requires JDK 21+ for optimal performance
+* (+) Tool calling — the LLM fetches its own commit data, no PromptBuilder churn
+* (+) Self-contained shadow JAR — model embedded, no env vars needed
+* (+) Pure JVM, BOM-managed deps, no native library management
+* (-) Requires JDK 21+ for Panama Vector
+* (-) Fat JAR is large (~2.0 GB) — see Risks §11
 
 === Decision 3: MCP Protocol for AI Integration
 

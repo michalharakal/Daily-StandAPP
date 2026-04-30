@@ -285,3 +285,40 @@ class MockJvmLLMSummarizer : LLMSummarizer {
         "Mock summary of: ${text.take(50)}..."
 }
 ----
+
+== 8.7 LLM Tool Calling
+
+The SKAINET backend runs the embedded Llama 3.2 1B Instruct inside a `JavaAgentLoop` from `skainet-transformers` 0.21.1. The agent loop turns the LLM into a *driver* — instead of the CLI handing the model a fully-formed prompt with commits already inlined, the model itself decides which tool to call and when.
+
+=== Tool Surface
+
+Three tools are registered on every SKAINET-backed `JavaAgentLoop`:
+
+[cols="1,3,2"]
+|===
+|Tool |Purpose |Underlying call
+
+|`get_current_date`
+|Anchors the model in real time so it can resolve "yesterday", "this week", etc.
+|`java.time.LocalDate.now(UTC)` + `Instant.now()`
+
+|`get_commits_by_author`
+|Fetch commits filtered by a substring author match in a date window.
+|`de.jug_da.data.git.commitsByAuthorAndPeriod`
+
+|`get_all_commits`
+|Fetch every commit in a date window (when no author is requested).
+|`de.jug_da.data.git.getAllCommitsInPeriod`
+|===
+
+=== Privacy Implications
+
+Tool calling does not break the privacy-first guarantee from §4. The agent loop runs entirely in-process: the model emits a `<tool_call>` block, `JavaAgentLoop` parses it, dispatches to the local `JavaTool.execute()`, and feeds the result back into the same in-process model session. No network call, no cloud assistant, no log shipping. The boundary between "what the model produces" and "what our code does" stays inside the JVM.
+
+=== Boundary with the MCP-Protocol Tools
+
+The `mcp-server` module exposes the same JGit functions as MCP tools, but for a *different consumer* (external AI assistants like Claude Desktop). Both surfaces share the JGit backend in the `data` module. They are kept distinct so that:
+
+* Schemas can evolve independently — the LLM can be retrained against richer schemas without breaking external MCP clients.
+* The MCP server can run headless without loading the embedded GGUF.
+* Tool-calling logic for the embedded LLM is unit-testable without standing up an MCP transport.

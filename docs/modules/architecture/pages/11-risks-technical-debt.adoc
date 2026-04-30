@@ -43,6 +43,27 @@ Models are 4-8GB
 |Poor first-run experience
 |Provide download scripts, progress indicators
 |Low
+
+|TR-06
+|*Self-Contained JAR Size*
+Embedding Llama 3.2 1B Q8_0 makes the shadow JAR ~2.0 GB.
+|Slow CI uploads, exceeds some artefact-size limits, awkward in `git lfs`-free repos.
+|Keep the GGUF gitignored and only fetched at build time via `uv run scripts/download-model.py`. Document `MCP_LLM_MODEL_PATH` as an escape hatch. Consider a slim build profile in the future.
+|Medium
+
+|TR-07
+|*Embedded-Model Cache Extraction*
+On first run, `EmbeddedModelLoader` copies ~1.3 GB out of the JAR to `~/.cache/standapp/models/`. JVM/JAR resource APIs cannot serve random-access reads, which `KLlamaJava.loadGGUF` requires.
+|First-run latency (~5-15 s on local SSD); fails on read-only home dirs or near-full disks.
+|Idempotency check (file size match) skips extraction on subsequent runs. Surface a clear log line. Consider honouring `STANDAPP_CACHE_DIR` for sandboxed environments.
+|Low
+
+|TR-08
+|*skainet-transformers API Stability*
+Library is at 0.21.1; `JavaAgentLoop`, `JavaTool`, and `ChatTemplate` are stable but pre-1.0.
+|Minor-version bumps may rename builder methods or template names.
+|BOM-pin both `skainet` and `skainet-transformers` versions. Hold a single golden sample (`SKaiNET-transformers/llm-apps/kllama-java-sample`) as the migration reference.
+|Medium
 |===
 
 == 11.2 Technical Debt

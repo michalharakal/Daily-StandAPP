@@ -1,11 +1,15 @@
 package de.jug_da.standapp.llm
 
+import java.nio.file.Path
+
 /**
  * Factory that instantiates the right [LLMService] based on environment variables.
  *
  * Environment variables:
- * - `MCP_LLM_BACKEND`            – "SKAINET" | "KLLAMA" | "REST" | "REST_API" | "OLLAMA" (required)
- * - `MCP_LLM_MODEL_PATH`         – Path to GGUF model file (SKAINET backend)
+ * - `MCP_LLM_BACKEND`            – "SKAINET" | "REST_API" (default: SKAINET)
+ * - `MCP_LLM_MODEL_PATH`         – Override path to GGUF model file. If unset on the
+ *                                   SKAINET backend, the embedded Llama 3.2 1B Instruct
+ *                                   resource is extracted to `~/.cache/standapp/models/`.
  * - `MCP_LLM_REST_BASE_URL`      – Base URL for REST API backend (default: http://localhost:11434)
  * - `MCP_LLM_REST_MODEL`         – Model name for REST API backend (default: llama3.2:3b)
  * - `MCP_LLM_REST_API_KEY`       – Optional Bearer token for authenticated REST API endpoints
@@ -20,14 +24,13 @@ object LLMServiceFactory {
         println("[LLMServiceFactory] Creating backend: $backendType (programmatic)")
         return when (backendType) {
             LLMBackendType.SKAINET -> {
-                require(config.modelPath.isNotBlank()) { "modelPath is required for SKAINET backend" }
-                SKaiNetLLMService.create(config.modelPath)
+                val modelPath = if (config.modelPath.isNotBlank()) {
+                    Path.of(config.modelPath)
+                } else {
+                    EmbeddedModelLoader.extract()
+                }
+                SKaiNetLLMService.create(modelPath)
             }
-            // LLMBackendType.DELIVERANCE -> {
-            //     require(config.deliveranceModelOwner.isNotBlank()) { "deliveranceModelOwner is required for DELIVERANCE backend" }
-            //     require(config.deliveranceModelName.isNotBlank()) { "deliveranceModelName is required for DELIVERANCE backend" }
-            //     DeliveranceLLMService.create(config.deliveranceModelOwner, config.deliveranceModelName)
-            // }
             LLMBackendType.REST_API -> {
                 RestApiLLMService(
                     baseUrl = config.baseUrl,
@@ -44,18 +47,15 @@ object LLMServiceFactory {
 
         return when (backend) {
             LLMBackendType.SKAINET -> {
-                val modelPath = System.getenv("MCP_LLM_MODEL_PATH")
-                    ?: error("MCP_LLM_MODEL_PATH is required for SKAINET backend")
-                println("[LLMServiceFactory] Loading SKaiNET model from: $modelPath")
+                val override = System.getenv("MCP_LLM_MODEL_PATH")
+                val modelPath = if (!override.isNullOrBlank()) {
+                    println("[LLMServiceFactory] Using MCP_LLM_MODEL_PATH override: $override")
+                    Path.of(override)
+                } else {
+                    EmbeddedModelLoader.extract()
+                }
                 SKaiNetLLMService.create(modelPath)
             }
-
-            // LLMBackendType.DELIVERANCE -> {
-            //     val owner = System.getenv("MCP_LLM_DELIVERANCE_OWNER") ?: "TinyLlama"
-            //     val model = System.getenv("MCP_LLM_DELIVERANCE_MODEL") ?: "TinyLlama-1.1B-Chat-v1.0"
-            //     println("[LLMServiceFactory] Deliverance model: $owner/$model")
-            //     DeliveranceLLMService.create(owner, model)
-            // }
 
             LLMBackendType.REST_API -> {
                 val baseUrl = System.getenv("MCP_LLM_REST_BASE_URL") ?: "http://localhost:11434"

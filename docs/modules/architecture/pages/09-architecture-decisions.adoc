@@ -3,6 +3,11 @@
 :toclevels: 3
 :icons: font
 
+[IMPORTANT]
+====
+**Doc status (2026-04-30):** the ADR adopting `skainet-transformers` `JavaAgentLoop` for SKAINET tool calling was rolled back during validation. Llama 3.2 1B Q8_0 could not emit reliable tool-call JSON; the SKAINET runtime now uses `KLlamaSession.generate()` directly with a Llama 3 turn-formatted prompt. The "consequences" + diagram in that ADR no longer match the code. See plan `continue-with-general-effort-groovy-coral.md` §V3 + §V7.2 + §V8.2.
+====
+
 == ADR-001: Privacy-First Architecture (Foundational)
 
 === Status
@@ -271,3 +276,43 @@ MCP_LLM_REST_API_KEY=optional-key
 * (+) Easy to configure in Claude Desktop MCP config
 * (+) `LLMBackendType.fromEnv()` provides validation at startup
 * (-) Two configuration paths coexist (env vars and system properties)
+
+---
+
+== ADR-010: Adopt skainet-transformers Agent Loop with Embedded Model
+
+=== Status
+Accepted (2026-04-30)
+
+=== Context
+The previous LLM path called `KLlamaSession.generate(prompt, config)` once with a fully pre-built prompt that the CLI assembled by pulling commits with JGit and stuffing them into a `PromptBuilder`. Three things made this brittle:
+
+* The CLI had to know the LLM's expected prompt format.
+* The model had no way to ask for additional data — the operator had to pre-decide author / date window / depth.
+* Distribution required users to download a multi-GB GGUF and set `MCP_LLM_MODEL_PATH` themselves.
+
+Maven Central now has skainet 0.21.0 plus a sibling library, skainet-transformers 0.21.1, that exposes `JavaAgentLoop`, `JavaTool`, and `JavaTools.definition()` — a tool-calling agent loop layered on the existing kllama runtime.
+
+=== Decision
+
+. **Upgrade** to skainet 0.21.0 and adopt skainet-transformers 0.21.1, BOM-managed (per the `skainet-consumer-setup` skill: BOM at `sk.ainet`, libraries at `sk.ainet.core` / `sk.ainet.llm`).
+. **Replace** the single-shot SKAINET path with `JavaAgentLoop`. The CLI hands the model a high-level task; the model calls `get_current_date`, `get_commits_by_author`, or `get_all_commits` itself.
+. **Embed** Llama 3.2 1B Instruct (Q8_0, ~1.3 GB) as a JAR resource so the CLI shadow JAR (~2.0 GB) ships self-contained.
+. **Default** `MCP_LLM_BACKEND` to `SKAINET` — no env vars required for the common path.
+. **Keep** the REST_API backend on the legacy single-shot path with `PromptBuilder`. Remote tool calling can be added later if a user needs it.
+
+=== Consequences
+
+* (+) The model can answer follow-up questions ("What did Alice do last week?") without a CLI redesign — just a different task prompt.
+* (+) Self-contained distribution: download the JAR, run it. No `MCP_LLM_MODEL_PATH`, no manual GGUF wrangling.
+* (+) BOM-managed deps eliminate version drift across `sk.ainet.core:*` artefacts.
+* (+) Single tool-calling code path; tools can be reused by future MCP / web surfaces.
+* (-) Fat JAR is large (~2.0 GB). See §11 risks.
+* (-) First run extracts the GGUF to `~/.cache/standapp/models/` (5-15 s). Idempotent on later runs.
+* (-) Locks us to skainet-transformers' Llama 3 chat-template; switching to a non-Llama family means re-validating the agent loop.
+* (-) JDK 21+ with Panama Vector remains required — same constraint as before.
+
+=== Related
+
+* `SKaiNET-transformers/llm-apps/kllama-java-sample/.../Main.java` — canonical Java sample used as the implementation reference.
+* `skainet-consumer-setup` skill — BOM-management rules followed by `gradle/libs.versions.toml`.
