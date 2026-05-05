@@ -68,8 +68,7 @@ The `:benchmark` module evaluates local LLM backends for standup summary generat
 - JDK 25+
 - At least one backend available:
   - **LM Studio** or **Ollama** running locally or on a remote machine, or
-  - **SKAINET** with a GGUF model file on disk, or
-  - **JLama** (downloads model automatically on first run)
+  - **SKAINET** with a GGUF model file on disk
 
 ### Unit Tests
 
@@ -152,7 +151,7 @@ java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BENCH_DIR` | `./bench` | Directory containing `case-XX.json` test files |
-| `BENCH_BACKENDS` | all | Comma-separated list: `SKAINET`, `JLAMA`, `REST_API` |
+| `BENCH_BACKENDS` | all | Comma-separated list: `SKAINET`, `REST_API` |
 | `BENCH_RUNS` | `5` | Number of repeated runs per case (for determinism scoring) |
 | `BENCH_CASES` | all | Comma-separated case IDs, e.g. `case-01,case-08` |
 | `BENCH_PROMPTS` | both | Comma-separated prompt types: `SUMMARY`, `JSON` |
@@ -220,11 +219,10 @@ Pick the model that passes quality thresholds while meeting your operational con
 
 | Priority | Choose | When |
 |----------|--------|------|
-| Offline/privacy first | SKAINET or JLama | No network dependency, data stays on device |
+| Offline/privacy first | SKAINET | No network dependency, data stays on device |
 | Lowest latency | SKAINET (KLlama) | Kotlin-native inference, no HTTP overhead |
 | Easiest setup | REST_API (Ollama) | Single `ollama pull` command, broad model catalog |
 | Best quality ceiling | REST_API (cloud) | Acceptable latency/cost trade-off, internet available |
-| Pure Java / no native libs | JLama | Environments where JNI/native binaries are restricted |
 
 ### Quality thresholds ("good enough" for workshop use)
 

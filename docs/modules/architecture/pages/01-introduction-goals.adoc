@@ -90,7 +90,7 @@ graph LR
 
 |5
 |*Extensibility*
-|Pluggable LLM architecture via `LLMService` interface. Currently implemented with three backends: SKaiNET kllama (local), REST API (OpenAI-compatible), and JLama (pure Java).
+|Pluggable LLM architecture via `LLMService` interface. Production backends: SKaiNET kllama (in-process JVM, embedded GGUF) and REST API (OpenAI-compatible — Ollama, LM Studio, OpenAI). Benchmark-only alternative engines (Deliverance, qxotic) plug into the same interface for engine-independence comparisons.
 |===
 
 IMPORTANT: Privacy is non-negotiable. The embedded AI engine (SKaiNET kllama) exists specifically to ensure commit data never leaves the developer's machine. Cloud-based AI services are explicitly excluded from this architecture.

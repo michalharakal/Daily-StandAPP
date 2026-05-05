@@ -67,7 +67,6 @@ object LLMServiceFactory {
         return when (backend) {
             LLMBackendType.SKAINET -> SKaiNetLLMService.create(modelPath)
             LLMBackendType.REST_API -> RestApiLLMService(baseUrl, model, apiKey)
-            LLMBackendType.JLAMA -> JLamaService.create(modelPath, tokenizerPath)
         }
     }
 
@@ -139,7 +138,7 @@ class SkainetKLlamaService {
 
 |`MCP_LLM_BACKEND`
 |_(required)_
-|Backend: `SKAINET`, `REST_API`, `JLAMA`
+|Backend: `SKAINET`, `REST_API`
 
 |`MCP_LLM_MODEL_PATH`
 |_(required for SKAINET)_

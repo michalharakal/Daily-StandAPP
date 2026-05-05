@@ -400,7 +400,7 @@ graph TB
 |15 JSON scenarios (normal, edge, stress) in `bench/` directory
 
 |*Multi-Backend*
-|Compares SKaiNET, JLama, and REST API backends side-by-side
+|Compares SKaiNET (production) and REST API (Ollama/LM Studio/OpenAI) side-by-side. Benchmark-only alternative engines (Deliverance, qxotic) wired in via `:benchmark` to demonstrate engine-independence.
 
 |*Quality Scoring*
 |JSON validity, schema compliance, hallucination detection

@@ -76,40 +76,45 @@ Accepted
 === Context
 Need local LLM inference without cloud dependencies. Options considered:
 * llama.cpp (C++ with JNI bindings)
-* JLama (Pure Java)
-* SKaiNET kllama (Pure Kotlin)
+* JVM-native engines (SKaiNET kllama, Deliverance, qxotic)
+* OpenAI-compatible local servers (Ollama, LM Studio, vLLM)
 
 === Decision
-Define `LLMService` interface for pluggable LLM backends. Use `LLMServiceFactory` to instantiate backends based on the `MCP_LLM_BACKEND` environment variable.
+Define `LLMService` interface for pluggable LLM backends. Use `LLMServiceFactory` to instantiate the production backends based on the `MCP_LLM_BACKEND` environment variable. Alternative JVM engines used only for benchmarking plug into the same interface from `:benchmark` so they don't pollute the production classpath.
 
-=== Current Implementations
-* **SKaiNET kllama** (`SKaiNetLLMService`) - Pure Kotlin, GGUF model loading, SIMD via Vector API
-* **REST API** (`RestApiLLMService`) - OpenAI-compatible HTTP endpoints (Ollama, llama.cpp server, LM Studio, vLLM)
-* **JLama** (`JLamaService`) - Pure Java LLM inference
+=== Production Implementations
+* **SKaiNET kllama** (`SKaiNetLLMService`) - Pure Kotlin, GGUF model loading, SIMD via Vector API; also `ToolCallingLLMService` for opt-in agent loop (ADR-011).
+* **REST API** (`RestApiLLMService`) - OpenAI-compatible HTTP endpoints (Ollama, llama.cpp server, LM Studio, vLLM, OpenAI cloud)
+
+=== Benchmark-Only Alternative Engines
+* **Deliverance** — pure-Java JVM engine; wired into `:benchmark` to demonstrate engine-independence of the `LLMService` abstraction.
+* **qxotic** — alternative JVM engine; same purpose, different code path.
 
 === Rationale
 * Pluggable architecture enables comparing multiple backends
 * SKaiNET: Pure Kotlin, no native dependencies, SIMD acceleration via Java Vector API
 * REST API: Leverage existing local inference servers
-* JLama: Pure Java alternative for environments where Kotlin is not preferred
+* Deliverance / qxotic: prove the abstraction holds across genuinely different in-process JVM engines, without forcing alternative-engine deps into the production fat JAR
 
 === Consequences
-* (+) Three production backends available
-* (+) Benchmark module can compare backends side-by-side
-* (+) No native library management with SKaiNET/JLama
-* (+) REST API allows using Ollama and other local servers
+* (+) Two production backends available; multiple in-benchmark alternatives prove the seam
+* (+) Benchmark module can compare backends side-by-side without changing the production build
+* (+) No native library management for the SKaiNET CPU path (Panama Vector); native FFM kernels are an opt-in upgrade
 * (-) Requires JDK 21+ for Vector API (SKaiNET)
+* (-) Benchmark-only engines may lag releases on Maven Central; need nested-git + `mavenLocal()` install for them
 
 [mermaid]
 ----
 graph LR
     IFACE[LLMService<br/>interface] --> SKAINET[SKaiNetLLMService]
     IFACE --> REST[RestApiLLMService]
-    IFACE --> JLAMA[JLamaService]
+    IFACE --> DELIVERANCE[DeliveranceLLMService<br/>:benchmark only]
+    IFACE --> QXOTIC[QxoticLLMService<br/>:benchmark only]
 
     style SKAINET fill:#c8e6c9
     style REST fill:#e3f2fd
-    style JLAMA fill:#fff3e0
+    style DELIVERANCE fill:#fff3e0,stroke-dasharray: 5 5
+    style QXOTIC fill:#fff3e0,stroke-dasharray: 5 5
 ----
 
 == ADR-004: MCP Protocol for AI Assistant Integration
@@ -225,7 +230,7 @@ tasks.named<Jar>("jvmJar") {
 Accepted
 
 === Context
-The existing LLM integration options (SKaiNET kllama, JLama, REST API client) are tightly coupled to the application's internal `LLMService` interface. External tools and standard OpenAI-compatible clients cannot interact with the system directly.
+The existing LLM integration options (SKaiNET kllama, REST API client) are tightly coupled to the application's internal `LLMService` interface. External tools and standard OpenAI-compatible clients cannot interact with the system directly.
 
 === Decision
 Add a separate `cloud-api` module group providing an OpenAI-compatible REST API server, client, model DTOs, and Koog agent integration. The modules are:
@@ -267,7 +272,7 @@ Use environment variables as the primary configuration mechanism via `LLMService
 === Environment Variables
 [source,bash]
 ----
-MCP_LLM_BACKEND=SKAINET          # or REST_API, JLAMA
+MCP_LLM_BACKEND=SKAINET          # or REST_API
 MCP_LLM_MODEL_PATH=/path/to/model.gguf
 MCP_LLM_REST_BASE_URL=http://localhost:11434
 MCP_LLM_REST_MODEL=llama3.2:3b

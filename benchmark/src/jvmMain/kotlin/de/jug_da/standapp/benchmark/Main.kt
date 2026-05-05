@@ -22,7 +22,6 @@ import java.io.File
  * - BENCH_CLOUD_MODEL       — cloud model name (default: gpt-4o-mini)
  * - BENCH_CLOUD_API_KEY     — optional cloud Bearer token (falls back to OPENAI_API_KEY)
  * - MCP_LLM_MODEL_PATH      — GGUF model path for SKAINET backend
- * - BENCH_JLAMA_MODEL       — HuggingFace model ID for JLAMA backend (default: mistralai/Mistral-7B-Instruct-v0.3)
  */
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")

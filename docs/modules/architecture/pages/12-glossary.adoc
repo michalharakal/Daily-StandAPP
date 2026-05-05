@@ -127,8 +127,11 @@
 |*LM Studio*
 |Desktop application for running local LLMs with an OpenAI-compatible API.
 
-|*JLama*
-|Pure Java implementation for LLM inference.
+|*Deliverance*
+|Pure-Java JVM LLM inference engine (https://github.com/edwardcapriolo/deliverance). Wired into `:benchmark` only — used to demonstrate engine-independence of the `LLMService` abstraction.
+
+|*qxotic*
+|Alternative JVM LLM inference engine (https://github.com/qxoticai/qxotic). Wired into `:benchmark` only, same purpose as Deliverance.
 
 |*Antora*
 |Documentation site generator designed for creating documentation portals from AsciiDoc content.
