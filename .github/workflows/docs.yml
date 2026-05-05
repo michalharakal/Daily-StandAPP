@@ -1,0 +1,69 @@
+name: Build and Deploy Documentation
+
+# Triggers:
+#   - push to main/develop with changes under docs/ or this workflow itself
+#   - PRs against main/develop with changes under docs/ (build only, no deploy)
+#   - manual via the Actions tab
+#
+# IMPORTANT: For deploys to actually publish, repo Settings → Pages → Source
+# must be set to "GitHub Actions" (not "Deploy from a branch"). The legacy
+# `site` branch source is unused by this workflow.
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build documentation with Docker
+        run: |
+          cd docs
+          docker build -t dailystandapp-docs .
+          docker run --rm \
+            -v "${{ github.workspace }}:/project" \
+            -w /project/docs \
+            dailystandapp-docs \
+            antora-playbook.yml
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/build/site
+
+  deploy:
+    # Deploy only from the main branches; PR builds stop at the upload step
+    # so previews aren't pushed to the live site.
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
