@@ -21,5 +21,6 @@
 * Explanation
 ** xref:explanation/divio-overview.adoc[Divio framework]
 ** xref:explanation/why-prompts-matter-on-small-models.adoc[Why prompts matter on small models]
+** xref:explanation/inference-stages.adoc[Inference stages: tokens → prefill → decode]
 ** xref:explanation/agent-loop-internals.adoc[Agent-loop internals]
 ** xref:explanation/negative-sample-2026-05-05.adoc[Negative sample (2026-05-05)]

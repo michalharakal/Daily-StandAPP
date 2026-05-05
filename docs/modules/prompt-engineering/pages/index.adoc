@@ -84,6 +84,9 @@ Cross-references go both ways:
 |Default vs tool-calling runtime paths
 |xref:architecture:06-runtime-view.adoc[§6.2 + §6.5]
 
+|Inference pipeline (token → prefill → decode → tool → decode)
+|xref:explanation/inference-stages.adoc[Inference stages] (this module)
+
 |Agent loop, chat-template internals
 |xref:architecture:08-crosscutting-concepts.adoc[§8.7]
 

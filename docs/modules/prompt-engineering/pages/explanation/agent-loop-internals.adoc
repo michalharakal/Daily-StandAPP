@@ -8,6 +8,15 @@ xref:architecture:08-crosscutting-concepts.adoc[Architecture §8.7] —
 that section is structural ("the loop has these components"); this page
 is dynamic ("the loop runs through these steps").
 
+NOTE: This page treats `runtime.generateUntilStop()` as a single black-box
+call — render-prompt → generate → parse-tools → repeat. The level *below*
+that — what the model actually does between "tokens go in" and "tokens
+come out" (tokenization, prefill, decode, KV cache) — is documented in
+xref:explanation/inference-stages.adoc[Inference stages]. Read that one
+first if you've never thought about the inference pipeline; it's the
+prerequisite for understanding why the agent loop's per-round costs are
+shaped the way they are.
+
 == One round of the loop
 
 [mermaid]
