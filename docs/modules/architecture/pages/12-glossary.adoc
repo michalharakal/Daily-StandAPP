@@ -131,7 +131,7 @@
 |Pure-Java JVM LLM inference engine (https://github.com/edwardcapriolo/deliverance). Wired into `:benchmark` only — used to demonstrate engine-independence of the `LLMService` abstraction.
 
 |*qxotic*
-|Alternative JVM LLM inference engine (https://github.com/qxoticai/qxotic). Wired into `:benchmark` only, same purpose as Deliverance.
+|JVM-native LLM inference toolkit (https://github.com/qxoticai/qxotic). Wired into `:benchmark` only via subprocess wrapper — the runnable inference lives in qxotic's `examples` module's `Llama32CliQ8_0` CLI, which our `QxoticLLMService` shells out to once per generate call. Demonstrates the `LLMService` abstraction holds even across engines whose runtime surface is a CLI binary, not a library.
 
 |*Antora*
 |Documentation site generator designed for creating documentation portals from AsciiDoc content.

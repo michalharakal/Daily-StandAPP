@@ -32,6 +32,13 @@ import java.io.File
  *                              Requires building with `-Pdeliverance.enabled=true`
  *                              and `scripts/setup-bench-engines.sh` having installed
  *                              the deliverance jars to ~/.m2 first.
+ * - BENCH_QXOTIC_MODEL      — Absolute path to a Llama 3.2 Q8_0 GGUF for the QXOTIC
+ *                              engine, or the literal string "embedded" to reuse the
+ *                              GGUF that the SKAINET path extracts to ~/.cache/standapp.
+ *                              Requires building with `-Pqxotic.enabled=true` and
+ *                              `scripts/setup-bench-engines.sh` having cloned + built
+ *                              qxotic, with external/qxotic-classpath.txt produced.
+ * - BENCH_QXOTIC_TIMEOUT_MS  — Override the qxotic subprocess timeout (default 600000).
  */
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
@@ -112,6 +119,18 @@ fun main() {
             println("WARN: BENCH_DELIVERANCE_MODEL=$deliveranceModel set but DeliveranceLLMService is not on the classpath.")
             println("      Re-run with: ./gradlew :benchmark:jvmRun -Pdeliverance.enabled=true")
             println("      And first install the deliverance jars: ./scripts/setup-bench-engines.sh")
+        }
+    }
+
+    val qxoticModel = System.getenv("BENCH_QXOTIC_MODEL")
+    if (qxoticModel != null && (requestedBackends == null || "QXOTIC" in requestedBackends)) {
+        val factory = BenchmarkEngineRegistry.qxoticFactory(qxoticModel)
+        if (factory != null) {
+            backends["QXOTIC"] = factory
+        } else {
+            println("WARN: BENCH_QXOTIC_MODEL=$qxoticModel set but QxoticLLMService is not on the classpath.")
+            println("      Re-run with: ./gradlew :benchmark:jvmRun -Pqxotic.enabled=true")
+            println("      And first install qxotic + capture classpath: ./scripts/setup-bench-engines.sh")
         }
     }
 

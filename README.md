@@ -70,8 +70,8 @@ The `:benchmark` module evaluates local LLM backends for standup summary generat
   - **LM Studio** or **Ollama** running locally or on a remote machine, or
   - **SKAINET** with a GGUF model file on disk
 - Optional benchmark-only alternative engines:
-  - **Deliverance** — pure-Java JVM inference. Requires `./scripts/setup-bench-engines.sh` (clones the repo + `mvn install -DskipTests` into `~/.m2`), then build with `-Pdeliverance.enabled=true`.
-  - **qxotic** — alternative JVM inference. Same pattern (placeholder until upstream POM publishes).
+  - **Deliverance** — pure-Java JVM inference. Requires `./scripts/setup-bench-engines.sh` (clones the repo + `mvn install` into `~/.m2`), then build with `-Pdeliverance.enabled=true`. In-process; auto-downloads HuggingFace models.
+  - **qxotic** — JVM-native LLM toolkit. Same setup script, then build with `-Pqxotic.enabled=true`. Subprocess-launched (the runnable inference lives in qxotic's `examples` module's `Llama32CliQ8_0` CLI; we shell out to it once per generate call). Slower than in-process — model is reloaded per call — but proves the abstraction holds across very different engine designs.
 
 ### Unit Tests
 
