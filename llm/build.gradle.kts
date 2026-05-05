@@ -84,13 +84,37 @@ val embeddedModelFile = layout.projectDirectory.file(
     "src/jvmMain/resources/models/Llama-3.2-1B-Instruct-Q8_0.gguf"
 ).asFile
 
+// Resolve `uv` on PATH so we can skip the download cleanly on environments
+// (CI, sandboxed builds) that don't have it. Setting STANDAPP_SKIP_MODEL_DOWNLOAD=1
+// also disables the task — useful when iterating without needing the embedded GGUF.
+val uvOnPath: String? = System.getenv("PATH")
+    ?.split(File.pathSeparatorChar)
+    ?.map { File(it, "uv") }
+    ?.firstOrNull { it.canExecute() }
+    ?.absolutePath
+val skipModelDownload: Boolean =
+    System.getenv("STANDAPP_SKIP_MODEL_DOWNLOAD") == "1" || uvOnPath == null
+
 val prepareModel = tasks.register<Exec>("prepareModel") {
     description = "Download Llama-3.2-1B-Instruct-Q8_0.gguf into jvmMain resources via uv."
     workingDir = rootDir
     commandLine("uv", "run", "scripts/download-model.py")
     inputs.file(rootDir.resolve("scripts/download-model.py"))
     outputs.file(embeddedModelFile)
-    onlyIf { !embeddedModelFile.exists() }
+    onlyIf {
+        when {
+            embeddedModelFile.exists() -> false
+            skipModelDownload -> {
+                logger.lifecycle(
+                    "[prepareModel] skipping model download — " +
+                        if (uvOnPath == null) "`uv` not on PATH"
+                        else "STANDAPP_SKIP_MODEL_DOWNLOAD=1"
+                )
+                false
+            }
+            else -> true
+        }
+    }
 }
 
 tasks.named("jvmProcessResources").configure {
