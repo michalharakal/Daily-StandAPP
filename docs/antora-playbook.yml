@@ -1,7 +1,7 @@
 site:
   title: DailyStandApp Documentation
-  url: https://jug-da.github.io/DailyStandApp-MCP
-  start_page: dailystandapp:architecture:index.adoc
+  url: https://michalharakal.github.io/Daily-StandAPP
+  start_page: architecture:architecture:index.adoc
 
 content:
   sources:
