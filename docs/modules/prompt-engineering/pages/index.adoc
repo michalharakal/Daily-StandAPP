@@ -48,6 +48,21 @@ Trying tool calling:: xref:tutorials/first-tool-call.adoc[Tutorials → Your fir
 
 Picking a model:: xref:reference/model-selection.adoc[Reference → Model selection].
 
+Engine-independence workshop (4 exercises, ~2 hours total):: Each
+exercise runs the same 15-case benchmark against one engine, with
+explicit copy-paste setup. Suitable for Java devs not familiar with
+Kotlin or Gradle — Gradle wrapper, `-P` properties, and `BENCH_*` env
+vars are explained inline.
++
+. xref:tutorials/benchmark-skainet.adoc[SKAINET] — start here; zero
+  external setup.
+. xref:tutorials/benchmark-rest-api.adoc[REST_API] — Ollama or LM
+  Studio; remote inference.
+. xref:tutorials/benchmark-deliverance.adoc[Deliverance] — second
+  in-process JVM engine; benchmark-only.
+. xref:tutorials/benchmark-qxotic.adoc[qxotic] — subprocess wrapper;
+  proves the seam holds even when the engine is a CLI.
+
 Stuck::
   - Output looks weird → xref:how-to/debug-with-stage-logs.adoc[How-to → Debug with stage logs]
   - Want a different model → xref:how-to/switch-chat-template.adoc[How-to → Switch chat template]

@@ -3,6 +3,10 @@
 * Tutorials
 ** xref:tutorials/getting-started.adoc[Getting started]
 ** xref:tutorials/first-tool-call.adoc[Your first tool call]
+** xref:tutorials/benchmark-skainet.adoc[Exercise: benchmark with SKAINET]
+** xref:tutorials/benchmark-rest-api.adoc[Exercise: benchmark with Ollama / LM Studio]
+** xref:tutorials/benchmark-deliverance.adoc[Exercise: benchmark with Deliverance]
+** xref:tutorials/benchmark-qxotic.adoc[Exercise: benchmark with qxotic]
 * How-to guides
 ** xref:how-to/add-a-new-tool.adoc[Add a new tool]
 ** xref:how-to/switch-chat-template.adoc[Switch chat template]

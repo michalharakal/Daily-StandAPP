@@ -1,0 +1,220 @@
+= Exercise: Benchmark with qxotic (subprocess wrapper)
+:toc: left
+:icons: font
+
+**Engine:** QxoticLLMService (subprocess around qxotic's
+`Llama32CliQ8_0` example) +
+**Goal:** add a fourth engine to the comparison — one whose runnable
+inference lives in a CLI binary, not a library API. Demonstrates that
+the `LLMService` abstraction holds even when the integration crosses
+a process boundary, not just module/JVM boundaries. **Time:** ~30–60
+min for setup + a slow run.
+
+== Prerequisites
+
+[cols="1,3"]
+|===
+|Need |Why
+
+|JDK 25
+|qxotic targets JDK 25; both `mvn install` and the spawned subprocess
+need it. Verify `java -version`.
+
+|Maven 3.9+
+|qxotic has no Maven Central release; we install from source. The
+setup script invokes `mvn install` for you. Verify `mvn -v`.
+
+|A Llama 3.2 Q8_0 GGUF
+|qxotic's CLI takes a local GGUF path. Easiest source: run the
+SKAINET exercise once to extract the embedded GGUF to
+`~/.cache/standapp/models/Llama-3.2-1B-Instruct-Q8_0.gguf`. Reuse that
+file here.
+
+|~3 GB free disk
+|For the qxotic source clone, Maven cache, and the GGUF (already
+present if you ran the SKAINET exercise).
+
+|Internet access
+|For the initial git clone + `mvn install` of transitive deps.
+|===
+
+== For Java developers — what this engine is
+
+qxotic is a JVM-native LLM inference toolkit
+(https://github.com/qxoticai/qxotic). Its public library API
+(`jota`, `gguf`, `toknroll-*`) is low-level — tensors, kernels,
+memory management. The runnable inference logic for Llama 3.2 lives
+in the project's `examples` module as a single 3835-line CLI
+(`Llama32CliQ8_0.java`) whose helper classes (`LoadedModel`,
+`Llama32Model`, `Sampler`) are `private static final` nested classes.
+Not callable as a library.
+
+We can either:
+
+. Vendor those helpers into our codebase (multi-day port; fragile).
+. Spawn the CLI as a subprocess, pass the prompt as a CLI argument,
+  capture stdout. (~hour, slow per-call but real.)
+
+This exercise is option 2. `QxoticLLMService.generate()` shells out to
+`java -cp <captured classpath> com.qxotic.jota.examples.llama.Llama32CliQ8_0`
+once per case. Each call pays the JVM startup + GGUF load cost
+(~5–15 s) on top of inference. The benchmark reports those numbers
+honestly — qxotic's latency line item will be larger, and that's
+*the truth of the integration today*.
+
+== Steps
+
+=== 1. Install qxotic + capture its runtime classpath
+
+[source,bash]
+----
+./scripts/setup-bench-engines.sh
+----
+
+What this does:
+
+. Clones https://github.com/qxoticai/qxotic into `external/qxotic/`.
+. Runs `mvn install -DskipTests=true -Dtoknroll.skipDependentTests=true -fae -pl examples -am` —
+  installs the modules `examples` depends on and tolerates flaky
+  tiktoken-resource tests. (`-DskipTests` alone wasn't enough;
+  qxotic's `toknroll-core` uses a custom skip property.)
+. Runs `mvn dependency:build-classpath` once to capture qxotic's
+  runtime classpath into `external/qxotic-classpath.txt`. The
+  subprocess wrapper reads this file at construction time so we don't
+  re-resolve the classpath on every `generate()` call.
+
+First-time install takes 5–15 minutes. Re-runs are nearly instant.
+
+=== 2. Verify the wrapper can launch qxotic at all
+
+Before paying for a 15-case benchmark, sanity-check with one tiny
+prompt:
+
+[source,bash]
+----
+java --enable-native-access=ALL-UNNAMED \
+     --add-modules=jdk.incubator.vector \
+     -cp "$(cat external/qxotic-classpath.txt)" \
+     com.qxotic.jota.examples.llama.Llama32CliQ8_0 \
+     --model "$HOME/.cache/standapp/models/Llama-3.2-1B-Instruct-Q8_0.gguf" \
+     --prompt "Say hi in three words." \
+     --max-tokens 16
+----
+
+If this prints something (even just timing diagnostics on stdout), the
+plumbing works. If it errors with `model file not found`, run the
+xref:tutorials/benchmark-skainet.adoc[SKAINET exercise] once first to
+extract the embedded GGUF.
+
+=== 3. Run the benchmark with qxotic enabled
+
+[source,bash]
+----
+BENCH_BACKENDS=QXOTIC \
+BENCH_QXOTIC_MODEL="$HOME/.cache/standapp/models/Llama-3.2-1B-Instruct-Q8_0.gguf" \
+BENCH_RUNS=2 \
+BENCH_CASES=case-01,case-03 \
+    ./gradlew :benchmark:jvmRun -Pqxotic.enabled=true --console=plain
+----
+
+Important caveats baked into the example above:
+
+* **`BENCH_RUNS=2`** instead of the default 5. Each call spawns a
+  fresh JVM and reloads the model — at ~10 s overhead per call,
+  default settings make a single case take 5+ minutes.
+* **`BENCH_CASES=case-01,case-03`** restricts to two short cases for a
+  first run. Drop the filter once you know the pipeline works.
+
+You can also use the literal string `embedded` to default to the
+SKAINET-cached GGUF without typing the path:
+
+[source,bash]
+----
+BENCH_QXOTIC_MODEL=embedded ./gradlew :benchmark:jvmRun -Pqxotic.enabled=true
+----
+
+=== 4. Inspect the report
+
+[source,bash]
+----
+cat benchmark-results/benchmark-report.md
+----
+
+== What you should see
+
+A `QXOTIC` row in the comparison table. Compared to SKAINET on the
+same hardware:
+
+* **Latency p50** is typically 5–10× SKAINET's because of the
+  per-call JVM startup + model reload. This is the cost of subprocess
+  integration, transparently visible in the metrics.
+* **Auto pass rate** depends on whether qxotic's Q8_0 kernels
+  successfully JIT on your JVM. On JDK 25 with `--add-modules=jdk.incubator.vector`,
+  some configurations log
+  `WARN: disabling fast llama.gemv.q8_0 kernel; … Cause: Failed to load Java kernel`
+  on stderr — when that happens, qxotic falls back to a slow path and
+  may produce degenerate output. The wrapper returns whatever qxotic
+  generated; the benchmark scoring honestly reports the result.
+
+== Stretch goals
+
+* Run all four engines in one go (assuming you've also done the
+  Deliverance and REST_API exercises):
++
+[source,bash]
+----
+BENCH_BACKENDS=SKAINET,REST_API,DELIVERANCE,QXOTIC \
+BENCH_LOCAL_URL=http://localhost:11434/v1 \
+BENCH_LOCAL_MODEL=llama3.2:3b \
+BENCH_DELIVERANCE_MODEL=TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+BENCH_QXOTIC_MODEL=embedded \
+BENCH_RUNS=3 \
+BENCH_CASES=case-01,case-03,case-08 \
+    ./gradlew :benchmark:jvmRun \
+        -Pdeliverance.enabled=true \
+        -Pqxotic.enabled=true \
+        --console=plain
+----
+
+* Inspect the qxotic CLI's actual stdout: replace the wrapper with the
+  raw command from step 2 and look at what comes out. Then read
+  `QxoticLLMService.extractModelOutput()` to see how the wrapper
+  separates timing diagnostics from model text.
+
+* Investigate the kernel-load warning — try different `--add-opens`
+  combinations or check qxotic's issue tracker. If you find a fix,
+  the Q8_0 kernel should JIT and qxotic's tok/s should rise from
+  ~0.3 to a couple of orders of magnitude faster.
+
+== When this tutorial breaks
+
+* `external/qxotic-classpath.txt missing` (from the wrapper) → setup
+  script either failed or wasn't run. Re-run
+  `./scripts/setup-bench-engines.sh` and watch for `✓ qxotic
+  classpath captured (… bytes)` near the end.
+* `Could not find or load main class
+  com.qxotic.jota.examples.llama.Llama32CliQ8_0` → the captured
+  classpath doesn't include the examples jar. Inspect:
+  `tail -c 200 external/qxotic-classpath.txt` should end with
+  `:.../com/qxotic/examples/0.1.0/examples-0.1.0.jar`.
+* `qxotic exited 1` with stderr about kernel load → the build *ran*
+  but the optimized Q8_0 kernel didn't compile on this JVM. Generation
+  is still happening, just slowly with potentially degenerate output.
+  Treat as expected for now.
+* Subprocess hangs > 10 min → cancel with Ctrl+C; the CLI may be
+  stuck in a generation loop. Override the wrapper's per-call timeout
+  with `BENCH_QXOTIC_TIMEOUT_MS=60000` (one minute) to cut runs short.
+
+== After all four exercises
+
+You've now run the same 15-case benchmark against four genuinely
+different engine integrations:
+
+* SKAINET — Kotlin in-process, embedded GGUF (production)
+* REST_API — HTTP client to an OpenAI-shaped server (production)
+* Deliverance — Java in-process, auto-downloaded HF model (benchmark only)
+* qxotic — subprocess around a CLI binary, local GGUF (benchmark only)
+
+That's the engine-independence story made concrete. The
+xref:reference/model-selection.adoc[Model selection reference] has the
+broader decision framework for picking among them in real use.

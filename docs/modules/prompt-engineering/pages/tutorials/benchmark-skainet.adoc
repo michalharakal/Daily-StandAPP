@@ -1,0 +1,141 @@
+= Exercise: Benchmark with SKAINET
+:toc: left
+:icons: font
+
+**Engine:** SKaiNET kllama (Kotlin in-process, embedded GGUF) +
+{empty}**Goal:** run the 15-case benchmark suite against the production SKAINET
+backend with zero external setup. **Time:** ~10–20 min, mostly model
+warm-up and inference.
+
+NOTE: This is the easiest of the four engine tutorials — no third-party
+servers, no manual model downloads. Start here if you've never run the
+benchmark before.
+
+== Prerequisites
+
+[cols="1,3"]
+|===
+|Need |Why
+
+|JDK 21 or newer
+|The benchmark needs Java's incubator Vector API (Panama) for SKaiNET's
+SIMD path. You can verify with `java -version`.
+
+|Disk space ~1.5 GB
+|First run extracts the embedded Llama 3.2 1B Q8_0 GGUF (~1.3 GB) to
+`~/.cache/standapp/models/`. Subsequent runs reuse the cached file.
+
+|*Not* required
+|Gradle, Kotlin, Maven, Docker. The repo uses the Gradle Wrapper —
+`./gradlew` auto-downloads the right Gradle version on first run.
+|===
+
+== For Java developers — what `./gradlew` is
+
+If you're coming from Maven, the Gradle Wrapper is the equivalent of the
+Maven Wrapper: a small script + JAR committed to the repo that
+self-bootstraps the right Gradle version. You don't need Gradle
+installed; running `./gradlew` (or `gradlew.bat` on Windows) is enough.
+
+`-P<key>=<value>` on the command line is Gradle's project-property flag
+— think of it as Maven's `-Dproperty=value` but scoped to Gradle's
+build script. `-e KEY=value` is *not* a Gradle thing; that's a shell
+convention some examples use to set an env var for one command. Both
+forms appear in this exercise.
+
+== Steps
+
+=== 1. Clone the repo and verify Java
+
+[source,bash]
+----
+git clone https://github.com/michalharakal/Daily-StandAPP.git
+cd Daily-StandAPP
+java -version   # should print 21.x.x or newer
+----
+
+=== 2. Run the benchmark with SKAINET only
+
+[source,bash]
+----
+BENCH_BACKENDS=SKAINET BENCH_RUNS=3 \
+    ./gradlew :benchmark:jvmRun --console=plain
+----
+
+`BENCH_BACKENDS=SKAINET` restricts the run to one backend so the
+exercise stays under 20 min (the default is "all available," which can
+take an hour with a cloud baseline). `BENCH_RUNS=3` lowers the
+runs-per-case from the default 5 to keep things quick. Drop both for a
+real benchmark.
+
+NOTE: First run extracts the embedded GGUF. You'll see
+`[EmbeddedModelLoader] Extracting … to ~/.cache/standapp/models/…` and
+a 5–15 s pause. Subsequent runs skip extraction.
+
+=== 3. Inspect the report
+
+[source,bash]
+----
+ls benchmark-results/
+# benchmark-report.md
+# benchmark-results.csv
+
+# Markdown comparison table
+cat benchmark-results/benchmark-report.md | head -40
+----
+
+== What you should see
+
+A Markdown report with a table like:
+
+[source,markdown]
+----
+## Comparison Table
+
+| Backend | Faithfulness | Completeness | Structure | Auto pass% | Latency p50 | Latency p95 | Throughput | Determinism |
+|---------|--------------|--------------|-----------|------------|-------------|-------------|------------|-------------|
+| SKAINET | 0.00 | 0.00 | 0.00 | 0.66 | 4287 ms | 9420 ms | 14.2 c/s | 0.71 |
+----
+
+The numbers will vary by hardware. Things to notice:
+
+* **Auto pass rate** is heuristic ("did the output have the right
+  Markdown headings? are commit IDs valid? no hallucinations?"). The
+  human-scored columns (`Faithfulness`/`Completeness`/`Structure`) read
+  `0.00` because they need manual annotation — this is a known
+  benchmark limitation, not a quality drop.
+* **Latency p50 / p95** is wall-time per case in milliseconds.
+* **Determinism** is Jaccard similarity on word sets across runs (1.0 =
+  identical output, 0.0 = no overlap). At `temp=0.6` (the floor enforced
+  by SKAINET's raw-session path) you'll see 0.4–0.8 typically.
+
+== Stretch goals
+
+* Try `BENCH_RUNS=5` (default) and compare determinism with `BENCH_RUNS=10`.
+* Filter to a single case: `BENCH_CASES=case-08` (the 32-commit stress test).
+* Add cold-start handling: `BENCH_WARMUP=1` discards the first run per
+  case (JIT bias). Compare the latency p50 with and without.
+* Set a different model via `MCP_LLM_MODEL_PATH` to point at a 3B GGUF
+  you've downloaded yourself (any Llama-3 family; the Llama 3 turn-tag
+  format is hard-coded in `SKaiNetLLMService`).
+
+== When this tutorial breaks
+
+* `Could not find or load main class` → JDK is < 21 or the wrapper
+  picked the wrong toolchain. Confirm `java -version` and `./gradlew
+  --version`.
+* `OutOfMemoryError` during inference → SKAINET's KV cache for the 1B
+  model needs ~6 GB heap. The build sets `-Xmx12g` for `:benchmark:jvmRun`
+  but if you're running on a memory-constrained machine, drop
+  `BENCH_RUNS=1` and `BENCH_CASES=case-03` (single-commit) to verify
+  the path before scaling up.
+* Incredibly slow first run (>5 min for `case-01`) → the native FFM
+  kernel didn't load and Panama Vector is doing all the math. Check
+  `:llm:build.gradle.kts` ensures `libs.skainet.backend.native.cpu` is
+  on the runtime classpath.
+
+== Next exercise
+
+* xref:tutorials/benchmark-rest-api.adoc[Benchmark with an
+  OpenAI-compatible server (Ollama/LM Studio)] — same suite, remote
+  inference.

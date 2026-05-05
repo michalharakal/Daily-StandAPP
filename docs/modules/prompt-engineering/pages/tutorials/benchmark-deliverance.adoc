@@ -1,0 +1,177 @@
+= Exercise: Benchmark with Deliverance (in-process Java)
+:toc: left
+:icons: font
+
+**Engine:** DeliveranceLLMService (pure-Java JVM inference) +
+**Goal:** add a second in-process JVM engine to the comparison —
+demonstrating that the `LLMService` abstraction holds across
+genuinely different in-process engines, not just SKAINET. **Time:**
+~30–60 min, mostly first-time `mvn install` of the Deliverance source.
+
+== Prerequisites
+
+[cols="1,3"]
+|===
+|Need |Why
+
+|JDK 25
+|Deliverance's `core` module compiles for Java 25. Earlier JDKs will
+fail to install. Verify with `java -version`.
+
+|Maven 3.9+
+|Deliverance has no Maven Central release; we install it from source
+into `~/.m2`. The setup script invokes `mvn install` for you, but it
+needs `mvn` on `$PATH`. Verify with `mvn -v`.
+
+|~5 GB free disk
+|For the cloned source, Maven's `~/.m2` cache, and the HuggingFace
+model that Deliverance auto-downloads on first call (typically
+TinyLlama 1.1B Q8 → ~1.2 GB).
+
+|Internet access
+|For the initial git clone + `mvn install` of transitive deps + the
+HuggingFace model download.
+|===
+
+== For Java developers — what we're doing here
+
+`scripts/setup-bench-engines.sh` is a thin shell helper that:
+
+. Clones https://github.com/edwardcapriolo/deliverance into
+  `external/deliverance/` (gitignored).
+. Runs `mvn install -DskipTests=true …` in that clone, which publishes
+  Deliverance's jars to your `~/.m2/repository`.
+. Deliverance's `0.0.4-SNAPSHOT` artifacts then resolve from
+  `mavenLocal()` when our `:benchmark` Gradle module asks for them.
+
+The Gradle property `-Pdeliverance.enabled=true`:
+
+. Adds `mavenLocal()` to `:benchmark`'s repositories (so the
+  Deliverance jars resolve).
+. Includes `benchmark/src/jvmMain/deliverance/` as an extra source
+  directory (where `DeliveranceLLMService.kt` lives).
+. Adds `io.teknek.deliverance:core` and `:safetensors` as
+  `implementation` deps.
+
+When `-Pdeliverance.enabled` is unset (default), none of the above
+happens — the Deliverance source set isn't compiled, no Deliverance
+deps are needed, no `mavenLocal()` is consulted. CI passes without
+ever knowing Deliverance exists.
+
+== Steps
+
+=== 1. Install Deliverance into your local Maven cache
+
+[source,bash]
+----
+./scripts/setup-bench-engines.sh
+----
+
+First-time output (truncated):
+
+[source]
+----
+→ cloning deliverance into external/deliverance
+→ mvn install deliverance (skipping tests; this can take a few minutes)
+✓ deliverance installed
+✓ qxotic already in ~/.m2 — skipping        # if you ran the qxotic exercise first
+----
+
+The `mvn install` step takes 3–8 minutes on first run. Repeat
+invocations are nearly instant — the script checks
+`~/.m2/repository/io/teknek/deliverance/core/0.0.4-SNAPSHOT/core-0.0.4-SNAPSHOT.jar`
+and skips if present.
+
+=== 2. Run the benchmark with Deliverance enabled
+
+[source,bash]
+----
+BENCH_BACKENDS=DELIVERANCE \
+BENCH_DELIVERANCE_MODEL=TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+BENCH_RUNS=3 \
+    ./gradlew :benchmark:jvmRun -Pdeliverance.enabled=true --console=plain
+----
+
+`BENCH_DELIVERANCE_MODEL` takes a HuggingFace `owner/name` path.
+Deliverance auto-downloads the model on first generate() call —
+expect a 60–120 s pause at the start of the first case while the
+model lands in `~/.cache/deliverance/`. Subsequent runs reuse it.
+
+If you forget the `-Pdeliverance.enabled=true` flag you'll see:
+
+[source]
+----
+WARN: BENCH_DELIVERANCE_MODEL=… set but DeliveranceLLMService is not on the classpath.
+      Re-run with: ./gradlew :benchmark:jvmRun -Pdeliverance.enabled=true
+      And first install the deliverance jars: ./scripts/setup-bench-engines.sh
+----
+
+That's the reflection-based registry telling you the gated source set
+wasn't built in.
+
+=== 3. Inspect the report
+
+[source,bash]
+----
+cat benchmark-results/benchmark-report.md
+----
+
+== What you should see
+
+A `DELIVERANCE` row in the comparison table. Compared to SKAINET on
+the same hardware:
+
+* **Auto pass rate** is typically comparable to SKAINET on TinyLlama
+  1.1B — both are sub-2B models with limited structural fidelity.
+* **Latency** is usually 1.5–3× SKAINET's, because Deliverance's pure
+  Java inference doesn't have skainet's native FFM kernels. Same model
+  weights, slower runtime.
+* **Determinism** depends on the sampling implementation; Deliverance's
+  `GeneratorParameters.withTemperature()` honours the value strictly.
+
+== Stretch goals
+
+* Run **SKAINET + DELIVERANCE side-by-side** for a direct in-process
+  comparison:
++
+[source,bash]
+----
+BENCH_BACKENDS=SKAINET,DELIVERANCE \
+BENCH_DELIVERANCE_MODEL=TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+    ./gradlew :benchmark:jvmRun -Pdeliverance.enabled=true
+----
++
+The report's "Cloud vs Local Delta Analysis" section will quantify the
+SKAINET-vs-Deliverance gap.
+
+* Try Deliverance with a different HF model
+  (e.g. `microsoft/Phi-3-mini-4k-instruct`) and watch the auto pass
+  rate move with model capacity.
+
+* Read `benchmark/src/jvmMain/deliverance/.../DeliveranceLLMService.kt`
+  — it's ~80 lines. Compare to `:llm/.../SKaiNetLLMService.kt`. The
+  shape is identical: load model, build prompt, call the engine's
+  `generate(...)`, return text. That's the engine-independence story
+  in code.
+
+== When this tutorial breaks
+
+* `mvn install` fails on first run → check `mvn -v` reports Maven 3.9+
+  and JDK 25. Older JDKs will fail Deliverance's compile.
+* `Could not resolve io.teknek.deliverance:core:0.0.4-SNAPSHOT` →
+  `mavenLocal()` isn't being consulted. Confirm the `-Pdeliverance.enabled=true`
+  flag is on the command line; without it, the build's `repositories`
+  block doesn't include `mavenLocal()`.
+* `Class not found: DeliveranceLLMService` (in stage logs) → source set
+  inclusion didn't happen. Check `benchmark/build.gradle.kts` —
+  `if (deliveranceEnabled)` should add `kotlin.srcDir("src/jvmMain/deliverance")`.
+* HuggingFace download stalls → the default fetcher uses HTTPS to
+  `huggingface.co`. If you're behind a proxy, set
+  `HTTP_PROXY` / `HTTPS_PROXY` env vars.
+
+== Next exercise
+
+* xref:tutorials/benchmark-qxotic.adoc[Benchmark with qxotic
+  (subprocess wrapper)] — same engine-pluggability story, but
+  integrating an inference engine that exposes only a CLI rather than
+  a library API.
