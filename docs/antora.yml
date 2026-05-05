@@ -4,3 +4,4 @@ version: ~
 start_page: architecture:index.adoc
 nav:
   - modules/architecture/nav.adoc
+  - modules/prompt-engineering/nav.adoc

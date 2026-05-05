@@ -1,0 +1,151 @@
+= Tool-Call Parsers Reference
+:toc: left
+:icons: font
+
+What `template.parseToolCalls(rawText)` actually recognises. Three
+strategies fire in order; the first one that returns non-empty results
+wins. Source:
+`SKaiNET-transformers/llm-agent/src/commonMain/kotlin/sk/ainet/apps/kllama/chat/ToolCallParser.kt:25-29`.
+
+[mermaid]
+----
+flowchart TB
+    IN[Raw model output] --> S1{HermesToolCallParserStrategy}
+    S1 -- match --> OUT[List of ToolCall]
+    S1 -- no match --> S2{Llama3FunctionTagParserStrategy}
+    S2 -- match --> OUT
+    S2 -- no match --> S3{Llama31ToolCallParserStrategy}
+    S3 -- match --> OUT
+    S3 -- no match --> EMPTY[Empty list — treated as final answer]
+----
+
+== Strategy 1: Hermes / ChatML
+
+Source: `ToolCallParser.kt:94-115`.
+
+Regex-driven; matches `<tool_call>` blocks:
+
+[source]
+----
+<tool_call>\s*(\{[\s\S]*?\})\s*</tool_call>
+----
+
+Accepted forms (all from `ToolCallParserTest.kt`):
+
+[source]
+----
+<tool_call>
+{"name": "calculator", "arguments": {"expression": "2 + 3"}}
+</tool_call>
+----
+
+Multiple calls in the same response are supported. Tolerates whitespace
+inside the tags. Used by `qwen`, `chatml`, and any model that emits the
+Hermes-style wrapper.
+
+== Strategy 2: Llama 3.1 FUNCTION_TAG
+
+Source: `ToolCallParser.kt:193-213`.
+
+Regex:
+
+[source]
+----
+<function=([A-Za-z_][A-Za-z0-9_]*)>\s*(\{[\s\S]*?\})\s*</function>
+----
+
+Accepted form:
+
+[source]
+----
+<function=list_files>{"path": "/tmp"}</function>
+----
+
+The function name comes from the `=name` part of the open tag; arguments
+are parsed as JSON from the body.
+
+== Strategy 3: Llama 3.1/3.2 bare JSON
+
+Source: `ToolCallParser.kt:130-183`.
+
+Brace-balancer (not regex). Looks for a `{...}` block whose top level
+contains a `"name"` key. Optionally strips a leading `<|python_tag|>`
+marker. Tolerates prose before and after the JSON.
+
+Both `arguments` and `parameters` are accepted as the args-object key
+(`ToolCallParser.kt:72-74`):
+
+[source,kotlin]
+----
+val arguments = obj["arguments"]?.jsonObject
+    ?: obj["parameters"]?.jsonObject
+    ?: JsonObject(emptyMap())
+----
+
+Accepted forms (verified by tests):
+
+[source]
+.Bare single-line JSON
+----
+{"name":"calc", "parameters":{"x":1}}
+----
+
+[source]
+.With <|python_tag|> prefix
+----
+<|python_tag|>{"name": "calc", "parameters": {"x": 1}}
+----
+
+[source]
+.With prose before/after
+----
+Let me calculate that for you.
+{"name":"calc","parameters":{"x":1}}
+That should give you the result.
+----
+
+== Known limitations
+
+[IMPORTANT]
+====
+**The bare-JSON strategy's test suite covers only single-line inputs.**
+See `ToolCallParserTest.kt:122-150`.
+
+In particular: a *multi-line* JSON object wrapped in markdown ` ``` `
+fences (which is what 1B Llama models tend to produce when given a
+"single JSON object on one line" instruction they can't follow) is **not**
+in the test suite, and is empirically not parsed —
+xref:explanation/negative-sample-2026-05-05.adoc[the 2026-05-05 negative
+sample] documents one such failure.
+
+If you observe this failure mode, two workarounds exist:
+
+. Switch to a model and template that uses an XML wrapper
+  (`qwen`/`chatml`) — the Hermes regex tolerates multi-line JSON because
+  the open/close tags anchor the match.
+. Strip code-fence markers before passing the raw text to
+  `parseToolCalls`. This would need a wrapper around the agent loop.
+====
+
+== Validation after parsing
+
+Once `parseToolCalls` returns a non-empty list, the agent loop calls
+`ToolCallValidator.validate(call, def)` against the registered
+`ToolDefinition`. On failure the loop:
+
+* Calls `listener?.onToolCallValidationFailed(call, reason)`
+* Returns `"validation error: <reason>"` as the tool result
+* Does *not* invoke the tool's `execute`
+
+The model sees the validation error on the next round and can retry with
+correct arguments. Useful when the model omits a required field or sends
+the wrong type.
+
+== See also
+
+* `ToolCallParserTest.kt` — the canonical test suite (~190 lines) at
+  `SKaiNET-transformers/llm-agent/src/commonTest/kotlin/sk/ainet/apps/kllama/chat/ToolCallParserTest.kt`. Read this if you suspect parser behaviour you're unsure about.
+* xref:reference/chat-templates.adoc[Chat templates] — which template
+  produces output for which parser strategy.
+* xref:explanation/agent-loop-internals.adoc[Agent-loop internals] — how
+  parsed tool calls flow back into the conversation.

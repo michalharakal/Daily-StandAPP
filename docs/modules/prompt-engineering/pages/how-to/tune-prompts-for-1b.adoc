@@ -1,0 +1,146 @@
+= Tune Prompts for a 1B Model
+:toc: left
+:icons: font
+
+The Llama 3.2 1B Q8_0 we ship embedded is small enough that prompt shape
+matters more than instruction wording. The same task that works on Claude
+or GPT-4 with a casual one-liner needs structural scaffolding here.
+
+This page collects tactics that empirically work, with before/after
+examples drawn from this codebase.
+
+== Tactic 1: provide a structural skeleton
+
+A 1B model is much better at *filling in slots* than at *generating a
+structure from scratch*. Tell it the exact section headings and let it
+fill in the content.
+
+[source,markdown]
+.Before — open-ended (works on a 7B+, fragile on a 1B)
+----
+Summarise the following git commits as a daily standup report.
+
+{{commits}}
+----
+
+[source,markdown]
+.After — explicit skeleton (`DefaultPrompts.SUMMARY_USER`)
+----
+Given the following Git commits, produce a concise standup report with
+exactly these three markdown headings:
+
+## Yesterday
+(Summarise work completed based on the commits)
+
+## Today
+(Infer planned work as a continuation, or state "Continue work on …")
+
+## Blockers
+(List any obstacles mentioned in commit messages, or "None")
+
+Reference commit IDs where relevant. Be concise and actionable.
+
+Commits:
+{{commits}}
+----
+
+The "After" version is what's currently in
+`standapp-ai-engine/.../control/PromptBuilder.kt`. The skeleton anchors the
+output, so the model can spend its capacity on content rather than format
+invention.
+
+== Tactic 2: keep system prompts short
+
+Every token in the system message is processed on every prefill (or every
+re-render in the agent loop). The default `SKaiNetLLMService` system
+prompt is ~80 chars; the `ToolCallingLLMService` system prompt is ~240
+chars. Anything in the system that doesn't change *the model's behaviour*
+is wasted prefill cost.
+
+If you're tempted to write a long persona, instead write a *one-line*
+persona and put the constraints in the user message — they'll be processed
+once and discarded.
+
+== Tactic 3: name a single output format
+
+Saying "respond with JSON or markdown" doubles the model's choice space.
+Pick one. The `DefaultPrompts.JSON_USER` template makes one choice — JSON
+only, with a worked schema.
+
+== Tactic 4: lead with an instruction, not context
+
+Bad order:
+
+[source]
+----
+Here are the commits: …
+Now write a standup summary.
+----
+
+Better order:
+
+[source]
+----
+Write a standup summary with three sections (## Yesterday, ## Today,
+## Blockers). Use these commits:
+…
+----
+
+The instruction at the top is in the model's working memory throughout
+generation; an instruction at the bottom of a long context is more likely
+to be ignored or corrupted.
+
+== Tactic 5: avoid open-ended choices
+
+"Decide whether the commits indicate progress or not" → bad.
+"Pick one of: progress / blocked / unclear. Justify in one sentence." → good.
+
+A 1B is much better at picking from an enumeration than at producing a
+free-form judgement.
+
+== Tactic 6: temperature matters more than you think
+
+The codebase clamps temperature to ≥ 0.6 in both
+`SKaiNetLLMService.kt:34` and `ToolCallingLLMService.kt`, because at
+temperature 0.1 the raw-session path collapses into repetition
+("Goodbye. Goodbye. Goodbye."). The chat-template path is more tolerant of
+low temperatures because the turn tags steer sampling, but 0.6–0.7 is a
+safe default. For deterministic output (benchmark-style), drop to 0.1
+*only after* you've structurally constrained the prompt.
+
+== Tactic 7: verify with an empty case
+
+If the commit list is empty, the CLI bypasses the model with a hard-coded
+"No commits found" message. Always sanity-check what your prompt does on
+empty/edge inputs before declaring it "good enough".
+
+== Negative-sample anti-pattern
+
+The opt-in tool-calling system prompt currently reads:
+
+[source]
+----
+You are a developer assistant. You can call tools to fetch data from the
+user's git repository, then summarise the results. When asked about recent
+commits, call the `get_recent_commits` tool exactly once, then write a
+short standup summary.
+----
+
+This is pleasant English but a structural mess for a 1B:
+
+* Two tasks (call a tool *and* summarise) in one sentence.
+* "Exactly once" — a constraint the model can't reliably honour.
+* No example of a successful tool call.
+* No exit condition (when does it know it has summarised "enough"?).
+
+xref:explanation/negative-sample-2026-05-05.adoc[The 2026-05-05 negative
+sample] documents what the model actually does with this — multi-line JSON
+inside markdown fences, then 512 tokens of hallucinated commits. A tighter
+version with a one-shot example would likely fare better; that's an open
+investigation.
+
+== See also
+
+* xref:reference/prompt-templates.adoc[All current prompts in the codebase].
+* xref:explanation/why-prompts-matter-on-small-models.adoc[Why this matters
+  more on small models] — the conceptual argument.

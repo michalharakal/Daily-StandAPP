@@ -1,0 +1,111 @@
+= Switch Chat Template
+:toc: left
+:icons: font
+
+Drive the agent loop against a different model family by changing one
+string. The agent loop is template-agnostic; the same `Tool` registry
+works whether you target Llama, Qwen, Gemma, ChatML, or Apertus.
+
+== When this applies
+
+* Opt-in tool-calling path only.
+* You have a model GGUF that matches the family you want to target. The
+  embedded model is Llama 3.2 1B; *to use any other family you need a path
+  override.*
+
+== The change
+
+`ToolCallingLLMService.create` takes a `templateName: String` parameter:
+
+[source,kotlin]
+----
+ToolCallingLLMService.create(
+    modelPath = …,
+    tools = listOf(myTool),
+    systemPrompt = …,
+    templateName = "qwen",  // <- change this
+)
+----
+
+`LLMServiceFactory.createToolCallingForGit` currently hardcodes `"llama3"`.
+To switch families from the CLI you'd add an env var or arg, then thread
+it through to the factory.
+
+== Supported template names
+
+[cols="1,2,3"]
+|===
+|`templateName` |Model family it targets |Notes
+
+|`llama3`
+|Llama 3.x (3.0/3.1/3.2/3.3 instruct)
+|Default for the embedded model. Tool-call format defaults to
+single-line JSON; the parser also accepts `<\|python_tag\|>\{json\}` and
+`<function=name>\{args\}</function>` forms.
+
+|`qwen`
+|Qwen 3.x
+|`<tool_call>...</tool_call>` XML wrapper around a JSON body. Parser is
+the well-tested Hermes strategy — generally the *most reliable* template
+for tool calling against small open-weights models.
+
+|`gemma`
+|Gemma 2 / Gemma 3
+|`{"functionCall":{"name":"...", "args":{...}}}` JSON. Parser strategy
+exists but coverage is thinner than Hermes.
+
+|`gemma4`
+|Gemma 4
+|Custom `<\|tool_call>...<tool_call\|>` block with TypeScript-style
+arguments and a special `<\|"\|>` string delimiter. Custom parser; not
+JSON-compatible.
+
+|`chatml`
+|Hermes-style ChatML (Mistral Instruct, OpenHermes, NousHermes, others)
+|Same `<tool_call>` wrapper as Qwen. Works with the Hermes parser.
+
+|`apertus`
+|Apertus
+|TypeScript-style type declarations for tools; tool calls in a
+`<\|tools_prefix>...<\|tools_suffix>` block as `[{name: args_obj}, ...]`.
+|===
+
+When in doubt, prefer `qwen` or `chatml` — both go through the
+`HermesToolCallParserStrategy`, which has the broadest test coverage in
+skainet-transformers.
+
+== How resolution works
+
+Internally the service calls
+`ToolCallingSupportResolver.resolveOrFallback(metadata, templateName)`. With
+an explicit `templateName` set, the resolver returns that family's provider
+directly — `ModelMetadata` is ignored on the explicit path. So the string
+you pass *is* what you get; no auto-detection in this configuration.
+
+If the name is unknown, the resolver falls back to
+`GenericToolCallingSupport`, which produces a generic system message that
+many models handle but none handle perfectly.
+
+== Verifying after a switch
+
+. `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` should show delimiters from
+  the new family. For Qwen, expect `<tools>` and `<tool_call>` tags. For
+  Gemma 4, expect `<|tool>` blocks.
+. The tool definition should be embedded inline; `parameters` schema
+  should be present.
+. First model output (visible in the streamed tokens) should use the
+  family's response delimiter — e.g. `<tool_call>{"name":...,"arguments":...}</tool_call>`
+  for Qwen.
+
+If you see Llama 3 delimiters in the rendered template even though you
+asked for `qwen`, the explicit name wasn't picked up — check your call
+site.
+
+== See also
+
+* xref:reference/chat-templates.adoc[Chat templates] — exact format
+  per family with response examples.
+* xref:reference/tool-call-parsers.adoc[Tool-call parsers] — which
+  parser handles which family.
+* xref:reference/model-selection.adoc[Model selection] — which models
+  pair well with which template.

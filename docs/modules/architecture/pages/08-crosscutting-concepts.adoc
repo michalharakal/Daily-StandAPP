@@ -288,37 +288,210 @@ class MockJvmLLMSummarizer : LLMSummarizer {
 
 == 8.7 LLM Tool Calling
 
-The SKAINET backend runs the embedded Llama 3.2 1B Instruct inside a `JavaAgentLoop` from `skainet-transformers` 0.21.1. The agent loop turns the LLM into a *driver* — instead of the CLI handing the model a fully-formed prompt with commits already inlined, the model itself decides which tool to call and when.
+The SKAINET backend has two paths. The default — `SKaiNetLLMService` — calls
+`KLlamaSession.generate(...)` once with a Llama 3 turn-tag-wrapped prompt that
+already contains the commits. The opt-in path — `ToolCallingLLMService`, gated
+by `STANDAPP_TOOL_CALLING=1` — runs the model inside a `JavaAgentLoop` from
+`skainet-transformers` and lets the model fetch commits on its own. The
+`REST_API` backend is always single-shot.
+
+This section covers the opt-in path. Anything below applies only when
+`STANDAPP_TOOL_CALLING=1`.
 
 === Tool Surface
 
-Three tools are registered on every SKAINET-backed `JavaAgentLoop`:
+A single tool is registered on the `JavaAgentLoop`:
 
 [cols="1,3,2"]
 |===
 |Tool |Purpose |Underlying call
 
-|`get_current_date`
-|Anchors the model in real time so it can resolve "yesterday", "this week", etc.
-|`java.time.LocalDate.now(UTC)` + `Instant.now()`
-
-|`get_commits_by_author`
-|Fetch commits filtered by a substring author match in a date window.
-|`de.jug_da.data.git.commitsByAuthorAndPeriod`
-
-|`get_all_commits`
-|Fetch every commit in a date window (when no author is requested).
-|`de.jug_da.data.git.getAllCommitsInPeriod`
+|`get_recent_commits`
+|List commits in the configured repo within the last N days, optionally
+filtered by author. Returns at most 50 entries, one per line.
+|`de.jug_da.data.git.getAllCommitsInPeriod` (or
+`commitsByAuthorAndPeriod` if `author` is supplied)
 |===
+
+The tool is implemented as `de.jug_da.standapp.llm.GetRecentCommitsTool` and
+takes the `repoDir` from CLI args at construction time — the model never sees
+or supplies a repo path, which keeps the privacy boundary from §4 intact.
+
+=== Chat Templates and Tool-Call Processing
+
+This is the part of the loop that turns the model from a text predictor into
+something that can call code. Three pieces matter: the *chat template* that
+renders the conversation into a token stream, the *tool-call parser* that
+extracts structured calls from the model's raw output, and the *round loop*
+that drives the back-and-forth.
+
+==== Chat-template resolution
+
+`ToolCallingSupportResolver.resolveOrFallback(metadata, "llama3")` returns a
+`ToolCallingSupport` provider, which yields a `ChatTemplate`. Implementations
+live in `SKaiNET-transformers/llm-agent/src/commonMain/kotlin/sk/ainet/apps/kllama/chat/`:
+
+* `Llama3ChatTemplate.kt` — Llama 3 instruct format with `<|begin_of_text|>`,
+  `<|start_header_id|>{system|user|assistant|tool}<|end_header_id|>`, and
+  `<|eot_id|>` delimiters.
+* `Llama3ToolFormat.kt` — how Llama 3's tool schema gets serialised into the
+  system message and how tool-call output is parsed back.
+* `GemmaChatTemplate.kt`, `Gemma4ChatTemplate.kt`, `QwenChatTemplate.kt`,
+  `ChatMLTemplate.kt`, `ApertusChatTemplate.kt` — peer formats. Switching
+  models means changing the `templateName` argument; the rest of the loop is
+  unchanged.
+
+The resolver picks the template by name first, then falls back to a heuristic
+match against `ModelMetadata`. We pass `"llama3"` explicitly because the
+embedded GGUF is Llama 3.2 1B Instruct.
+
+==== What the rendered prompt actually looks like
+
+`ChatTemplate.apply(messages, tools, addGenerationPrompt=true)` produces the
+full string that the tokenizer sees. `ToolCallingLLMService` logs this for
+round 0 under `[STAGE/RENDERED CHAT TEMPLATE (round 0)]`. The shape is:
+
+[source]
+----
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+You are a developer assistant. You can call tools …
+
+You have access to the following tools:
+{
+  "name": "get_recent_commits",
+  "description": "List git commits …",
+  "parameters": { "type": "object", "properties": { "days": …, "author": … }, "required": ["days"] }
+}
+
+If you choose to call a tool, format the call as <function-call-marker>{…JSON…}</function-call-marker>
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+Summarise the work done in this git repository over the last 7 day(s) …
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+----
+
+The exact tool-call delimiters are template-specific (Llama 3 uses
+`<|python_tag|>`-prefixed JSON in this codebase's wiring, Gemma 4 uses
+`<tool_call>` blocks, etc.). The parser knows the format because the same
+template instance handles both rendering and parsing.
+
+==== Tool-call parsing
+
+Once a round of generation finishes (EOS or `maxTokensPerRound` reached),
+`AgentLoop.run` calls `template.parseToolCalls(rawText)` (delegating to
+`ToolCallParser` for the default formats). This returns
+`List<ToolCall(id, name, arguments: JsonObject)>`. The agent then:
+
+. Calls `template.parseThinkingBlocks(rawText)` and strips them from the
+  conversation — reasoning tokens never get fed back to the next round.
+. Validates each `ToolCall` against the JSON-Schema in its `ToolDefinition`
+  (`ToolCallValidator`). On validation failure the loop appends
+  `"validation error: <reason>"` to the conversation as a `TOOL` message
+  *without invoking the tool* — the model sees the problem on the next
+  round and can fix its arguments.
+. On valid calls, dispatches to `ToolRegistry.execute(call)` which calls
+  `Tool.execute(arguments)`. Whatever string the tool returns becomes the
+  next `TOOL` message.
+
+If `parseToolCalls` returns an empty list, the loop is done — the assistant
+message *is* the final answer and the loop returns it.
+
+==== The round loop
+
+For each round (capped at `AgentConfig.maxToolRounds = 5`):
+
+. `runtime.reset()` — drop any cached KV state, the next render starts fresh.
+. `template.apply(messages, tools, addGenerationPrompt=true)` — render the
+  *whole* conversation including all prior tool calls and tool results.
+. `runtime.generateUntilStop(...)` — generate tokens until EOS or the round
+  cap, streaming each one to the listener.
+. Extract thinking, parse tool calls, validate, execute, append `TOOL`
+  messages. If no calls, return the assistant message.
+
+The full-context re-render on every round is expensive (the prompt grows with
+each `TOOL` message added), but it sidesteps any KV-cache invalidation issues
+between rounds. This is upstream behaviour in
+`AgentLoop.kt:102-167`, not something this app controls.
+
+==== Logging surface
+
+`ToolCallingLLMService` emits `[STAGE/...]` lines on stderr for every
+transition the public Java facade gives us visibility into:
+
+[cols="2,3"]
+|===
+|Stage tag |Meaning
+
+|`[STAGE/MODEL LOAD]`
+|GGUF path + template name when the session is opened (and `done` when
+loaded).
+
+|`[STAGE/INPUT]`
+|One-line summary: prompt sizes, tool count, template name, temperature,
+maxTokens.
+
+|`[STAGE/SYSTEM PROMPT]` / `[STAGE/USER PROMPT]`
+|Full text of the prompts as Kotlin strings — what the renderer will turn
+into the chat template.
+
+|`[STAGE/TOOL REGISTERED]`
+|One line per tool: name + description (the same description the model sees
+in the rendered system message).
+
+|`[STAGE/RENDERED CHAT TEMPLATE (round 0)]`
+|Full string that goes to the tokenizer for round 0. The agent loop
+re-renders on every round but only round 0 is logged here.
+
+|`[STAGE/PREFILL DONE]`
+|Time-to-first-token in milliseconds. Prefill cost is dominated by the
+rendered prompt length.
+
+|`[STAGE/COMPLETE]`
+|Tokens streamed, total wall time, tok/s, final answer length.
+
+|`[STAGE/FINAL ANSWER]`
+|The string that `agent.chat(...)` returned — what the CLI then prints.
+
+|`[GitTool] get_recent_commits(...)`
+|Per-invocation arguments and result size. Emitted by `GetRecentCommitsTool`
+itself, not the loop.
+|===
+
+The default single-shot path (`SKaiNetLLMService`) emits a smaller subset:
+`[STAGE/INPUT]`, `[STAGE/SYSTEM PROMPT]`, `[STAGE/USER PROMPT]`,
+`[STAGE/WRAPPED PROMPT (Llama 3 turn tags)]`, `[STAGE/PREFILL DONE]`,
+`[STAGE/COMPLETE]`, `[STAGE/FINAL ANSWER]`. No tool stages because there
+are no tools.
+
+NOTE: Because `JavaAgentLoop` only exposes `Consumer<String>` (a token
+callback) in its public API, this layer cannot emit structured
+`onToolCalls` / `onToolResult` / `onAssistantMessage` events. The tool-call
+JSON is still visible in the streamed token output; it is just not split
+into its own log line. See TR-09 in §11 for the upstream change that would
+fix this.
 
 === Privacy Implications
 
-Tool calling does not break the privacy-first guarantee from §4. The agent loop runs entirely in-process: the model emits a `<tool_call>` block, `JavaAgentLoop` parses it, dispatches to the local `JavaTool.execute()`, and feeds the result back into the same in-process model session. No network call, no cloud assistant, no log shipping. The boundary between "what the model produces" and "what our code does" stays inside the JVM.
+Tool calling does not break the privacy-first guarantee from §4. The agent
+loop runs entirely in-process: the model emits a tool-call block,
+`JavaAgentLoop` parses it, dispatches to the local tool's `execute()`, and
+feeds the result back into the same in-process model session. No network
+call, no cloud assistant, no log shipping. The boundary between "what the
+model produces" and "what our code does" stays inside the JVM.
 
 === Boundary with the MCP-Protocol Tools
 
-The `mcp-server` module exposes the same JGit functions as MCP tools, but for a *different consumer* (external AI assistants like Claude Desktop). Both surfaces share the JGit backend in the `data` module. They are kept distinct so that:
+The `mcp-server` module exposes JGit functions as MCP tools, but for a
+*different consumer* (external AI assistants like Claude Desktop) and with a
+different schema (separate `get_commits_by_author` and `get_all_commits`
+tools, with explicit `repoDir` and ISO date arguments). Both surfaces share
+the JGit backend in the `data` module. They are kept distinct so that:
 
-* Schemas can evolve independently — the LLM can be retrained against richer schemas without breaking external MCP clients.
+* Schemas can evolve independently — the local model can be retrained against
+  a tighter schema (`get_recent_commits` with an integer day count) without
+  breaking external MCP clients.
 * The MCP server can run headless without loading the embedded GGUF.
-* Tool-calling logic for the embedded LLM is unit-testable without standing up an MCP transport.
+* Tool-calling logic for the embedded LLM is unit-testable without standing
+  up an MCP transport.

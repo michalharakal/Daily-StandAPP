@@ -1,0 +1,234 @@
+= Chat Templates Reference
+:toc: left
+:toclevels: 2
+:icons: font
+
+What each model family expects on the wire — system-message tool-schema
+shape, response delimiter, response body, and which parser strategy
+handles the response. Source files cited live under
+`SKaiNET-transformers/llm-agent/src/commonMain/kotlin/sk/ainet/apps/kllama/chat/`.
+
+== Quick comparison table
+
+[cols="1,2,2,2,1"]
+|===
+|Family |Tool definition shape |Response delimiter |Response body example |Parser strategy
+
+|Llama 3.2 (`llama3`)
+|Bare JSON objects, one per line
+|None — single-line JSON
+|`{"name":"calculator","parameters":{"expression":"2+3"}}`
+|`Llama31ToolCallParserStrategy`
+
+|Llama 3.1 FUNCTION_TAG
+|Bare JSON objects
+|`<function=name>...</function>`
+|`<function=calculator>{"expression":"2+3"}</function>`
+|`Llama3FunctionTagParserStrategy`
+
+|Gemma 2 / 3 (`gemma`)
+|`function_declarations` JSON array
+|None — single-line JSON
+|`{"functionCall":{"name":"calculator","args":{"expression":"2+3"}}}`
+|`GemmaToolCallParserStrategy`
+
+|Gemma 4 (`gemma4`)
+|`<\|tool>` block, TS-style declarations
+|`<\|tool_call>` block
+|`call:calculator{expression:<\|"\|>2+3<\|"\|>}`
+|`Gemma4ChatTemplate.parseToolCalls`
+
+|Qwen 3.x (`qwen`)
+|`<tools>` array of `function`-schemas
+|`<tool_call>...</tool_call>`
+|`<tool_call>{"name":"calculator","arguments":{"expression":"2+3"}}</tool_call>`
+|`HermesToolCallParserStrategy`
+
+|ChatML / Hermes (`chatml`)
+|JSON objects (one per line)
+|`<tool_call>...</tool_call>`
+|`<tool_call>{"name":"calculator","arguments":{"expression":"2+3"}}</tool_call>`
+|`HermesToolCallParserStrategy`
+
+|Apertus (`apertus`)
+|`<\|developer_start>` TS-style types
+|`<\|tools_prefix>...<\|tools_suffix>`
+|`<\|tools_prefix>[{"calculator":{"expression":"2+3"}}]<\|tools_suffix>`
+|`ApertusToolCallParserStrategy`
+|===
+
+== Llama 3.2 / 3.x (`llama3`)
+
+Source: `Llama3ChatTemplate.kt:37-87`.
+
+The tool schema is rendered into the system message followed by a strict
+format instruction:
+
+[source]
+----
+You are a helpful assistant with tool calling capabilities.
+When you receive a tool call response, use the output to format an answer
+to the original user question.
+
+You have access to the following functions:
+
+{"name":"calculator","description":"…","parameters":{…}}
+
+If you choose to call a function, your reply MUST be a single JSON object
+on one line in the following format and nothing else:
+{"name": <function-name>, "parameters": <arguments-object>}
+Do not write the function definition. Do not include any prose. Do not use
+variables.
+----
+
+Tool definitions are rendered as bare JSON objects separated by `\n\n`.
+Note `parameters`-not-`arguments` — Llama 3 uses `parameters` while Hermes
+and ChatML use `arguments`. The parser accepts both as the args-object key
+(`ToolCallParser.kt:72-74`).
+
+Wire format:: Llama 3 turn tags wrap the whole conversation:
+`<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n` …
+`<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n` …
+`<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n`.
+
+Tool result feedback:: A `TOOL` message becomes a `tool` role turn:
+`<|start_header_id|>tool<|end_header_id|>\n\n<result text><|eot_id|>`.
+
+Known reliability issue on small models:: The 1B variant routinely ignores
+the "single JSON object on one line" instruction — see
+xref:explanation/negative-sample-2026-05-05.adoc[the negative sample]. Larger
+Llama 3 variants (8B+) follow the rule more reliably.
+
+== Llama 3.1 FUNCTION_TAG
+
+Selected via `Llama3ToolFormat.FUNCTION_TAG` in the
+`Llama3ChatTemplate` constructor. The system message instructs:
+
+[source]
+----
+If you choose to call a function, ONLY reply in the format below and
+nothing else:
+<function=function_name>{"arg_name": "arg_value"}</function>
+Function calls MUST be on a single line. Required parameters MUST be
+specified.
+----
+
+Used by Llama 3.1 instruct checkpoints; mostly superseded by the JSON
+format in 3.2.
+
+== Gemma 2 / 3 (`gemma`)
+
+Source: `GemmaChatTemplate.kt:14-27`.
+
+Tool schema is wrapped as `function_declarations`:
+
+[source,json]
+----
+[{
+  "function_declarations": [
+    {"name":"calculator","description":"…","parameters":{…}}
+  ]
+}]
+----
+
+The model returns `{"functionCall":{"name":"...", "args":{...}}}` (note
+`args`, not `arguments` or `parameters`). Less battle-tested than Hermes.
+
+== Gemma 4 (`gemma4`)
+
+Source: `Gemma4ChatTemplate.kt:15-85`. Custom format with TypeScript-style
+type declarations and a special `<|"|>` string delimiter (a single
+sentencepiece token).
+
+[source]
+----
+<|tool>declaration:calculator{description:<|"|>Evaluate…<|"|>,parameters:{…}}<tool|>
+----
+
+Response shape:
+
+[source]
+----
+<|tool_call>call:calculator{expression:<|"|>2+3<|"|>}<tool_call|>
+----
+
+Custom parser at `Gemma4ChatTemplate.kt:550-609` (brace-balanced, not
+JSON). If you're not specifically targeting Gemma 4, prefer a different
+template — the format is unique enough that mistakes silently produce
+unparseable output.
+
+== Qwen 3.x (`qwen`)
+
+Source: `QwenChatTemplate.kt:9-86`. *Probably the most reliable choice*
+for tool calling against open-weights models in this codebase: Qwen models
+were trained heavily on this exact format, and the parser is the
+well-tested `HermesToolCallParserStrategy`.
+
+System-message body:
+
+[source]
+----
+You are Qwen, created by Alibaba Cloud. You are a helpful assistant.
+
+# Tools
+
+You may call one or more functions to assist with the user query.
+
+You are provided with function signatures within <tools></tools> XML tags:
+<tools>
+[{"type":"function","function":{"name":"calculator", …}}]
+</tools>
+
+For each function call, return a JSON object with function name and
+arguments within <tool_call></tool_call> XML tags:
+<tool_call>
+{"name": <function-name>, "arguments": <args-json-object>}
+</tool_call>
+----
+
+Response delimiter is the same `<tool_call>` XML wrapper.
+
+== ChatML / Hermes (`chatml`)
+
+Source: `ChatMLTemplate.kt:8-62`. ChatML is a generic format used by
+Mistral instruct, OpenHermes, NousHermes, and many fine-tunes. The system
+message instructs the model to wrap calls in `<tool_call>...</tool_call>`,
+matching Qwen's response format. Same Hermes parser strategy.
+
+== Apertus (`apertus`)
+
+Source: `ApertusChatTemplate.kt:62-328`. TypeScript-style type
+declarations in a `<|developer_start|>...<|developer_end|>` block:
+
+[source]
+----
+// Evaluate simple arithmetic expressions
+type calculator = (_: {
+  expression?: string
+}) => any;
+----
+
+Response is a JSON array of single-key objects in a tools-prefix/suffix
+wrapper:
+
+[source]
+----
+<|tools_prefix|>[{"calculator": {"expression":"2+3"}}]<|tools_suffix|>
+----
+
+Custom parser at `ApertusToolCallParserStrategy.kt:29-71`.
+
+== When in doubt
+
+* Sticking with the embedded model? Use `llama3`.
+* Using REST API against an external Qwen / Hermes-trained model?
+  Use `qwen` or `chatml` — they go through the best-tested parser.
+* Using Gemma 4 specifically? Use `gemma4` — its format is unique and
+  no other template will produce parseable output for it.
+
+== See also
+
+* xref:reference/tool-call-parsers.adoc[Tool-call parsers] — what each
+  parser strategy actually accepts.
+* xref:how-to/switch-chat-template.adoc[How-to: switch chat template] —
+  practical instructions.

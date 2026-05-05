@@ -1,0 +1,128 @@
+= Debug with Stage Logs
+:toc: left
+:icons: font
+
+`[STAGE/...]` lines on stderr are the primary instrument for diagnosing
+LLM behaviour. This page is a decision tree from "something is wrong" to
+"here is the likely cause".
+
+== Capture the logs
+
+[source,bash]
+----
+STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
+  --args="--repo /path --days 2" 2>stages.log
+----
+
+stdout = streamed model tokens + final answer. stderr = stage logs.
+Keep them separate: when the model goes wrong, the streamed tokens and the
+log lines tell different parts of the story.
+
+== Symptom → likely cause
+
+=== Symptom: nothing happens for >60 s after `[STAGE/INPUT]`
+
+You see `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` then silence. Eventually
+either `[STAGE/PREFILL DONE]` lands (very late) or the process is killed.
+
+Likely cause:: The native CPU kernels didn't load. The Panama Vector
+fallback is much slower; on a 1.6 KB rendered prompt it should still be
+< 30 s, but on long prompts (60+ commits in the user message) it can be
+many minutes.
+
+Check:: stdout near the model-load banner. Look for
+`[SKaiNET] Using SIMD-accelerated CPU operations (Vector API)`. If you see
+*only* that and not a native-kernel log line, the native provider didn't
+register. See xref:architecture:11-risks-technical-debt.adoc[TR-08-adjacent].
+
+Workaround::
+  - Switch to the default single-shot path (unset `STANDAPP_TOOL_CALLING`)
+  - Try the REST API backend against a faster external runtime
+
+=== Symptom: model output contains commit IDs that don't exist
+
+stdout has a confident-looking summary with hashes like `commit-fb1c2c3`,
+but those aren't real hashes from your repo.
+
+Likely cause:: The tool-call parser missed the model's tool-call output, so
+the tool never executed and the model fell back to making things up.
+
+Check::
+  - Search `stages.log` for `[GitTool] get_recent_commits(`. *Absent* →
+    the tool was never executed.
+  - Search stdout for the JSON the model emitted. If it's wrapped in
+    markdown ` ``` ` fences or spans multiple lines, that's likely the
+    cause — the bare-JSON parser strategy is tested only on single-line
+    inputs.
+
+Workaround::
+  - Try `templateName="qwen"` against a Qwen 3 model — Qwen's
+    `<tool_call>...</tool_call>` delimiters match the well-tested Hermes
+    parser strategy.
+  - Tighten the system prompt to repeat the format instruction multiple
+    times (small-model tactic).
+
+=== Symptom: model output is repetitive ("Goodbye. Goodbye. Goodbye.")
+
+Likely cause:: Temperature too low for the path you're on.
+
+Check:: `[STAGE/INPUT]` reports `temp=…`. The raw-session path enforces
+`temp >= 0.6`; the agent-loop path inherits the same clamp. If you're on
+the REST path and explicitly set a low temperature, that's the culprit.
+
+Workaround:: Use `temp = 0.6` to `0.7` for production output; reserve
+`< 0.3` for benchmark/determinism testing on a model that can handle it.
+
+=== Symptom: `[STAGE/COMPLETE]` shows `tokensSeen=0`
+
+Likely cause:: The model emitted the EOS token immediately, before
+producing any visible output. Usually a malformed prompt — for example,
+the chat template ended without an assistant prefix.
+
+Check:: `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` should end with
+`<|start_header_id|>assistant<|end_header_id|>\n\n`. If it ends with
+`<|eot_id|>`, the model has nothing to continue.
+
+=== Symptom: the agent loop runs the full 5 rounds and returns truncated text
+
+Likely cause:: The model keeps emitting tool calls (or things that look
+like tool calls) and never produces a "final" assistant message.
+
+Check:: stdout should show 5 rounds of tool-call JSON. The default loop
+caps at `maxToolRounds = 5` and returns whatever the last assistant
+message was.
+
+Workaround:: System-prompt the model to stop calling tools once it has
+the data, e.g. "After one successful call, summarise without further
+calls."
+
+== Stage tags by phase
+
+[mermaid]
+----
+flowchart LR
+    subgraph "Setup"
+      A[STAGE/MODEL LOAD] --> B[STAGE/INPUT]
+      B --> C[STAGE/SYSTEM PROMPT]
+      C --> D[STAGE/USER PROMPT]
+      D --> E[STAGE/TOOL REGISTERED]
+    end
+    subgraph "Generate"
+      E --> F[STAGE/RENDERED CHAT TEMPLATE]
+      F --> G[STAGE/PREFILL DONE]
+      G --> H[STAGE/COMPLETE]
+    end
+    subgraph "Result"
+      H --> I[STAGE/FINAL ANSWER]
+    end
+----
+
+If a stage is skipped, the issue is upstream of where the next stage would
+have appeared. Stage logs are *cheap*; add more in your tools' `execute`
+methods if you need finer visibility.
+
+== See also
+
+* xref:reference/stage-logs.adoc[Reference: every stage tag and meaning].
+* xref:explanation/negative-sample-2026-05-05.adoc[Negative sample: a real
+  failure walked through with stage logs].

@@ -1,0 +1,240 @@
+= Negative Sample: 2026-05-05 Tool-Calling Run
+:toc: left
+:icons: font
+
+A worked post-mortem of an end-to-end run of the opt-in tool-calling
+path against the embedded Llama 3.2 1B Q8_0 model. The run failed in
+two distinct ways, each instructive. Documenting the failure honestly
+beats pretending the path is working.
+
+The raw transcripts live at `/tmp/standapp.stderr` and
+`/tmp/standapp.stdout` on the development machine; the excerpts below
+are tightened for readability.
+
+== Setup
+
+Command:
+
+[source,bash]
+----
+STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
+  --args="--repo /home/miso/projects/lindau/Daily-StandAPP --days 2"
+----
+
+Expected behaviour:
+
+. Model loads, agent loop starts.
+. Model emits a `get_recent_commits` tool call with `days=2`.
+. Tool fetches commits from the repo (~5 commits in the window).
+. Tool result (compact text summary) is fed back to the model.
+. Model produces a Markdown standup summary referencing real commit IDs.
+
+Total expected wall time: well under a minute.
+
+== What actually happened
+
+[mermaid]
+----
+sequenceDiagram
+    participant U as User
+    participant SVC as ToolCallingLLMService
+    participant M as Llama 3.2 1B
+    participant T as GetRecentCommitsTool
+
+    U->>SVC: run with STANDAPP_TOOL_CALLING=1
+    Note over SVC: stages logged: MODEL LOAD,<br/>INPUT, SYSTEM/USER PROMPT,<br/>RENDERED CHAT TEMPLATE
+    SVC->>M: prefill 1.6 KB rendered prompt
+    Note over M: 14 minutes!<br/>(840 008 ms)
+    M-->>SVC: first token
+    M->>M: emit ```<br/>{<br/>  "name": "get_recent_commits",<br/>  "parameters": { "days": 2 }<br/>}<br/>```
+    Note over SVC: ToolCallParser returns []<br/>(fence-wrapped multi-line<br/>JSON not recognised)
+    SVC->>SVC: round treated as final answer
+    M-->>U: 512 tokens of fabricated commits<br/>(commit-fb1c2c3, commit-abc123, …)
+    U->>SVC: kill (output is garbage)
+----
+
+Concretely, from the stderr stage logs:
+
+[source]
+----
+[STAGE/MODEL LOAD] path=…/Llama-3.2-1B-Instruct-Q8_0.gguf template=llama3
+[STAGE/MODEL LOAD] done
+[STAGE/INPUT] system=241ch user=284ch tools=1 template=llama3 temp=0.6 maxTokens=512
+…
+[STAGE/RENDERED CHAT TEMPLATE (round 0)] >>>
+…1.6 KB of rendered Llama 3 turn-tagged prompt with tool schema…
+[STAGE/RENDERED CHAT TEMPLATE (round 0)] <<<
+[STAGE/PREFILL DONE] first token after 840008ms
+----
+
+And from the stdout (streamed model output):
+
+[source]
+----
+```
+{
+  "name": "get_recent_commits",
+  "parameters": {
+    "days": 2
+  }
+}
+```
+
+## Yesterday
+
+### `commit-fb1c2c3` (2 days ago)
+Fixed a critical bug in the `login` function …
+
+### `commit-dcba1c2` (2 days ago)
+Implemented a performance optimization for the `search` function …
+…
+----
+
+There is no `[GitTool] get_recent_commits(...)` line in the stage log,
+which is the smoking gun: the tool was *never executed*. The commit IDs
+in the output (`commit-fb1c2c3`, `commit-dcba1c2`, etc.) are
+hallucinated — no such commits exist in this repo.
+
+== Two distinct bugs
+
+=== Bug 1: 14-minute prefill (latency)
+
+840 008 ms to prefill a 1.6 KB rendered prompt is two orders of
+magnitude slower than the same scale of prompt would take on the
+default single-shot path. The Panama Vector fallback is slow but not
+*this* slow.
+
+Hypothesis (unverified): the agent-loop path doesn't engage the native
+FFM CPU kernels (`skainet-backend-native-cpu`). Evidence — the stdout
+shows only `[SKaiNET] Using SIMD-accelerated CPU operations (Vector API)`
+and no native-kernel registration line. The native kernel is
+auto-registered via the `KernelProvider` SPI; if it failed to load at
+runtime the Panama Vector path silently takes over.
+
+Why this might be path-specific: `JavaAgentLoop` constructs an
+`InferenceRuntime` differently than the raw `KLlamaSession.generate`
+path. The two paths share the same `KLlamaSession`, but the runtime
+context the agent loop passes to the kernel may diverge somehow.
+
+This is unconfirmed. Investigation needed:
+
+* Add explicit logging on the `KernelProvider` SPI to confirm which
+  provider is selected at the start of each generation.
+* Compare prefill timing on the two paths against the same input.
+* Inspect the FFM init path for any hidden dependency on session state
+  the agent loop doesn't set up.
+
+Tracked at xref:architecture:11-risks-technical-debt.adoc[TR-08]
+(skainet-transformers API stability includes runtime-construction
+differences).
+
+=== Bug 2: Parser missed the fence-wrapped multi-line JSON
+
+The model's tool-call output was:
+
+[source]
+----
+```
+{
+  "name": "get_recent_commits",
+  "parameters": {
+    "days": 2
+  }
+}
+```
+----
+
+Note three things:
+
+. *Wrapped in markdown ` ``` ` fences* — the model added "helpful"
+  formatting.
+. *Multi-line, pretty-printed* — the model ignored the system prompt's
+  "single JSON object on one line" instruction.
+. *Otherwise correctly structured* — `name` is right, `parameters` is
+  right, `days: 2` is exactly the value the user wanted.
+
+`Llama31ToolCallParserStrategy` (the bare-JSON parser, the third strategy
+to fire) is brace-balanced and tolerates leading/trailing prose. In
+principle it should handle multi-line JSON. In practice the test suite
+covers only single-line inputs (`ToolCallParserTest.kt:122-150`), and
+this case slipped through.
+
+The likely culprit: either the leading ` ``` ` confuses the brace finder,
+or the multi-line whitespace breaks something subtler in the JSON
+extraction. Without an upstream test case it's hard to be sure; either
+way, the *user-visible behaviour* is that the parser returned an empty
+list, the agent loop treated round 0 as final, and the model — having
+emitted only its tool-call attempt and not a real answer — was given 512
+tokens to free-generate. Hence the hallucinations.
+
+Tracked as a follow-up, no TR yet — likely belongs upstream as a parser
+test addition or a documented limitation.
+
+== Why the path is opt-in (and that this isn't a regression)
+
+xref:architecture:09-architecture-decisions.adoc[ADR-011] documents the
+opt-in model: `STANDAPP_TOOL_CALLING=1` is required to take this path,
+and the consequences section explicitly notes the 1B reliability
+problem is unsolved. The default single-shot path (`SKaiNetLLMService`)
+remains the production-grade flow and is not affected by either bug.
+
+In other words: the negative sample isn't a regression — it's the
+ground-truth state of the opt-in path documented honestly. Knowing
+this, the user can make an informed decision about whether to enable
+the flag.
+
+== Path to a working state
+
+In rough order of expected payoff:
+
+. **Switch model + template.** Try `templateName="qwen"` against an
+  actual Qwen 3 7B Instruct on the REST_API path. Qwen's
+  `<tool_call>...</tool_call>` XML wrapper is parsed by the well-tested
+  `HermesToolCallParserStrategy`, which handles multi-line JSON
+  natively. This sidesteps Bug 2 entirely. (Bug 1 is also moot if the
+  REST server has its own efficient inference stack.)
+. **Tighten the system prompt with a one-shot example.** Show the model
+  a literal example of a successful tool call in the system message:
+  `Example: {"name":"get_recent_commits","parameters":{"days":7}}`. A
+  1B will copy a literal example more reliably than it will follow
+  abstract format instructions.
+. **Investigate the kernel-provider load.** Add a one-line log in
+  `ToolCallingLLMService` that calls into the kernel SPI directly and
+  reports which provider is selected. If the native CPU kernel is
+  available but not chosen, that's an upstream bug in skainet-transformers
+  worth filing.
+. **Pre-strip code fences in the parser wrapper.** A small wrapper
+  around `agent.chat` that intercepts the streamed tokens and strips
+  ` ``` ` markers before the next round's parse. Ugly but local; would
+  fix the multi-line-JSON-in-fences case without touching upstream.
+. **Add an upstream test case** for fence-wrapped multi-line JSON in
+  `ToolCallParserTest.kt`. If it fails, the maintainers know there's a
+  parser limitation to address. If it passes, our local hypothesis is
+  wrong and the failure has a different cause.
+. **Hold ground on ADR-011's opt-in model.** Until the path is reliable,
+  default users should keep getting the single-shot path that works.
+
+These fixes are *not* part of this documentation commit — that's the
+next working session.
+
+== What this teaches us in general
+
+* *Opt-in by default* for unstable code paths buys you a place to
+  experiment without breaking production users.
+* *Stage logs* are the difference between "tool calling is broken" and
+  "tool calling is broken in *these two specific ways*." Without the
+  logs, the diagnosis above would have been guesswork.
+* *Honest negative samples* are documentation gold. Anyone landing on
+  this page now knows exactly what the failure mode looks like and
+  what to try first.
+
+== See also
+
+* xref:tutorials/first-tool-call.adoc[Tutorial: your first tool call] —
+  has a banner pointing here.
+* xref:how-to/debug-with-stage-logs.adoc[How-to: debug with stage logs]
+  — symptom-driven decision tree built partly from this run.
+* xref:reference/tool-call-parsers.adoc[Reference: tool-call parsers] —
+  the parser limitations Bug 2 hinges on.
+* xref:architecture:09-architecture-decisions.adoc[ADR-011] — the
+  opt-in coexistence decision this run validated.

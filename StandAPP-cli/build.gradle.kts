@@ -43,7 +43,6 @@ tasks.shadowJar {
 
 repositories {
     mavenCentral()
-    mavenLocal()
 }
 
 dependencies {

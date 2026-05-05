@@ -1,0 +1,83 @@
+= Prompt Engineering Handbook
+:toc: left
+:toclevels: 2
+:icons: font
+
+Practitioner-facing handbook for working with the embedded LLM, tool calling,
+chat templates, and parsers. The architecture docs (`architecture` module)
+explain *what* the system is; this module explains *how to use it well*.
+
+The pages are organised by the
+https://documentation.divio.com/[Divio documentation framework] — four
+quadrants by reader intent:
+
+[mermaid]
+----
+flowchart LR
+    NEW[I'm new here] --> TUT[Tutorials]
+    TASK[I want to do X] --> HOWTO[How-to guides]
+    LOOKUP[I need a fact] --> REF[Reference]
+    WHY[I want to understand] --> EXP[Explanation]
+
+    TUT --> GS[Getting started]
+    TUT --> FTC[Your first tool call]
+
+    HOWTO --> ANT[Add a new tool]
+    HOWTO --> SCT[Switch chat template]
+    HOWTO --> TP[Tune prompts for 1B]
+    HOWTO --> DBG[Debug with stage logs]
+
+    REF --> CT[Chat templates]
+    REF --> TCP[Tool-call parsers]
+    REF --> SL[Stage logs]
+    REF --> MS[Model selection]
+    REF --> PT[Prompt templates]
+
+    EXP --> DIV[Divio framework]
+    EXP --> WHYP[Why prompts matter]
+    EXP --> ALI[Agent-loop internals]
+    EXP --> NS[Negative sample 2026-05-05]
+----
+
+== Where to start
+
+Newcomer:: xref:tutorials/getting-started.adoc[Tutorials → Getting started].
+Three commands and a paragraph; you'll have a standup summary in your terminal.
+
+Trying tool calling:: xref:tutorials/first-tool-call.adoc[Tutorials → Your first tool call] — and read xref:explanation/negative-sample-2026-05-05.adoc[the negative-sample post-mortem] before you do, because it doesn't yet work end-to-end on the embedded 1B.
+
+Picking a model:: xref:reference/model-selection.adoc[Reference → Model selection].
+
+Stuck::
+  - Output looks weird → xref:how-to/debug-with-stage-logs.adoc[How-to → Debug with stage logs]
+  - Want a different model → xref:how-to/switch-chat-template.adoc[How-to → Switch chat template]
+  - Want to add capability → xref:how-to/add-a-new-tool.adoc[How-to → Add a new tool]
+
+== Relationship to the architecture docs
+
+This module is task-oriented; the
+xref:architecture:index.adoc[Architecture module] is structure-oriented (arc42).
+Cross-references go both ways:
+
+[cols="2,3"]
+|===
+|Topic |Architecture page
+
+|Why tool calling is opt-in
+|xref:architecture:09-architecture-decisions.adoc[ADR-011]
+
+|Default vs tool-calling runtime paths
+|xref:architecture:06-runtime-view.adoc[§6.2 + §6.5]
+
+|Agent loop, chat-template internals
+|xref:architecture:08-crosscutting-concepts.adoc[§8.7]
+
+|`LLMService` interface, factory, classes
+|xref:architecture:05-building-block-view.adoc[§5.2]
+
+|Quantisation tradeoffs, performance numbers
+|xref:architecture:10-quality-requirements.adoc[§10]
+
+|Known risks (parser, listener, kernel)
+|xref:architecture:11-risks-technical-debt.adoc[§11]
+|===

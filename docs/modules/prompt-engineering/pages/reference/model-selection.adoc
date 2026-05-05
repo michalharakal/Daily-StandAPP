@@ -1,0 +1,169 @@
+= Model Selection
+:toc: left
+:icons: font
+
+Decision matrix for picking a model + backend + chat template + prompt
+style. Extends — does not replace — the
+"Model Selection Best Practices" section in the repo `README.md`.
+
+== Decision matrix
+
+[cols="2,1,2,2,3"]
+|===
+|Scenario |Backend |Model |Template |Notes
+
+|Demo / privacy-first / offline
+|`SKAINET` (default)
+|Embedded Llama 3.2 1B Q8_0
+|`llama3`
+|Self-contained JAR; ~2 GB. CLI pre-fetches commits via JGit. Uses the
+single-shot path. Quality: rough but workable on small-to-medium commit
+windows. Default for the repo.
+
+|Demo / privacy-first + tool calling experiment
+|`SKAINET`, `STANDAPP_TOOL_CALLING=1`
+|Embedded Llama 3.2 1B Q8_0
+|`llama3`
+|Opt-in path that exercises the agent loop. *Currently unreliable on the
+1B* — see xref:explanation/negative-sample-2026-05-05.adoc[the negative
+sample]. Worth running for instrumentation but don't trust the output.
+
+|Local high-quality / offline
+|`REST_API` against local Ollama or llama.cpp
+|Llama 3.2 3B Instruct or Qwen 3 7B Instruct
+|`llama3` for Llama, `qwen` for Qwen
+|3B is the sweet spot for standup quality on a CPU laptop. 7B if you
+have an RTX 3060+. Qwen is more reliable for tool calling; Llama is
+better for free-form prose.
+
+|Tool calling that actually works
+|`REST_API` against Ollama, LM Studio, or vLLM
+|Qwen 3 7B+ or any Hermes-trained checkpoint
+|`qwen` or `chatml`
+|The `<tool_call>...</tool_call>` XML wrapper is parsed by the
+well-tested Hermes strategy. Most reliable open-weights tool calling we
+can get without rolling our own parser.
+
+|Cloud baseline / quality benchmark
+|`REST_API` against OpenAI/Anthropic
+|GPT-4o-mini, GPT-4o, Claude Sonnet 4.6
+|n/a (the remote service handles formatting)
+|For baselining the local stack against. Not for production — the
+privacy guarantee in xref:architecture:09-architecture-decisions.adoc[ADR-001] forbids cloud
+processing of commit data in practice.
+
+|Pure-Java integration test
+|`REST_API` against any local server
+|Whatever's loaded
+|n/a
+|Useful when running headless from a Java service that doesn't want to
+embed a 1.3 GB GGUF.
+|===
+
+== Quantisation tradeoffs
+
+[cols="1,1,1,2"]
+|===
+|Quant |Disk size for 7B |Throughput (CPU) |Quality vs FP16
+
+|Q4_K_M
+|~4 GB
+|10–20 tok/s
+|~95% of FP16 on benchmark scores
+
+|Q5_K_M
+|~5 GB
+|8–15 tok/s
+|~98% of FP16
+
+|Q8_0
+|~7 GB (1.3 GB for our 1B)
+|6–12 tok/s
+|~99.5% of FP16
+|===
+
+For the embedded model we picked Q8_0 specifically because the *1B model
+is small enough to spend the bandwidth on quality*. On a 7B+, Q4_K_M is
+usually the right default. For numbers and reasoning behind these
+quantisation levels, see
+xref:architecture:10-quality-requirements.adoc[Architecture §10].
+
+== Model-family choice for tool calling
+
+[cols="1,1,3"]
+|===
+|Family |Tool-call reliability |Why
+
+|Qwen 3
+|High
+|Trained heavily on the `<tool_call>` XML format; matches the
+well-tested Hermes parser strategy.
+
+|Hermes / OpenHermes / NousHermes
+|High
+|Fine-tunes specifically targeting the same `<tool_call>` format Qwen
+uses.
+
+|Llama 3.2/3.3 8B+
+|Medium
+|Native tool-call training, but Meta's format is
+single-line-JSON-or-`<\|python_tag\|>` which the parser handles less
+robustly than XML wrappers.
+
+|Llama 3.2 1B / 3B
+|Low
+|Capacity-constrained — emits malformed JSON, ignores
+single-line constraint, hallucinates calls. Not recommended for
+production tool calling.
+
+|Gemma 2 / 3
+|Low–medium
+|Model is good but its `functionCall` JSON format is less standardised;
+parser strategy has thinner test coverage.
+
+|Gemma 4
+|Unknown
+|Unique format; usable but no field experience yet in this codebase.
+
+|Apertus
+|Unknown
+|TS-style declaration syntax; no field experience.
+|===
+
+== When CPU-only is the constraint
+
+* 1B Q8 → 5–15 s per standup summary on a recent x86_64 with native
+  kernels; 30+ s on Panama Vector only.
+* 3B Q4 → 30–60 s per summary, depending on commit count.
+* 7B Q4 → likely 2–5 minutes; usable for batch but not interactive.
+
+For interactive feel, prefer 1B–3B. For higher-quality offline reports,
+batch a 7B overnight.
+
+== When you have a GPU
+
+The REST API path through Ollama (or vLLM, or llama.cpp server) gets you
+GPU acceleration for free. The CLI doesn't care — it just hits an
+OpenAI-compatible HTTP endpoint. Set:
+
+[source,bash]
+----
+MCP_LLM_BACKEND=REST_API \
+MCP_LLM_REST_BASE_URL=http://localhost:11434/v1 \
+MCP_LLM_REST_MODEL=qwen2.5:7b-instruct \
+./gradlew :StandAPP-cli:run --args="…"
+----
+
+Tool calling on the REST path currently uses the legacy single-shot
+prompt — the agent loop is SKAINET-only.
+xref:architecture:09-architecture-decisions.adoc[ADR-011] notes this as a
+deferred follow-up.
+
+== See also
+
+* `README.md` "Model Selection Best Practices" — quality/latency
+  thresholds and the cloud-baseline comparison rubric.
+* xref:reference/chat-templates.adoc[Chat templates] — what each
+  template name accepts.
+* xref:architecture:10-quality-requirements.adoc[Architecture §10] —
+  empirical quantisation/throughput tables.

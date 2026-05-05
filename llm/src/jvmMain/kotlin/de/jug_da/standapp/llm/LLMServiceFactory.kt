@@ -41,6 +41,30 @@ object LLMServiceFactory {
         }
     }
 
+    /**
+     * Build a SKAINET-backed tool-calling [LLMService] with the git tool
+     * registered against [repoDir]. Forces the SKAINET path regardless of
+     * `MCP_LLM_BACKEND`, since the agent loop is implemented against
+     * [sk.ainet.apps.kllama.java.KLlamaSession].
+     */
+    fun createToolCallingForGit(
+        repoDir: String,
+        systemPrompt: String = ToolCallingLLMService.DEFAULT_SYSTEM_PROMPT,
+    ): LLMService {
+        val override = System.getenv("MCP_LLM_MODEL_PATH")
+        val modelPath = if (!override.isNullOrBlank()) {
+            println("[LLMServiceFactory] tool-calling: using MCP_LLM_MODEL_PATH override: $override")
+            Path.of(override)
+        } else {
+            EmbeddedModelLoader.extract()
+        }
+        return ToolCallingLLMService.create(
+            modelPath = modelPath,
+            tools = listOf(GetRecentCommitsTool(repoDir)),
+            systemPrompt = systemPrompt,
+        )
+    }
+
     fun create(): LLMService {
         val backend = LLMBackendType.fromEnv()
         println("[LLMServiceFactory] Selected backend: $backend")

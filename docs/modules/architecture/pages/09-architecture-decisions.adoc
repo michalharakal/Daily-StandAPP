@@ -5,7 +5,11 @@
 
 [IMPORTANT]
 ====
-**Doc status (2026-04-30):** the ADR adopting `skainet-transformers` `JavaAgentLoop` for SKAINET tool calling was rolled back during validation. Llama 3.2 1B Q8_0 could not emit reliable tool-call JSON; the SKAINET runtime now uses `KLlamaSession.generate()` directly with a Llama 3 turn-formatted prompt. The "consequences" + diagram in that ADR no longer match the code. See plan `continue-with-general-effort-groovy-coral.md` §V3 + §V7.2 + §V8.2.
+**Doc status (2026-05-05):** ADR-010 (full replacement with `JavaAgentLoop`) is
+*amended* — the agent-loop path is now opt-in (`STANDAPP_TOOL_CALLING=1`) rather
+than the default. ADR-011 records the opt-in coexistence decision. The 1B
+reliability problem from the original 2026-04-30 rollback note is unsolved; the
+opt-in lets us exercise tool calling without breaking the proven default path.
 ====
 
 == ADR-001: Privacy-First Architecture (Foundational)
@@ -296,7 +300,9 @@ Maven Central now has skainet 0.21.0 plus a sibling library, skainet-transformer
 === Decision
 
 . **Upgrade** to skainet 0.21.0 and adopt skainet-transformers 0.21.1, BOM-managed (per the `skainet-consumer-setup` skill: BOM at `sk.ainet`, libraries at `sk.ainet.core` / `sk.ainet.llm`).
-. **Replace** the single-shot SKAINET path with `JavaAgentLoop`. The CLI hands the model a high-level task; the model calls `get_current_date`, `get_commits_by_author`, or `get_all_commits` itself.
+. **Add** a `JavaAgentLoop`-based path *alongside* the single-shot SKAINET path
+(see ADR-011 for the opt-in coexistence). When opted in, the CLI hands the
+model a high-level task and the model calls `get_recent_commits` itself.
 . **Embed** Llama 3.2 1B Instruct (Q8_0, ~1.3 GB) as a JAR resource so the CLI shadow JAR (~2.0 GB) ships self-contained.
 . **Default** `MCP_LLM_BACKEND` to `SKAINET` — no env vars required for the common path.
 . **Keep** the REST_API backend on the legacy single-shot path with `PromptBuilder`. Remote tool calling can be added later if a user needs it.
@@ -316,3 +322,77 @@ Maven Central now has skainet 0.21.0 plus a sibling library, skainet-transformer
 
 * `SKaiNET-transformers/llm-apps/kllama-java-sample/.../Main.java` — canonical Java sample used as the implementation reference.
 * `skainet-consumer-setup` skill — BOM-management rules followed by `gradle/libs.versions.toml`.
+
+---
+
+== ADR-011: Tool Calling as Opt-In Second SKAINET Path
+
+=== Status
+Accepted (2026-05-05)
+
+=== Context
+
+ADR-010's plan to *replace* the single-shot SKAINET path with `JavaAgentLoop`
+was rolled back on 2026-04-30: Llama 3.2 1B Q8_0 could not reliably emit the
+tool-call JSON the loop expects, and long summarisation prompts (60+ commits)
+hung for minutes inside the loop's per-round re-rendering. The default SKAINET
+runtime went back to a single `KLlamaSession.generate(...)` call with a
+hand-built Llama 3 turn-tag prompt.
+
+That rollback erased the visible tool-calling surface but kept all the wiring
+(skainet-transformers in `build.gradle.kts`, `JavaAgentLoop` accessible at
+runtime). Two things now make adding it back useful:
+
+* The `mcp-server` module already exposes git tools to *external* clients;
+  not exercising the same shape internally means we don't validate the loop
+  on real workloads.
+* Some prompts are short enough that a single `get_recent_commits` round
+  works fine on the 1B, even if the full multi-round flow is unreliable.
+
+=== Decision
+
+Add `ToolCallingLLMService` as a second `LLMService` implementation, gated by
+an opt-in env var. Keep `SKaiNetLLMService` (raw single-shot) as the default.
+
+. **Two services, one interface.** Both implement `LLMService.generate(...)`.
+  `LLMServiceFactory.create()` returns the default; new
+  `LLMServiceFactory.createToolCallingForGit(repoDir)` returns the opt-in one.
+  Selection happens in `StandAPP-cli/Main.kt` based on `STANDAPP_TOOL_CALLING=1`.
+. **Single tool registered:** `get_recent_commits` (`days`, optional `author`).
+  The `repoDir` is captured at construction time, never asked of the model.
+. **Source-level dependency.** `settings.gradle.kts` already includes
+  `../SKaiNET-transformers` as a composite build, so `ToolCallingLLMService`
+  compiles against whatever version is checked out locally (currently 0.23.1).
+  The Maven coordinates pin in `gradle/libs.versions.toml` (now `0.23.2`)
+  matters only when the composite include is removed.
+. **Stage logging on both paths.** Every prompt-life-cycle transition emits
+  a `[STAGE/...]` line on stderr — see §8.7 for the table. Without this it
+  is hopeless to debug what the model is doing.
+. **REST_API stays single-shot.** Remote tool calling can be added later by
+  registering tools through the OpenAI-compatible API; out of scope here.
+
+=== Consequences
+
+* (+) Tool calling is exercisable and observable without breaking the proven
+  default path. Users who want it set one env var.
+* (+) The same `Tool` registry shape (`get_recent_commits`) is the model the
+  MCP server exposes — schema/behaviour can converge over time.
+* (+) `[STAGE/...]` logs on both paths give a uniform debugging surface.
+  Rendered chat template is logged for round 0 of the agent loop, which is
+  the single most useful artefact when the model misbehaves.
+* (-) Two `LLMService` implementations to maintain. The shared bits
+  (`formatLlama3Turn` in the raw path vs. `template.apply` in the loop) drift
+  if upstream changes the chat-template format.
+* (-) `JavaAgentLoop` only exposes a streaming-token callback in its public
+  API. We cannot emit structured `onToolCalls` / `onToolResult` events from
+  this layer — see TR-09. Mid-stream tool-call JSON is still visible in the
+  streamed tokens, just not split into its own log line.
+* (-) The 1B reliability problem is *not* fixed by this ADR. Long prompts
+  through the loop will still hang; that is why this is opt-in, not default.
+
+=== Related
+
+* `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/ToolCallingLLMService.kt` — implementation.
+* `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/GitTools.kt` — `GetRecentCommitsTool`.
+* §6.2 (runtime view, opt-in) and §8.7 (chat templates + tool-call processing).
+* TR-09 in §11 — `AgentListener` not exposed via the public `JavaAgentLoop` facade.

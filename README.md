@@ -2,6 +2,36 @@
 
 [![JavaLand 2026 Banner](https://www.javaland.eu/fileadmin/Event/JavaLand/Banner/2026/JL_26-Banner-512x256px_Speaker.jpg)](https://meine.doag.org/events/javaland/2026/agenda/#agendaId.7511)
 
+## Standapp CLI
+
+Generate a daily standup summary from a git repo.
+
+```bash
+# Default: CLI fetches commits, hands the model a fully-formed prompt.
+./gradlew :StandAPP-cli:run --args="--repo /path/to/repo --days 7"
+```
+
+### Tool-calling mode (opt-in)
+
+Setting `STANDAPP_TOOL_CALLING=1` switches the SKAINET backend to a
+`JavaAgentLoop`-driven path. The model fetches commits itself by calling a
+`get_recent_commits` tool. Stage logs go to stderr; the streamed answer goes to
+stdout.
+
+```bash
+STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
+  --args="--repo /path/to/repo --days 7" 2>stages.log
+```
+
+`stages.log` will contain `[STAGE/INPUT]`, `[STAGE/RENDERED CHAT TEMPLATE
+(round 0)]`, `[STAGE/PREFILL DONE]`, `[STAGE/FINAL ANSWER]`, etc. — useful for
+debugging what the model is actually seeing and producing. See
+`docs/modules/architecture/pages/08-crosscutting-concepts.adoc` §8.7 for the
+full table.
+
+The 1B model can drive the loop on small commit windows but is unreliable on
+long ones — that is why this is opt-in, not default.
+
 ## MCP Server
 
 ### Step 1: Build the MCP Server

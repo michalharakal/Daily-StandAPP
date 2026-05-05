@@ -1,0 +1,117 @@
+= Your First Tool Call
+:toc: left
+:icons: font
+
+[WARNING]
+====
+The opt-in tool-calling path *does not yet produce reliable results on the
+embedded Llama 3.2 1B model* — see
+xref:explanation/negative-sample-2026-05-05.adoc[the 2026-05-05 negative
+sample] before assuming success. This tutorial is still useful: it shows you
+exactly what stage logs to read, and the diagnosis path when things go
+wrong.
+====
+
+== Goal
+
+Run the CLI through the `JavaAgentLoop`-driven path so the model fetches
+commits itself instead of receiving them pre-formatted in the prompt.
+
+== Run it
+
+[source,bash]
+----
+STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
+  --args="--repo /path/to/repo --days 2" 2>stages.log
+----
+
+`STANDAPP_TOOL_CALLING=1` flips the factory from `SKaiNetLLMService` to
+`ToolCallingLLMService`. The streamed answer goes to stdout; the
+`[STAGE/...]` stage logs go to stderr (captured here in `stages.log`).
+
+== What happens
+
+[mermaid]
+----
+sequenceDiagram
+    participant CLI
+    participant Service as ToolCallingLLMService
+    participant Agent as JavaAgentLoop
+    participant Model as Llama 3.2 1B
+    participant Tool as GetRecentCommitsTool
+
+    CLI->>Service: generate("Summarise … call get_recent_commits …")
+    Note over Service: log [STAGE/INPUT], [STAGE/SYSTEM PROMPT],<br/>[STAGE/USER PROMPT], [STAGE/RENDERED CHAT TEMPLATE]
+    Service->>Agent: agent.chat(prompt, onToken)
+    Agent->>Model: render llama3 chat template + tool schema
+    Model-->>Agent: tokens incl. {"name":"get_recent_commits","parameters":{"days":2}}
+    Agent->>Tool: execute({days:2})
+    Tool-->>Agent: "count=12\n- abc1234 …"
+    Agent->>Model: feed tool result, re-render, continue
+    Model-->>Agent: final markdown summary
+    Agent-->>Service: text
+    Note over Service: log [STAGE/COMPLETE], [STAGE/FINAL ANSWER]
+    Service-->>CLI: summary
+----
+
+== Reading the stage logs
+
+`stages.log` contains lines like:
+
+[source]
+----
+[STAGE/MODEL LOAD] path=…/Llama-3.2-1B-Instruct-Q8_0.gguf template=llama3
+[STAGE/MODEL LOAD] done
+[STAGE/INPUT] system=241ch user=284ch tools=1 template=llama3 temp=0.6 maxTokens=512
+[STAGE/SYSTEM PROMPT] >>>
+You are a developer assistant. You can call tools …
+[STAGE/SYSTEM PROMPT] <<<
+[STAGE/USER PROMPT] >>>
+Summarise the work done in this git repository over the last 2 day(s) …
+[STAGE/USER PROMPT] <<<
+[STAGE/TOOL REGISTERED] get_recent_commits — List git commits …
+[STAGE/RENDERED CHAT TEMPLATE (round 0)] >>>
+<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+…
+You have access to the following functions:
+{"name":"get_recent_commits", …}
+…
+<|eot_id|><|start_header_id|>user<|end_header_id|>
+…
+<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+[STAGE/RENDERED CHAT TEMPLATE (round 0)] <<<
+[STAGE/PREFILL DONE] first token after 12345ms
+[STAGE/COMPLETE] tokensSeen=… totalMs=… finalChars=…
+[STAGE/FINAL ANSWER] >>>
+…the model's text…
+[STAGE/FINAL ANSWER] <<<
+----
+
+The single most useful block is `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` —
+that is *literally what the tokenizer sees*. If something is wrong with the
+prompt (wrong delimiters, missing tool schema, malformed system message),
+this is where you see it.
+
+xref:reference/stage-logs.adoc[See the full reference] for what every tag
+means.
+
+== When it goes wrong
+
+If you see no `[STAGE/PREFILL DONE]` for >60 s, the model is stuck in
+prompt processing — usually a CPU-kernel-provider issue.
+xref:explanation/negative-sample-2026-05-05.adoc[The negative sample]
+documents one such failure (840 s prefill).
+
+If `[STAGE/FINAL ANSWER]` contains commit IDs that don't exist in your
+repo, the tool was never called and the model hallucinated. Check stdout
+for whether the tool-call JSON appeared in the streamed tokens at all.
+`[GitTool] get_recent_commits(...)` is logged only when the tool *actually
+executed*; its absence proves the parser missed the call.
+
+== Next steps
+
+* xref:how-to/debug-with-stage-logs.adoc[Debug with stage logs] — decision
+  tree for common failure modes.
+* xref:how-to/tune-prompts-for-1b.adoc[Tune prompts for a 1B model].
+* xref:how-to/add-a-new-tool.adoc[Add a new tool] to extend the surface
+  beyond `get_recent_commits`.

@@ -1,0 +1,192 @@
+= Stage Logs Reference
+:toc: left
+:icons: font
+
+Every `[STAGE/...]` and `[GitTool]` line emitted by the LLM and tool
+layers, what it means, and which code path emits it.
+
+All stage logs go to *stderr*, not stdout. Streamed model tokens go to
+stdout. Capture them separately:
+
+[source,bash]
+----
+./gradlew :StandAPP-cli:run --args="…" >stdout.log 2>stderr.log
+----
+
+== Where they're emitted
+
+[cols="2,3"]
+|===
+|Tag |Source
+
+|`[STAGE/MODEL LOAD]`
+|`ToolCallingLLMService.kt` (companion `create`) and `SKaiNetLLMService.kt`
+(companion `create`)
+
+|`[STAGE/INPUT]`
+|`SKaiNetLLMService.kt:generate` and `ToolCallingLLMService.kt:generate`
+(start of the call)
+
+|`[STAGE/SYSTEM PROMPT]`
+|Both services, after `[STAGE/INPUT]`
+
+|`[STAGE/USER PROMPT]`
+|Both services, after `[STAGE/SYSTEM PROMPT]`
+
+|`[STAGE/TOOL REGISTERED]`
+|`ToolCallingLLMService.kt` only — one line per registered tool
+
+|`[STAGE/RENDERED CHAT TEMPLATE (round 0)]`
+|`ToolCallingLLMService.kt` only — the full string going into the
+tokenizer for round 0
+
+|`[STAGE/WRAPPED PROMPT (Llama 3 turn tags)]`
+|`SKaiNetLLMService.kt` only — equivalent of the rendered template for
+the raw single-shot path
+
+|`[STAGE/PREFILL DONE]`
+|Both services — emitted on first generated token, with TTFT in ms
+
+|`[STAGE/COMPLETE]`
+|Both services — emitted at end with totals (tokens, ms, tok/s, final
+char count)
+
+|`[STAGE/FINAL ANSWER]`
+|Both services — full answer text on stderr (the same text is also
+returned to the caller)
+
+|`[GitTool]`
+|`GitTools.kt` only — emitted when `GetRecentCommitsTool.execute` is
+called. Contains arguments and result size.
+|===
+
+== Per-tag detail
+
+=== `[STAGE/MODEL LOAD]`
+
+[source]
+----
+[STAGE/MODEL LOAD] path=/home/.../Llama-3.2-1B-Instruct-Q8_0.gguf template=llama3
+[STAGE/MODEL LOAD] done
+----
+
+Two lines bracket model loading. The first prints the GGUF path and chat
+template; the second prints when `KLlamaJava.loadGGUF` returns. Long gaps
+between them indicate disk-IO or initial JIT cost.
+
+=== `[STAGE/INPUT]`
+
+[source]
+----
+[STAGE/INPUT] system=241ch user=284ch tools=1 template=llama3 temp=0.6 maxTokens=512
+----
+
+Sizes in *characters*, not tokens. `tools=0` for the default single-shot
+path (which has no tools).
+
+=== `[STAGE/SYSTEM PROMPT]` and `[STAGE/USER PROMPT]`
+
+The full text of the system and user prompts, before the chat template
+renders them. Bracketed by `>>>` and `<<<` lines so you can grep them out
+if needed:
+
+[source]
+----
+[STAGE/SYSTEM PROMPT] >>>
+…multi-line text…
+[STAGE/SYSTEM PROMPT] <<<
+----
+
+=== `[STAGE/TOOL REGISTERED]`
+
+[source]
+----
+[STAGE/TOOL REGISTERED] get_recent_commits — List git commits …
+----
+
+Only emitted on the tool-calling path. One line per tool. The
+description shown is the same one rendered into the system message — if
+this is wrong, the model sees something wrong.
+
+=== `[STAGE/RENDERED CHAT TEMPLATE (round 0)]`
+
+The single most useful debugging artefact. This is the full string the
+tokenizer sees for round 0 of the agent loop, including:
+
+* Llama 3 turn tags (or the equivalent for whichever template you're using)
+* Tool schema rendered into the system message
+* Any user-supplied system prompt merged in
+* The user message
+* The trailing `<|start_header_id|>assistant<|end_header_id|>` that prompts
+  the model to start generating
+
+The agent loop re-renders on every round (with all prior tool messages
+appended), but only round 0 is logged. If you need later rounds, add
+extra logging to `ToolCallingLLMService` or wait for upstream to expose
+`AgentListener` (xref:architecture:11-risks-technical-debt.adoc[TR-09]).
+
+=== `[STAGE/WRAPPED PROMPT (Llama 3 turn tags)]`
+
+The single-shot equivalent of the rendered chat template. Unlike the
+agent-loop path, this is built by hand in `formatLlama3Turn` rather than
+delegated to skainet-transformers. Useful when comparing what the
+default path sends vs the agent-loop path.
+
+=== `[STAGE/PREFILL DONE]`
+
+[source]
+----
+[STAGE/PREFILL DONE] first token after 12345ms
+----
+
+Time-to-first-token (TTFT) in milliseconds. On a fast x86_64 with native
+CPU kernels, expect sub-second TTFT for short prompts. TTFT > 60 s on a
+short prompt usually means the native kernels didn't load (Panama Vector
+fallback only).
+
+=== `[STAGE/COMPLETE]`
+
+Default path:
+
+[source]
+----
+[STAGE/COMPLETE] 245 tokens in 8743ms (28.02 tok/s)
+----
+
+Tool-calling path:
+
+[source]
+----
+[STAGE/COMPLETE] tokensSeen=245 totalMs=8743 (28.02 tok/s) finalChars=1024
+----
+
+`tokensSeen` is the total tokens *streamed across all rounds*, not just
+the final round. `totalMs` is wall time including all prefills and tool
+executions.
+
+=== `[STAGE/FINAL ANSWER]`
+
+The full final answer text, bracketed by `>>>` / `<<<`. The same text is
+also what the CLI prints to stdout, so this can feel redundant — but
+having it on stderr lets you save the answer for diff/regression checks
+without scraping stdout.
+
+=== `[GitTool]`
+
+[source]
+----
+[GitTool] get_recent_commits(repo=/path/to/repo, days=2, author=*)
+[GitTool] result: 12 commits, 856 chars
+----
+
+Two lines per tool invocation: the parsed arguments, then the result
+size. *Absence of this line in your stage log when the model emits a
+tool-call JSON in stdout is the signature of a parser miss* — see
+xref:how-to/debug-with-stage-logs.adoc[the debug guide].
+
+== See also
+
+* xref:how-to/debug-with-stage-logs.adoc[How-to: debug with stage logs] —
+  symptom-driven decision tree.
+* xref:explanation/negative-sample-2026-05-05.adoc[Negative sample] — a
+  real failure walked through with these logs.

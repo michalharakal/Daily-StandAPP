@@ -1,0 +1,117 @@
+= Add a New Tool to the Agent Loop
+:toc: left
+:icons: font
+
+You want the model to be able to do something beyond
+`get_recent_commits` — fetch issues, query a database, run a shell command,
+whatever. This page walks through adding a `Tool` end-to-end.
+
+== When this applies
+
+* You want to use the *opt-in tool-calling path*
+  (xref:tutorials/first-tool-call.adoc[STANDAPP_TOOL_CALLING=1]).
+* The default single-shot `SKaiNetLLMService` ignores tools entirely; this
+  guide doesn't apply there.
+
+== The interface
+
+Implement `sk.ainet.apps.kllama.chat.Tool` from skainet-transformers:
+
+[source,kotlin]
+----
+public interface Tool {
+    public val definition: ToolDefinition
+    public fun execute(arguments: kotlinx.serialization.json.JsonObject): String
+}
+----
+
+`ToolDefinition` carries `name`, `description`, and a `parameters` JSON
+Schema as a `JsonObject`. The model never instantiates anything Kotlin-side —
+it only sees the schema as text in the rendered system message and produces
+JSON arguments back.
+
+== Reference implementation
+
+`llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/GitTools.kt` —
+`GetRecentCommitsTool` — is the canonical example. Three things to copy:
+
+. `definition` declares a JSON-Schema for `parameters`. Keep it tight: the
+  fewer optional fields, the easier for a small model.
+. `execute` parses each argument defensively — the model may send `days` as
+  string, integer, or double depending on the round.
+. `execute` returns a *short string*. The result becomes a `TOOL` message
+  appended to the conversation; long tool results blow up prefill cost on
+  the next round.
+
+== Tool-registration flow
+
+[mermaid]
+----
+flowchart TB
+    A[Implement Tool] --> B[Pass into ToolCallingLLMService.create]
+    B --> C[Service registers it in ToolRegistry]
+    C --> D[ChatTemplate.apply renders schema into system message]
+    D --> E[Model emits tool-call JSON in its output]
+    E --> F[ToolCallParser extracts ToolCall from raw text]
+    F --> G[ToolCallValidator checks args against schema]
+    G --> H[ToolRegistry.execute calls your Tool.execute]
+    H --> I[Result becomes TOOL message; loop re-renders + generates again]
+----
+
+== Add it to the CLI
+
+The shortest path is to extend `LLMServiceFactory.createToolCallingForGit`
+or add a sibling factory method that takes a list of tools. For example:
+
+[source,kotlin]
+----
+// llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/LLMServiceFactory.kt
+fun createToolCallingForGitWithExtras(
+    repoDir: String,
+    extras: List<Tool>,
+): LLMService {
+    val modelPath = …  // existing extraction logic
+    val tools = listOf<Tool>(GetRecentCommitsTool(repoDir)) + extras
+    return ToolCallingLLMService.create(modelPath, tools, DEFAULT_SYSTEM_PROMPT)
+}
+----
+
+`ToolCallingLLMService.create` already accepts `tools: List<Tool>`, so no
+upstream change is needed for the service itself.
+
+== Validate against a small tool first
+
+Once registered, exercise it with a *minimal* prompt that asks for exactly
+one tool call. Avoid composite tasks (`fetch X then summarise Y`) until the
+tool is proven to be reachable. Watch for:
+
+* `[STAGE/TOOL REGISTERED]` includes your tool's name.
+* `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` contains your `parameters`
+  schema verbatim.
+* `[GitTool]`-style log line from your tool prints when it executes — add
+  one in your `execute` if you want it visible.
+
+If the model emits a tool-call JSON in stdout but the tool never executes,
+the parser couldn't recognise the format — see
+xref:reference/tool-call-parsers.adoc[Tool-call parsers] for what's
+accepted.
+
+== Schema constraints to keep in mind
+
+* The 1B model is bad at JSON it has not seen. Stick with `string`,
+  `integer`, `boolean`, and `array` of those — avoid nested objects unless
+  you're on a 7B+.
+* `required` fields are *strict* — the model often omits them. Provide
+  sensible defaults inside `execute` and document the field as required
+  anyway, so the schema doesn't lie.
+* Description text on each property matters more than you'd think — the
+  model uses it to decide what value to put there.
+
+== See also
+
+* xref:reference/chat-templates.adoc[Chat templates] — how your schema
+  ends up rendered into the system message.
+* xref:reference/tool-call-parsers.adoc[Tool-call parsers] — what JSON
+  shapes the parser accepts.
+* xref:explanation/agent-loop-internals.adoc[Agent-loop internals] — the
+  full round lifecycle.

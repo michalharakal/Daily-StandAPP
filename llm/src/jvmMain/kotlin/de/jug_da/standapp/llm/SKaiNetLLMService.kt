@@ -37,20 +37,32 @@ class SKaiNetLLMService private constructor(
             .temperature(effectiveTemperature)
             .build()
         val fullPrompt = formatLlama3Turn(systemPrompt, prompt)
-        System.err.println("[SKaiNetLLMService] generate(): prompt=${fullPrompt.length} chars, maxTokens=$maxTokens, temp=$effectiveTemperature")
+        System.err.println("[STAGE/INPUT] system=${systemPrompt.length}ch user=${prompt.length}ch wrapped=${fullPrompt.length}ch maxTokens=$maxTokens temp=$effectiveTemperature")
+        System.err.println("[STAGE/SYSTEM PROMPT] >>>")
+        System.err.println(systemPrompt)
+        System.err.println("[STAGE/SYSTEM PROMPT] <<<")
+        System.err.println("[STAGE/USER PROMPT] >>>")
+        System.err.println(prompt)
+        System.err.println("[STAGE/USER PROMPT] <<<")
+        System.err.println("[STAGE/WRAPPED PROMPT (Llama 3 turn tags)] >>>")
+        System.err.println(fullPrompt)
+        System.err.println("[STAGE/WRAPPED PROMPT (Llama 3 turn tags)] <<<")
         var tokensProduced = 0
         val started = System.nanoTime()
         val result = session.generate(fullPrompt, config) { token ->
             tokensProduced++
             if (tokensProduced == 1) {
                 val ttfb = (System.nanoTime() - started) / 1_000_000
-                System.err.println("[SKaiNetLLMService] first token after ${ttfb}ms")
+                System.err.println("[STAGE/PREFILL DONE] first token after ${ttfb}ms")
             }
             System.out.print(token)
             System.out.flush()
         }
         val totalMs = (System.nanoTime() - started) / 1_000_000
-        System.err.println("[SKaiNetLLMService] done: $tokensProduced tokens in ${totalMs}ms (${"%.2f".format(tokensProduced * 1000.0 / totalMs)} tok/s)")
+        System.err.println("[STAGE/COMPLETE] $tokensProduced tokens in ${totalMs}ms (${"%.2f".format(tokensProduced * 1000.0 / totalMs)} tok/s)")
+        System.err.println("[STAGE/FINAL ANSWER] >>>")
+        System.err.println(result)
+        System.err.println("[STAGE/FINAL ANSWER] <<<")
         result
     }
 

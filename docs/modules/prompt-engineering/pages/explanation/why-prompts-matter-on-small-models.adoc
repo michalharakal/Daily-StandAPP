@@ -1,0 +1,166 @@
+= Why Prompts Matter on Small Models
+:toc: left
+:icons: font
+
+A 1B-parameter model has roughly a *thousandth* of the capacity of GPT-4
+or Claude. Tactics that feel like superstition on a frontier model are
+load-bearing on a 1B. This page is the conceptual argument behind
+xref:how-to/tune-prompts-for-1b.adoc[the tuning how-to].
+
+== Capacity, structure, and the structural prior
+
+A language model is a function that, given a prefix, outputs a
+probability distribution over the next token. At every step it is
+*sampling* from that distribution.
+
+A frontier model has enough internal structure that even a vague
+instruction ("summarise these commits") seeds a coherent output
+distribution. The model has seen hundreds of standup-report examples in
+training; it has an internal template it can imitate.
+
+A 1B model has not. Its internal "standup report" prior is much weaker.
+Asked to "summarise these commits", it might:
+
+* Repeat the input verbatim (low-entropy mode).
+* Drift into pleasantries ("That's a great set of commits!").
+* Generate plausible-looking but unrelated content.
+* Hallucinate commit IDs and authors that aren't in the input.
+
+The fix is to *give it a structural prior in the prompt* — explicit
+section headings, slot-filling instructions, and short examples. The
+model no longer has to invent the structure; it has to fill in slots.
+Slot-filling is much easier than free generation for a small model.
+
+== Why explicit headings work
+
+This is the difference between:
+
+[source,subs="-attributes"]
+.Open-ended (high-capacity-needed)
+----
+Summarise these commits as a daily standup report.
+
+{{commits}}
+----
+
+…and:
+
+[source,subs="-attributes"]
+.Skeleton (low-capacity-needed)
+----
+Produce a report with three sections:
+
+## Yesterday
+(work completed)
+
+## Today
+(planned work)
+
+## Blockers
+(obstacles, or "None")
+
+Commits:
+{{commits}}
+----
+
+The skeleton constrains the output distribution at every section
+boundary. After "## Yesterday\n", the model's next-token distribution
+sharply favours summary-prose tokens; after "## Blockers\n", it sharply
+favours short bullets or "None". The model spends its capacity on
+*content* rather than *format invention*.
+
+This is why `DefaultPrompts.SUMMARY_USER` looks the way it does. The
+parenthetical instructions per heading are not for stylistic flourish —
+they're additional structural anchors that tell the model what kind of
+content goes in each slot.
+
+== Why "exactly once" doesn't work
+
+A 1B can't reliably count, and "exactly once" is a counting constraint.
+The current tool-calling system prompt says:
+
+[source]
+----
+… call the `get_recent_commits` tool exactly once …
+----
+
+The model agrees in principle but routinely:
+
+* Calls the tool multiple times.
+* Doesn't call it at all.
+* Emits something that looks like a tool call but is malformed.
+
+A more robust framing for a small model is *positional*: "Your first
+output must be a tool call. Format: …\{example\}… ." Position is something
+the model can track better than count.
+
+== Token-budget reasoning: why prefill cost dominates
+
+Inference time on CPU is roughly:
+
+[source]
+----
+total_time ≈ prefill_time + (generated_tokens × per_token_time)
+----
+
+For a 1B Q8 on a recent x86_64:
+
+* `per_token_time` ≈ 50–80 ms with native CPU kernels.
+* `prefill_time` is roughly 0.2–0.5 ms per *input* token (no autoregressive
+  loop — kernel processes the whole prompt as a matrix multiply).
+
+So a 200-token prompt with 200 tokens of output costs:
+
+[source]
+----
+200 × 0.4ms + 200 × 60ms = 80ms + 12000ms ≈ 12s
+----
+
+But a 2000-token prompt with the same 200-token output costs:
+
+[source]
+----
+2000 × 0.4ms + 200 × 60ms = 800ms + 12000ms ≈ 12.8s
+----
+
+So far so good — prefill is cheap when it's working. But on the
+agent-loop path with the Panama Vector fallback, prefill drops to ~50–80
+ms per input token, and a 2000-token prompt becomes:
+
+[source]
+----
+2000 × 70ms + 200 × 60ms = 140000ms + 12000ms ≈ 152s
+----
+
+Plus, every tool-call round re-renders and re-prefills the *entire
+conversation*. Six rounds × multi-second prefill × Panama-Vector-only
+path × a sufficiently long conversation = the 14-minute prefill we
+observed in
+xref:explanation/negative-sample-2026-05-05.adoc[the negative sample].
+
+The takeaway: *keep prompts short* on small models, and especially short
+on the agent-loop path. The system prompt is the worst offender because
+it gets re-rendered every round.
+
+== When to give up on small models
+
+For some tasks, no amount of prompt tuning rescues a 1B:
+
+* Complex reasoning with chained tool calls (frontier-model territory).
+* Anything that requires accurate counting or arithmetic.
+* Tasks with strict JSON-output requirements *and* nontrivial content
+  (the model picks one to do well).
+* Tasks with subtle constraint composition ("X but only when Y unless Z").
+
+The signal: if your prompt is more than ~500 chars and includes
+multiple "but" or "unless" clauses, you've outgrown the 1B. Switch to
+3B (Llama 3.2 3B Instruct on the REST path) or 7B (Qwen 3 7B Instruct).
+
+== See also
+
+* xref:how-to/tune-prompts-for-1b.adoc[How-to: tune prompts for a 1B
+  model] — the practical recipe.
+* xref:reference/model-selection.adoc[Model selection] — when to escalate
+  to 3B/7B/cloud.
+* xref:explanation/negative-sample-2026-05-05.adoc[Negative sample] — what
+  happens when the 1B is asked to do too much.

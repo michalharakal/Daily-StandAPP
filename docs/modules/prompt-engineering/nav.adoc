@@ -1,0 +1,21 @@
+.Prompt Engineering
+* xref:index.adoc[Overview]
+* Tutorials
+** xref:tutorials/getting-started.adoc[Getting started]
+** xref:tutorials/first-tool-call.adoc[Your first tool call]
+* How-to guides
+** xref:how-to/add-a-new-tool.adoc[Add a new tool]
+** xref:how-to/switch-chat-template.adoc[Switch chat template]
+** xref:how-to/tune-prompts-for-1b.adoc[Tune prompts for a 1B model]
+** xref:how-to/debug-with-stage-logs.adoc[Debug with stage logs]
+* Reference
+** xref:reference/chat-templates.adoc[Chat templates]
+** xref:reference/tool-call-parsers.adoc[Tool-call parsers]
+** xref:reference/stage-logs.adoc[Stage logs]
+** xref:reference/model-selection.adoc[Model selection]
+** xref:reference/prompt-templates.adoc[Prompt templates]
+* Explanation
+** xref:explanation/divio-overview.adoc[Divio framework]
+** xref:explanation/why-prompts-matter-on-small-models.adoc[Why prompts matter on small models]
+** xref:explanation/agent-loop-internals.adoc[Agent-loop internals]
+** xref:explanation/negative-sample-2026-05-05.adoc[Negative sample (2026-05-05)]

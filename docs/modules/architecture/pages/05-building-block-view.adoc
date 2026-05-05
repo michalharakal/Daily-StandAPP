@@ -109,7 +109,12 @@ graph TB
 
 == 5.2 Module: llm (Level 2)
 
-The LLM module provides AI inference with a pluggable architecture. Two backends are available, selected via the `MCP_LLM_BACKEND` environment variable (default: `SKAINET`). The SKAINET path drives a `JavaAgentLoop` from `skainet-transformers` 0.21.1 — the model itself calls registered `JavaTool` instances mid-conversation.
+The LLM module provides AI inference with a pluggable architecture. Two
+backends are available, selected via `MCP_LLM_BACKEND` (default: `SKAINET`).
+The SKAINET backend itself has two paths: the default single-shot
+`SKaiNetLLMService` (raw `KLlamaSession.generate`) and the opt-in
+`ToolCallingLLMService` (driven by `JavaAgentLoop` from `skainet-transformers`),
+gated by `STANDAPP_TOOL_CALLING=1`.
 
 [mermaid]
 ----
@@ -121,16 +126,15 @@ graph TB
             LCONFIG[LLMConfig]
             SERVICE[LLMService<br/>interface]
             REST[RestApiLLMService]
-            SKLLM[SKaiNetLLMService]
+            SKLLM[SKaiNetLLMService<br/>raw single-shot]
+            TCLLM[ToolCallingLLMService<br/>opt-in agent loop]
             EML[EmbeddedModelLoader]
         end
 
-        subgraph "jvmMain / agent loop"
+        subgraph "jvmMain / agent loop (opt-in)"
             AGENT[JavaAgentLoop<br/>skainet-transformers]
             SESS[KLlamaSession<br/>kllama runtime]
-            T1[GetCurrentDateTool]
-            T2[GitCommitsByAuthorTool]
-            T3[GitAllCommitsTool]
+            TOOL[GetRecentCommitsTool]
         end
     end
 
@@ -141,25 +145,25 @@ graph TB
     FACTORY --> BACKEND
     FACTORY --> LCONFIG
     FACTORY --> SKLLM
+    FACTORY --> TCLLM
     FACTORY --> REST
     FACTORY --> EML
     EML --> GGUF
     SKLLM --> SERVICE
+    TCLLM --> SERVICE
     REST --> SERVICE
-    SKLLM --> AGENT
+    SKLLM --> SESS
+    TCLLM --> AGENT
     AGENT --> SESS
-    AGENT --> T1
-    AGENT --> T2
-    AGENT --> T3
+    AGENT --> TOOL
 
     style SERVICE fill:#fff9c4
     style FACTORY fill:#e8f5e9
     style SKLLM fill:#fff3e0
+    style TCLLM fill:#fff3e0
     style REST fill:#fff3e0
     style AGENT fill:#c8e6c9
-    style T1 fill:#c8e6c9
-    style T2 fill:#c8e6c9
-    style T3 fill:#c8e6c9
+    style TOOL fill:#c8e6c9
     style GGUF fill:#ffe0b2
 ----
 
@@ -182,25 +186,36 @@ graph TB
 |Data class for programmatic backend configuration (modelPath, baseUrl, modelName, apiKey)
 
 |`SKaiNetLLMService`
-|Wraps a `KLlamaSession` + a `JavaAgentLoop`. `generate()` delegates to `agent.chat(prompt, tokenConsumer)`, which drives a tool-calling conversation. Implements `AutoCloseable` so the session is released cleanly.
+|Default SKAINET path. Wraps a `KLlamaSession`; `generate()` calls
+`session.generate(wrappedPrompt, config)` once. Wrapping is `formatLlama3Turn`
+inline (the chat template is hand-rolled, not delegated to skainet-transformers).
+Emits `[STAGE/...]` logs for system/user/wrapped prompts, prefill TTFT, and
+final answer. Implements `AutoCloseable`.
+
+|`ToolCallingLLMService`
+|Opt-in SKAINET path (`STANDAPP_TOOL_CALLING=1`). Wraps a `KLlamaSession` +
+a `JavaAgentLoop` from `skainet-transformers`. `generate()` registers tools,
+renders the round-0 chat template for inspection, and delegates to
+`agent.chat(prompt, tokenConsumer)`. Logs every observable transition under
+`[STAGE/...]`. Implements `AutoCloseable`.
+
+|`GetRecentCommitsTool`
+|`Tool` (skainet-transformers public interface) wrapping `getAllCommitsInPeriod`
+/ `commitsByAuthorAndPeriod` from the `data` module. Schema: `{days: int,
+author?: string}`. The repo path is captured at construction time, never asked
+of the model. Caps results at 50 commits and emits `[GitTool]` log lines.
 
 |`EmbeddedModelLoader`
 |Locates `models/Llama-3.2-1B-Instruct-Q8_0.gguf` on the classpath and extracts it to `~/.cache/standapp/models/` on first launch (idempotent — skipped when the cached file size matches the resource).
 
-|`GetCurrentDateTool`
-|`JavaTool` returning today's UTC date + current instant; lets the model resolve relative phrases ("yesterday", "last week") before computing a date window.
-
-|`GitCommitsByAuthorTool`
-|`JavaTool` wrapping `commitsByAuthorAndPeriod` from the `data` module. Schema: `{repoDir, author, startDate, endDate}` (ISO-8601 instants).
-
-|`GitAllCommitsTool`
-|`JavaTool` wrapping `getAllCommitsInPeriod`. Schema: `{repoDir, startDate, endDate}`.
-
 |`RestApiLLMService`
-|OpenAI-compatible REST endpoint client (works with Ollama, llama.cpp server, LM Studio, vLLM). Uses the legacy single-shot prompt path — no tool calling.
+|OpenAI-compatible REST endpoint client (works with Ollama, llama.cpp server, LM Studio, vLLM). Always single-shot — no tool calling.
 |===
 
-NOTE: New backends can be added by implementing the `LLMService` interface and registering them in `LLMServiceFactory`. New tools can be added by implementing `JavaTool` and inserting them into `SKaiNetLLMService.defaultTools()`.
+NOTE: New backends can be added by implementing the `LLMService` interface and
+registering them in `LLMServiceFactory`. New tools for the opt-in path can be
+added by implementing `sk.ainet.apps.kllama.chat.Tool` and passing them to
+`ToolCallingLLMService.create(modelPath, tools=…)`.
 
 == 5.3 Module: data (Level 2)
 

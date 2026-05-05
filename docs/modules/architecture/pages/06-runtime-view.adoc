@@ -5,7 +5,13 @@
 
 [IMPORTANT]
 ====
-**Doc status (2026-04-30):** the SKAINET-backend sequence diagram further down (CLI → Service → JavaAgentLoop → tool calls → JGit) was rolled back during validation. The 1B model could not drive tool calls reliably; today the CLI pre-fetches commits and hands the model a fully-formed prompt, and `JavaAgentLoop` is not on the runtime path. The MCP-server flow (§6.1) is unaffected. See plan `continue-with-general-effort-groovy-coral.md` §V3 + §V7.2.
+**Doc status (2026-05-05):** the SKAINET backend now has two paths.
+The default (§6.5) is the single-shot one: CLI pre-fetches commits and hands the
+model a fully-formed prompt via `SKaiNetLLMService` — no agent loop, no tool
+parsing. Setting `STANDAPP_TOOL_CALLING=1` opts into the agent-loop path (§6.2):
+`ToolCallingLLMService` builds a `JavaAgentLoop` with a single `get_recent_commits`
+tool and lets the model drive the fetch. The 1B reliability problem from 2026-04-30
+is unsolved — opt-in is the compromise. See ADR-011.
 ====
 
 == 6.1 MCP Tool Call: Get Commits by Author
@@ -45,9 +51,12 @@ sequenceDiagram
     Transport-->>Client: tool result
 ----
 
-== 6.2 LLM Standup Summary via Agent Loop (SKAINET path)
+== 6.2 LLM Standup Summary via Agent Loop (SKAINET, opt-in)
 
-This is the canonical SKAINET-backend flow. The CLI no longer pre-fetches commits — it hands the model a high-level task, and the model itself drives `JavaTool` calls until it has the data it needs.
+Opt-in via `STANDAPP_TOOL_CALLING=1`. The CLI does not pre-fetch commits — it hands
+the model a short task prompt, and the agent loop drives a single `get_recent_commits`
+tool call before producing the summary. See §8 (Crosscutting Concepts) for the chat
+template + tool-call processing details.
 
 [mermaid]
 ----
@@ -56,43 +65,45 @@ sequenceDiagram
     participant CLI as StandAPP-cli
     participant Factory as LLMServiceFactory
     participant EML as EmbeddedModelLoader
-    participant Service as SKaiNetLLMService
-    participant Loop as JavaAgentLoop
+    participant Service as ToolCallingLLMService
+    participant Agent as JavaAgentLoop
     participant Model as KLlamaSession<br/>(Llama 3.2 1B Q8_0)
-    participant T1 as GetCurrentDateTool
-    participant T2 as GitCommitsByAuthorTool
+    participant Tool as GetRecentCommitsTool
     participant Git as JGit (data module)
 
-    User->>CLI: standapp --repo R --days 7
-    CLI->>Factory: create()
+    User->>CLI: STANDAPP_TOOL_CALLING=1<br/>standapp --repo R --days 7
+    CLI->>Factory: createToolCallingForGit(repoDir=R)
     Factory->>EML: extract()
     EML-->>Factory: ~/.cache/standapp/models/...gguf
-    Factory->>Service: SKaiNetLLMService.create(path)
-    Note over Service: builds JavaAgentLoop with<br/>3 JavaTools + llama3 template
+    Factory->>Service: ToolCallingLLMService.create(path, [GetRecentCommitsTool(R)])
+    Note over Service: log [STAGE/MODEL LOAD]
 
-    CLI->>Service: generate("Summarise standup for repo R, last 7 days. Workflow: 1) get_current_date 2) compute window 3) call git tool 4) summarise.")
-    Service->>Loop: agent.chat(prompt)
+    CLI->>Service: generate("Summarise the work … call get_recent_commits …")
+    Note over Service: log [STAGE/INPUT], [STAGE/SYSTEM PROMPT],<br/>[STAGE/USER PROMPT], [STAGE/RENDERED CHAT TEMPLATE]
+    Service->>Agent: agent.chat(prompt, tokenConsumer)
 
-    Loop->>Model: render llama3 chat template with tool schemas
-    Model-->>Loop: <tool_call>{name:get_current_date,args:{}}
-    Loop->>T1: execute({})
-    T1-->>Loop: today=2026-04-30, now=...
+    Agent->>Model: render llama3 chat template + tool schema
+    Model-->>Agent: streamed tokens incl. <tool_call>{name:get_recent_commits, args:{days:7}}
+    Agent->>Tool: execute({days:7})
+    Tool->>Git: getAllCommitsInPeriod(R, start, now)
+    Git-->>Tool: List<GitInfo>
+    Tool-->>Agent: "count=12\n- abc1234 … - …"<br/>(log [GitTool] result)
 
-    Loop->>Model: feed tool result + continue
-    Model-->>Loop: <tool_call>{name:get_commits_by_author, args:{repoDir,author,startDate,endDate}}
-    Loop->>T2: execute(args)
-    T2->>Git: commitsByAuthorAndPeriod(...)
-    Git-->>T2: List<GitInfo>
-    T2-->>Loop: "Found 12 commits: ..."
-
-    Loop->>Model: feed tool result + continue
-    Model-->>Loop: assistant message (final summary)
-    Loop-->>Service: final text
+    Agent->>Model: feed tool result, re-render, continue
+    Model-->>Agent: streamed tokens (final markdown summary)
+    Agent-->>Service: final text
+    Note over Service: log [STAGE/COMPLETE], [STAGE/FINAL ANSWER]
     Service-->>CLI: summary
     CLI-->>User: prints summary
 ----
 
-NOTE: The `REST_API` backend still uses the legacy single-shot path: the CLI pre-fetches commits with JGit, builds a prompt via `PromptBuilder`, and calls `service.generate(prompt)` once.
+NOTE: `JavaAgentLoop` exposes only a streaming-token callback in its public API.
+Mid-stream tool-call markers are visible via the tokens themselves but discrete
+`onToolCalls` / `onToolResult` events are not surfaced to this layer. See TR-09.
+
+NOTE: The `REST_API` backend always uses the legacy single-shot path: the CLI
+pre-fetches commits with JGit, builds a prompt via `PromptBuilder`, and calls
+`service.generate(prompt)` once.
 
 == 6.3 SKaiNET Initialisation (Embedded Model Extraction)
 
@@ -122,11 +133,48 @@ sequenceDiagram
         EML-->>Factory: target Path
     end
 
-    Factory->>KLlama: loadGGUF(target, systemPrompt)
+    Factory->>KLlama: loadGGUF(target, systemPrompt=null)
     KLlama-->>Factory: KLlamaSession
-    Factory->>Builder: session().tool(x3).template("llama3").build()
-    Builder-->>Factory: JavaAgentLoop
-    Factory-->>Factory: SKaiNetLLMService instance
+
+    alt STANDAPP_TOOL_CALLING=1
+        Factory->>Builder: session().tool(GetRecentCommitsTool).template("llama3").build()
+        Builder-->>Factory: JavaAgentLoop
+        Factory-->>Factory: ToolCallingLLMService instance
+    else default
+        Factory-->>Factory: SKaiNetLLMService instance<br/>(raw KLlamaSession.generate path)
+    end
+----
+
+== 6.5 LLM Standup Summary — Default SKAINET Path (Single-Shot)
+
+This is the default flow when `STANDAPP_TOOL_CALLING` is unset. The CLI fetches
+commits with JGit, formats them via `PromptBuilder`, and `SKaiNetLLMService` wraps
+the prompt in Llama 3 turn tags before a single `KLlamaSession.generate(...)` call.
+No agent loop, no tool parsing.
+
+[mermaid]
+----
+sequenceDiagram
+    participant User
+    participant CLI as StandAPP-cli
+    participant PB as PromptBuilder
+    participant Service as SKaiNetLLMService
+    participant Model as KLlamaSession<br/>(Llama 3.2 1B Q8_0)
+    participant Git as JGit (data module)
+
+    User->>CLI: standapp --repo R --days 7
+    CLI->>Git: getAllCommitsInPeriod(R, start, now)
+    Git-->>CLI: List<GitInfo>
+    CLI->>PB: buildUserPrompt(commits, SUMMARY)
+    PB-->>CLI: "Given the following Git commits …\n{{commits}} → expanded"
+
+    CLI->>Service: generate(prompt, temperature, topP)
+    Note over Service: log [STAGE/SYSTEM PROMPT],<br/>[STAGE/USER PROMPT],<br/>[STAGE/WRAPPED PROMPT (Llama 3 turn tags)]
+    Service->>Model: generate(wrappedPrompt, GenerationConfig)
+    Model-->>Service: streamed tokens
+    Note over Service: log [STAGE/PREFILL DONE] on first token,<br/>[STAGE/COMPLETE], [STAGE/FINAL ANSWER]
+    Service-->>CLI: summary
+    CLI-->>User: prints summary
 ----
 
 == 6.4 MCP Server Startup

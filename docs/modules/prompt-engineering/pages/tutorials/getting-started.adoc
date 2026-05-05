@@ -1,0 +1,81 @@
+= Getting Started
+:toc: left
+:icons: font
+
+Generate a daily standup summary from a git repository in three commands. No
+configuration, no API keys, no network — the model is embedded in the JAR.
+
+== Prerequisites
+
+* JDK 21+ (the build uses Gradle toolchain 25)
+* A git repo to summarise (the Daily-StandAPP repo itself works fine)
+
+== Run it
+
+[source,bash]
+----
+git clone <this repo>
+cd Daily-StandAPP
+./gradlew :StandAPP-cli:run --args="--repo /path/to/your/repo --days 2"
+----
+
+That's it. On first run the embedded ~1.3 GB GGUF gets extracted to
+`~/.cache/standapp/models/` (5–15 s on local SSD, idempotent). After that
+extraction every subsequent run skips straight to inference.
+
+== What you'll see
+
+[mermaid]
+----
+flowchart LR
+    USR[You] --> CLI[StandAPP-cli]
+    CLI --> JGIT[JGit]
+    JGIT --> COMMITS[List of commits]
+    COMMITS --> PB[PromptBuilder]
+    PB --> SVC[SKaiNetLLMService]
+    SVC --> MODEL[Llama 3.2 1B Q8_0]
+    MODEL --> ANSWER[Markdown summary]
+    ANSWER --> USR
+----
+
+The CLI fetches commits with JGit, formats them into a Markdown prompt
+using `PromptBuilder`, and asks the embedded model to produce a three-section
+standup report (`## Yesterday`, `## Today`, `## Blockers`).
+
+This is the *default* path — the CLI does the data gathering, the model does
+the writing. No agent loop, no tool calls. Architecturally this is described
+in xref:architecture:06-runtime-view.adoc[Architecture §6.5].
+
+== Output format
+
+The model is asked to produce:
+
+[source,markdown]
+----
+## Yesterday
+- Brief summary of work, referencing commit IDs
+
+## Today
+- Continuation, or "Continue work on …"
+
+## Blockers
+- Anything mentioned, or "None"
+----
+
+If your repo had no commits in the period, the CLI prints
+`No commits found in the last N day(s).` and exits without invoking the model.
+
+== Speed
+
+On a recent x86_64 laptop with the native CPU kernels: ~5–15 s for ~10–20
+commits. The Panama Vector fallback (any JVM 21+ machine) runs ~2–3× slower.
+
+== Next steps
+
+* xref:tutorials/first-tool-call.adoc[Try tool calling] — let the model
+  drive a `get_recent_commits` tool itself instead of pre-feeding it the
+  data. (Caveat: not yet reliable on the embedded 1B; read the negative
+  sample first.)
+* xref:reference/prompt-templates.adoc[See the actual prompts] used here.
+* xref:reference/model-selection.adoc[Pick a different model] for higher
+  quality or faster inference.

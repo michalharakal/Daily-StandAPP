@@ -1,0 +1,178 @@
+= Agent-Loop Internals
+:toc: left
+:icons: font
+
+What `JavaAgentLoop.chat(...)` does between "you call it" and "it returns".
+This page is the conceptual companion to
+xref:architecture:08-crosscutting-concepts.adoc[Architecture §8.7] —
+that section is structural ("the loop has these components"); this page
+is dynamic ("the loop runs through these steps").
+
+== One round of the loop
+
+[mermaid]
+----
+stateDiagram-v2
+    [*] --> Reset
+    Reset: runtime.reset()<br/>(drop KV cache)
+    Reset --> Render
+    Render: template.apply(messages, tools, addGenerationPrompt=true)
+    Render --> Encode
+    Encode: tokenizer.encode(rendered)
+    Encode --> Generate
+    Generate: runtime.generateUntilStop()<br/>(stream tokens until EOS or maxTokens)
+    Generate --> ParseThinking
+    ParseThinking: template.parseThinkingBlocks(rawText)
+    ParseThinking --> Strip
+    Strip: template.stripThinking(rawText)<br/>(visible response)
+    Strip --> ParseTools
+    ParseTools: template.parseToolCalls(rawText)
+    ParseTools --> Decision
+
+    state Decision <<choice>>
+    Decision --> [*]: empty list (final answer)
+    Decision --> Validate: tool calls present
+
+    Validate: ToolCallValidator.validate()<br/>per call
+    Validate --> Execute
+    Execute: ToolRegistry.execute(call)<br/>(invokes Tool.execute)
+    Execute --> AppendToolMsg
+    AppendToolMsg: messages.add(ChatMessage(TOOL, result, callId))
+    AppendToolMsg --> Reset: next round
+----
+
+Each transition can be observed in stage logs and in the streamed token
+output.
+
+== The five-step lifecycle in detail
+
+=== 1. Reset
+
+`runtime.reset()` drops the KV cache from any prior round. This is why
+re-rendering the full conversation is necessary: the cache from round N-1
+is gone, so round N starts the prefill from scratch.
+
+Why drop the cache? Because the rendered prompt for round N includes new
+TOOL messages that weren't in round N-1's prompt. Reusing cache across
+different prompts gives wrong results. The choice is between:
+
+* Drop cache, re-render fully (current approach — simple, correct, slow).
+* Maintain prefix-shared cache and only prefill the new tokens (faster
+  but requires careful prompt design and per-round invariants).
+
+skainet-transformers picks the simple option. This is fine for short
+conversations; it's the dominant cost for long ones (see
+xref:explanation/why-prompts-matter-on-small-models.adoc[the prefill
+math]).
+
+=== 2. Render and encode
+
+`ChatTemplate.apply(messages, tools, addGenerationPrompt=true)` produces
+the full string for the tokenizer. Three parts merge:
+
+* The base system message (often a hardcoded family-specific intro,
+  e.g. "You are Qwen, created by Alibaba Cloud.").
+* The tool schema, rendered into the system message in the family's
+  format (`<tools>`-wrapped JSON for Qwen, bare JSON for Llama 3, etc.).
+* The user-supplied system prompt (merged in by `mergeToolSystem` —
+  the user's text is appended *after* the family prefix and tool schema).
+* The conversation: user turns, assistant turns (including any prior tool
+  calls), tool turns.
+* The trailing assistant prefix (`<|start_header_id|>assistant…` for
+  Llama 3) that prompts the model to start generating.
+
+`tokenizer.encode(rendered)` produces the `IntArray` of token IDs. This
+is the input to the next step.
+
+=== 3. Generate
+
+`runtime.generateUntilStop` runs the model autoregressively. For each
+position:
+
+. Sample a token ID from the model's output distribution (with the
+  configured `temperature`).
+. If it equals `eosTokenId`, stop.
+. If we've produced `maxTokensPerRound` tokens, stop.
+. Otherwise, feed back as the next input token and continue.
+
+The `onToken` callback is invoked per token, decoded to a string fragment.
+This is what `ToolCallingLLMService` uses to stream to stdout.
+
+=== 4. Parse
+
+The raw text output goes through three parsers in sequence (most strict
+first):
+
+. `template.parseThinkingBlocks(rawText)` — extracts any reasoning
+  blocks (Gemma 4's `<|think>...<think|>`, etc.). These are emitted to
+  the listener but *stripped from the conversation* — the next round
+  doesn't see them. This keeps reasoning private and prevents the model
+  from chaining its own thinking across rounds.
+. `template.stripThinking(rawText)` — produces the visible response
+  (raw text minus thinking blocks). This is what gets persisted to the
+  conversation if no tool calls are found.
+. `template.parseToolCalls(rawText)` — extracts structured `ToolCall`
+  objects. The strategies are documented in
+  xref:reference/tool-call-parsers.adoc[the parser reference].
+
+The parser runs against the *raw* text, not the stripped one. This lets
+a model emit a thinking block and a tool call in the same response.
+
+=== 5. Decision: tool calls or final answer?
+
+If `parseToolCalls` returns an empty list, the assistant message is
+treated as the final answer. The visible (thinking-stripped) text is
+appended to the conversation as an `ASSISTANT` message; `onComplete` is
+called; the loop exits and returns.
+
+If there are tool calls:
+
+. Each call is validated against its registered `ToolDefinition`'s JSON
+  schema by `ToolCallValidator`. Invalid calls return their error as
+  the tool result *without* invoking the actual `Tool.execute`. The
+  model sees the error on the next round and can retry.
+. Valid calls are dispatched via `ToolRegistry.execute`, which calls the
+  registered `Tool.execute(arguments: JsonObject)`. The string result
+  becomes a `TOOL` message appended to the conversation.
+. The loop iterates.
+
+== Bounds: why `maxToolRounds=5`
+
+The default `AgentConfig` caps at 5 rounds. After that, the loop returns
+the last visible assistant message regardless. This is a safety net for
+runaway models that keep emitting tool calls.
+
+In practice:
+
+* Round 0: generate first response, often a tool call.
+* Round 1: tool result fed back, generate the answer.
+* That's the happy path — *two* rounds, not five.
+
+If a model is hitting round 5, something is wrong: it's stuck in a
+"think then call" loop, the model wasn't trained for tool calling, or
+the prompt is incompatible with the model. The cap stops it; you should
+diagnose with stage logs.
+
+== What the loop does *not* do
+
+* **Streaming output across tool calls.** The token callback fires
+  during generation, but tool execution is synchronous and blocks the
+  stream. The user sees the model's tokens streamed, then a pause for
+  tool execution, then the next round's tokens.
+* **Parallel tool execution.** Tool calls within a round are executed
+  sequentially in iteration order.
+* **Memory across `chat(...)` invocations.** Each `JavaAgentLoop.chat`
+  starts with the system prompt only (in the
+  `JavaAgentLoop.reset()` sense). For multi-turn conversation, you'd
+  need to manage the message list yourself or extend the facade.
+
+== See also
+
+* `AgentLoop.kt:102-167` upstream — the actual implementation; ~70 lines
+  and worth reading for confirmation.
+* xref:reference/stage-logs.adoc[Stage logs] — what each transition above
+  emits in the logs.
+* xref:reference/tool-call-parsers.adoc[Tool-call parsers] — what
+  `parseToolCalls` accepts.
+* xref:architecture:08-crosscutting-concepts.adoc[Architecture §8.7] —
+  the structural view of the same machinery.

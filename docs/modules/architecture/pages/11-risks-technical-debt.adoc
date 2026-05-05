@@ -60,10 +60,25 @@ On first run, `EmbeddedModelLoader` copies ~1.3 GB out of the JAR to `~/.cache/s
 
 |TR-08
 |*skainet-transformers API Stability*
-Library is at 0.21.1; `JavaAgentLoop`, `JavaTool`, and `ChatTemplate` are stable but pre-1.0.
+Library is at 0.23.x (composite-build at 0.23.1, Maven pin at 0.23.2); `JavaAgentLoop`, `JavaTool`, and `ChatTemplate` are stable but pre-1.0.
 |Minor-version bumps may rename builder methods or template names.
 |BOM-pin both `skainet` and `skainet-transformers` versions. Hold a single golden sample (`SKaiNET-transformers/llm-apps/kllama-java-sample`) as the migration reference.
 |Medium
+
+|TR-09
+|*`AgentListener` not exposed via `JavaAgentLoop` public API*
+The Java facade only takes a `Consumer<String>` token callback. Structured
+`onToolCalls` / `onToolResult` / `onAssistantMessage` / `onThinking`
+transitions are emitted by the underlying `AgentLoop` but not surfaced to
+consumers — `KLlamaSession.runtime` and `.tokenizer` are `internal`, so we
+cannot construct `AgentLoop` directly either.
+|`ToolCallingLLMService` cannot log per-tool-call structured events. Tool-call
+JSON is visible in the streamed token output but not split out. Debugging
+multi-round behaviour relies on reading the inline tokens.
+|Adding `Builder.listener(AgentListener)` to `JavaAgentLoop` upstream is the
+clean fix (a few lines). Until then, render the round-0 chat template
+manually via the public `ChatTemplate` API and watch the streamed tokens.
+|Low
 |===
 
 == 11.2 Technical Debt

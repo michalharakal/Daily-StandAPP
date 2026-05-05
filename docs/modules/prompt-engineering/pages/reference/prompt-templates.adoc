@@ -1,0 +1,201 @@
+= Prompt Templates Reference
+:toc: left
+:icons: font
+
+Every prompt currently used by the LLM module, with file paths so you
+can verify (and iterate) against the live code.
+
+== System prompts
+
+=== Default single-shot path (`SKaiNetLLMService`)
+
+Source: `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/SKaiNetLLMService.kt`,
+`DEFAULT_SYSTEM_PROMPT`.
+
+[source]
+----
+You are a helpful assistant that writes concise daily standup summaries
+from a list of git commits.
+----
+
+Tight (~115 chars). Names the persona and the task in one sentence.
+
+=== Tool-calling path (`ToolCallingLLMService`)
+
+Source: `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/ToolCallingLLMService.kt`,
+`DEFAULT_SYSTEM_PROMPT`.
+
+[source]
+----
+You are a developer assistant. You can call tools to fetch data from the
+user's git repository, then summarise the results. When asked about
+recent commits, call the `get_recent_commits` tool exactly once, then
+write a short standup summary.
+----
+
+Currently ~240 chars. Anti-pattern flagged in
+xref:how-to/tune-prompts-for-1b.adoc[the 1B-tuning page]: two tasks in
+one sentence, "exactly once" constraint the model can't honour, no
+worked example. Likely contributing to the failure documented in
+xref:explanation/negative-sample-2026-05-05.adoc[the negative sample].
+
+=== `LLMService.SYSTEM_PROMPT` (legacy)
+
+Source: `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/LLMService.kt`.
+
+[source]
+----
+You are a helpful assistant that creates concise standup summaries from
+git commit data.
+----
+
+Constant on the `LLMService` companion. Currently *unused* by the
+implementations above (each picks its own). Kept as a default for new
+backends.
+
+== User prompts (engine layer)
+
+Source: `standapp-ai-engine/src/commonMain/kotlin/dev/standapp/engine/control/PromptBuilder.kt`.
+
+=== `DefaultPrompts.SUMMARY_USER`
+
+[source,markdown,subs="-attributes"]
+----
+You are a developer assistant that creates daily standup summaries from
+Git commits.
+
+Given the following Git commits, produce a concise standup report with
+exactly these three markdown headings:
+
+## Yesterday
+(Summarise work completed based on the commits)
+
+## Today
+(Infer planned work as a continuation, or state "Continue work on …")
+
+## Blockers
+(List any obstacles mentioned in commit messages, or "None")
+
+Reference commit IDs where relevant. Be concise and actionable.
+
+Commits:
+{{commits}}
+----
+
+Used by the default single-shot path. The structural skeleton trick
+(explicit headings + parenthetical instructions per heading) is what
+makes a 1B reliable here.
+
+`\{\{commits\}\}` is replaced by `CommitFormatter.format(commits)` —
+multi-line text, one commit per `--- ID / Author / Date / Message`
+block.
+
+=== `DefaultPrompts.JSON_USER`
+
+[source,markdown,subs="-attributes"]
+----
+You are a developer assistant that creates structured standup data from
+Git commits.
+
+Given the following Git commits, produce a JSON object with this exact
+structure:
+{
+  "date": "<YYYY-MM-DD of the most recent commit>",
+  "author": "<primary author name>",
+  "categories": [
+    {
+      "name": "<category, e.g. Bug Fixes, Features, Refactoring, …>",
+      "commits": [
+        {
+          "id": "<commit hash from input>",
+          "summary": "<one-line summary>",
+          "status": "done | in-progress | unknown"
+        }
+      ]
+    }
+  ],
+  "blockers": ["<any obstacles, or empty array>"]
+}
+
+Rules:
+- Output ONLY valid JSON, no markdown fences, no extra text.
+- Every commit ID must come from the input — do not invent IDs.
+- Group commits into logical categories.
+- If there are multiple authors, use the most frequent as "author".
+
+Commits:
+{{commits}}
+----
+
+Used by `PromptType.JSON`. The CLI doesn't expose this prompt type
+directly today; the `:benchmark` module exercises it.
+
+=== `DefaultPrompts.SYSTEM`
+
+[source]
+----
+You are a developer assistant that creates concise standup summaries
+from Git commits.
+----
+
+Engine-layer default system prompt. The CLI doesn't currently use
+this — both LLM services have their own. Kept for symmetry with the
+user-prompt constants.
+
+== Tool-calling user prompt (CLI)
+
+Source: `StandAPP-cli/src/main/kotlin/de/jug_da/app/cli/Main.kt`,
+`buildToolCallingPrompt`.
+
+[source]
+----
+Summarise the work done in this git repository over the last N day(s).
+Call the `get_recent_commits` tool exactly once to fetch the commits
+[(pass author="…")], then write a concise standup report with three
+markdown sections: `## Yesterday`, `## Today`, `## Blockers`. Reference
+commit IDs where useful.
+----
+
+Built dynamically from the CLI args (`--days`, optional `--author`).
+*Note*: the `(pass author="…")` clause is only included when an author
+arg is supplied. Kept short on purpose — the agent loop re-renders it
+on every round, so brevity matters more here than in the single-shot
+path.
+
+== Tool descriptions (rendered into system message)
+
+Source: `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/GitTools.kt`,
+`GetRecentCommitsTool.definition`.
+
+[source,json]
+----
+{
+  "name": "get_recent_commits",
+  "description": "List git commits in the configured repository within the last N days. Returns a compact text summary with id, author, date, and message for each commit.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "days": {
+        "type": "integer",
+        "description": "Number of days to look back from now (positive integer, e.g. 7)."
+      },
+      "author": {
+        "type": "string",
+        "description": "Optional. Author name filter; omit or pass empty string for all authors."
+      }
+    },
+    "required": ["days"]
+  }
+}
+----
+
+The `description` text on each parameter is what the model uses to
+decide what value to put there — keep it specific and actionable, not
+just a type restatement.
+
+== See also
+
+* xref:how-to/tune-prompts-for-1b.adoc[How-to: tune prompts for a 1B
+  model] — the why behind these shapes.
+* xref:explanation/why-prompts-matter-on-small-models.adoc[Why prompts
+  matter on small models] — the conceptual argument.

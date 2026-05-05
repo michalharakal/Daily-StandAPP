@@ -10,7 +10,6 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
-        mavenLocal()
         mavenCentral()
     }
 }
@@ -21,6 +20,15 @@ include(":standapp-ai-engine")
 
 // Cloud API - OpenAI-compatible REST API modules
 include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-api:agent")
+
+// Composite build: source-level dependency on SKaiNET-transformers (which itself
+// composite-includes SKaiNET). Substitutes the sk.ainet.transformers:* coordinates
+// used in libs.versions.toml with the local project, so the daily app exercises
+// in-flight transformers + skainet changes without any mavenLocal staging.
+val localSkaiNetTransformers = file("../SKaiNET-transformers")
+if (localSkaiNetTransformers.isDirectory) {
+    includeBuild(localSkaiNetTransformers)
+}
 
 
 val javaVersion = System.getProperty("java.version")?.substringBefore('.')?.toIntOrNull() ?: 0

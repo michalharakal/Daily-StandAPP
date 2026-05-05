@@ -23,12 +23,17 @@ fun main(args: Array<String>) {
     if (config.author != null) println("Author:     ${config.author}")
     println()
 
+    val toolCalling = System.getenv("STANDAPP_TOOL_CALLING") == "1"
     val backend = LLMBackendType.fromEnv()
-    println("Generating standup summary (backend: $backend)…")
+    println("Generating standup summary (backend: $backend, tool-calling=$toolCalling)…")
     println()
 
     val service = try {
-        LLMServiceFactory.create()
+        if (toolCalling) {
+            LLMServiceFactory.createToolCallingForGit(repoDir = config.repoDir)
+        } else {
+            LLMServiceFactory.create()
+        }
     } catch (e: Exception) {
         System.err.println("Error: ${e.message}")
         System.err.println()
@@ -39,10 +44,10 @@ fun main(args: Array<String>) {
     // STANDAPP_TINY_PROMPT=1 → bypass the heavy summarisation template
     // and just send a one-line prompt. Useful for verifying the inference
     // path is alive without paying the prefill cost of a 1700-token prompt.
-    val summaryPrompt = if (System.getenv("STANDAPP_TINY_PROMPT") == "1") {
-        "Say hello in three words."
-    } else {
-        buildSummarisationPrompt(config) ?: run {
+    val summaryPrompt = when {
+        System.getenv("STANDAPP_TINY_PROMPT") == "1" -> "Say hello in three words."
+        toolCalling -> buildToolCallingPrompt(config)
+        else -> buildSummarisationPrompt(config) ?: run {
             println("No commits found in the last ${config.days} day(s).")
             return
         }
@@ -57,6 +62,21 @@ fun main(args: Array<String>) {
     }
 
     println(summary)
+}
+
+/**
+ * Tool-calling prompt: keep it short. The model is expected to call
+ * `get_recent_commits` to fetch the actual commit list, then summarise.
+ * Including the author hint only when set lets the model pass it through.
+ */
+private fun buildToolCallingPrompt(config: CliConfig): String = buildString {
+    append("Summarise the work done in this git repository over the last ${config.days} day(s). ")
+    append("Call the `get_recent_commits` tool exactly once to fetch the commits")
+    if (config.author != null) {
+        append(" (pass author=\"${config.author}\")")
+    }
+    append(", then write a concise standup report with three markdown sections: ")
+    append("`## Yesterday`, `## Today`, `## Blockers`. Reference commit IDs where useful.")
 }
 
 private fun buildSummarisationPrompt(config: CliConfig): String? {
@@ -136,9 +156,16 @@ private fun printUsage() {
           MCP_LLM_MODEL_PATH    Optional. Override the embedded GGUF (SKAINET only).
           MCP_LLM_REST_BASE_URL REST endpoint (default: http://localhost:11434)
           MCP_LLM_REST_MODEL    Model name for REST API (default: llama3.2:3b)
+          STANDAPP_TOOL_CALLING Set to 1 to drive the model through the tool-calling
+                                agent loop (registers a `get_recent_commits` git tool
+                                and lets the model fetch commits on demand). SKAINET only.
+          STANDAPP_TINY_PROMPT  Set to 1 to bypass summarisation (smoke-test inference path).
 
         Example (uses embedded model):
           standapp --repo /path/to/repo --days 7
+
+        Example (tool calling, with verbose stage logs to stderr):
+          STANDAPP_TOOL_CALLING=1 standapp --repo /path/to/repo --days 7
 
         Example (REST backend):
           MCP_LLM_BACKEND=REST_API standapp --repo /path/to/repo --days 7

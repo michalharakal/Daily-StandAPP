@@ -1,0 +1,100 @@
+= The Divio Documentation Framework
+:toc: left
+:icons: font
+
+Why this module is split into four quadrants, and how to navigate it.
+
+== The four quadrants
+
+The https://documentation.divio.com/[Divio framework] argues that good
+documentation has four distinct purposes, each of which works best as a
+separate page (or section) with its own writing style:
+
+[mermaid]
+----
+flowchart TB
+    subgraph LEARNING["Learning-oriented"]
+        TUT[Tutorials<br/>Take the user by the hand<br/>through a successful experience]
+    end
+    subgraph TASK["Goal-oriented"]
+        HOWTO[How-to guides<br/>Practical steps for<br/>a specific real-world goal]
+    end
+    subgraph INFO["Information-oriented"]
+        REF[Reference<br/>Accurate, complete<br/>technical descriptions]
+    end
+    subgraph UNDERSTANDING["Understanding-oriented"]
+        EXP[Explanation<br/>Discursive context<br/>that illuminates the topic]
+    end
+----
+
+The user's *intent* dictates which one they want:
+
+[cols="2,3,2"]
+|===
+|Reader intent |Section |Pages here
+
+|"I'm new — what does this even do?"
+|Tutorials
+|`getting-started`, `first-tool-call`
+
+|"I want to do X"
+|How-to guides
+|`add-a-new-tool`, `switch-chat-template`, `tune-prompts-for-1b`,
+`debug-with-stage-logs`
+
+|"What's the value/format/signature of …?"
+|Reference
+|`chat-templates`, `tool-call-parsers`, `stage-logs`,
+`model-selection`, `prompt-templates`
+
+|"Why does it work this way?"
+|Explanation
+|`divio-overview` (this page), `why-prompts-matter-on-small-models`,
+`agent-loop-internals`, `negative-sample-2026-05-05`
+|===
+
+== Why the split matters
+
+Mixing modes is the single most common documentation failure. A
+"tutorial" that breaks for a recipe of how to swap out a model, then
+breaks again to explain why prompts matter, leaves all three audiences
+unsatisfied.
+
+Concretely:
+
+* **Tutorials** must work end-to-end without the reader making choices.
+  If you find yourself writing "you can also do X" — that's a how-to.
+* **How-to guides** assume the reader already knows the fundamentals.
+  No "let me first explain what a chat template is" — that's tutorial or
+  explanation territory.
+* **Reference** is dry by design. No narrative, no preferences, no
+  recommendations. If the page reads like prose, it's not reference.
+* **Explanation** is the only quadrant where opinions and tradeoffs
+  belong. A reference page that says "we recommend Qwen because …" is
+  smuggling explanation into reference.
+
+== Conventions in this module
+
+* Each page has `:toc: left` so the navigation always shows the page
+  outline.
+* Mermaid diagrams use `flowchart` (not `graph`) for left-to-right
+  reading and `sequenceDiagram` for time-ordered interactions.
+* Cross-references use Antora xref syntax:
+  `xref:reference/chat-templates.adoc[label]` for in-module,
+  `xref:architecture:08-crosscutting-concepts.adoc[label]` for
+  across-module.
+* When a page must mention the *current state of the code*, it cites
+  `file_path:line_number` so the citation can be re-validated by `grep`.
+* When a page describes a known issue, it cross-links to a TR (technical
+  risk) entry in xref:architecture:11-risks-technical-debt.adoc[§11] so
+  the issue can be tracked centrally.
+
+== Where to go from here
+
+* Newcomer: xref:tutorials/getting-started.adoc[Tutorials → Getting started].
+* Curious about a known issue:
+  xref:explanation/negative-sample-2026-05-05.adoc[the 2026-05-05
+  negative sample] is the most data-rich page in the module.
+* Looking for a specific format detail:
+  xref:reference/chat-templates.adoc[Reference → Chat templates] or
+  xref:reference/tool-call-parsers.adoc[Reference → Tool-call parsers].
