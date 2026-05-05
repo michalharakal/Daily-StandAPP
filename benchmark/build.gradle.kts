@@ -5,6 +5,38 @@ plugins {
     kotlin("plugin.serialization") version libs.versions.kotlin.get()
 }
 
+// ---------------------------------------------------------------------------
+// Optional alternative-engine integration. Enabled via Gradle properties:
+//
+//   ./gradlew :benchmark:jvmRun -Pdeliverance.enabled=true
+//   ./gradlew :benchmark:jvmRun -Pqxotic.enabled=true
+//
+// When a property is set:
+//   - the corresponding source set under src/jvmMain/<engine>/ is included
+//   - the engine's coordinates are added as implementation deps
+//   - mavenLocal() is added to repositories (alternatives don't publish to
+//     Maven Central; see scripts/setup-bench-engines.sh)
+//
+// When unset (CI default), nothing changes and the alternative engines are
+// not on the classpath. BenchmarkEngineRegistry's reflection lookup returns
+// null and the relevant BENCH_*_MODEL env vars print a helpful warning.
+// ---------------------------------------------------------------------------
+val deliveranceEnabled: Boolean = providers.gradleProperty("deliverance.enabled")
+    .map { it.toBoolean() }.orElse(false).get()
+val qxoticEnabled: Boolean = providers.gradleProperty("qxotic.enabled")
+    .map { it.toBoolean() }.orElse(false).get()
+
+if (deliveranceEnabled || qxoticEnabled) {
+    // Project-level repositories shadow the settings-level dependency
+    // resolution config — re-declare both so the Kotlin compiler plugin
+    // (resolved from Central) and the alternative engines (mavenLocal) both
+    // resolve.
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
+}
+
 kotlin {
     jvmToolchain(25)
 
@@ -25,8 +57,20 @@ kotlin {
             implementation(project(":standapp-ai-engine"))
         }
 
-        jvmMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+        jvmMain {
+            if (deliveranceEnabled) {
+                kotlin.srcDir("src/jvmMain/deliverance")
+            }
+            if (qxoticEnabled) {
+                kotlin.srcDir("src/jvmMain/qxotic")
+            }
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+                if (deliveranceEnabled) {
+                    implementation(libs.deliverance.core)
+                    implementation(libs.deliverance.safetensors)
+                }
+            }
         }
 
         commonTest.dependencies {

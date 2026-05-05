@@ -1,10 +1,7 @@
-package de.jug_da.standapp.llm
+package de.jug_da.standapp.benchmark.engines
 
-// Commented out – Deliverance dependency removed, using local backends only.
-// To re-enable, uncomment the code below and restore the deliverance dependencies in build.gradle.kts.
-
-/*
 import com.codahale.metrics.MetricRegistry
+import de.jug_da.standapp.llm.LLMService
 import io.teknek.deliverance.DType
 import io.teknek.deliverance.generator.GeneratorParameters
 import io.teknek.deliverance.model.AbstractModel
@@ -19,9 +16,15 @@ import java.io.File
 import java.util.UUID
 
 /**
- * LLM backend powered by Deliverance (pure Java inference engine).
+ * Benchmark-only LLM backend powered by Deliverance
+ * (https://github.com/edwardcapriolo/deliverance).
  *
- * Runs transformer models in-process on the JVM using Java's Vector API.
+ * Pure-Java JVM inference engine, used here to demonstrate that the project's
+ * `LLMService` abstraction holds across different in-process engines. NOT on
+ * the production classpath — this file is only compiled when the benchmark
+ * module is built with `-Pdeliverance.enabled=true`. Production code paths
+ * stay clean of `io.teknek.deliverance` deps.
+ *
  * Bridges Deliverance's synchronous inference to [LLMService]'s suspend API
  * by running on [Dispatchers.Default] (compute pool).
  */
@@ -33,7 +36,7 @@ class DeliveranceLLMService private constructor(
         prompt: String,
         maxTokens: Int,
         temperature: Float,
-        topP: Float
+        topP: Float,
     ): String = withContext(Dispatchers.Default) {
         val promptSupport = model.promptSupport()
         val ctx = if (promptSupport.isPresent) {
@@ -55,25 +58,21 @@ class DeliveranceLLMService private constructor(
 
     companion object {
         /**
-         * Load a model from a HuggingFace repo and return a ready-to-use [DeliveranceLLMService].
-         *
-         * @param modelOwner HuggingFace model owner (e.g. "TinyLlama")
-         * @param modelName  HuggingFace model name (e.g. "TinyLlama-1.1B-Chat-v1.0")
+         * Load a model from a HuggingFace repo and return a ready-to-use
+         * [DeliveranceLLMService]. Reflectively invoked from
+         * `BenchmarkEngineRegistry` — keep the signature `(String, String)`.
          */
+        @JvmStatic
         fun create(modelOwner: String, modelName: String): DeliveranceLLMService {
-            println("[DeliveranceLLMService] Loading model $modelOwner/$modelName...")
+            println("[DeliveranceLLMService] Loading model $modelOwner/$modelName ...")
             val fetcher = ModelFetcher(modelOwner, modelName)
             val modelDir = fetcher.maybeDownload()
             return createFromPath(modelDir, fetcher)
         }
 
-        /**
-         * Load a model from a local directory.
-         *
-         * @param modelPath path to the directory containing model files (config.json, safetensors)
-         */
+        @JvmStatic
         fun createFromPath(modelPath: File, fetcher: ModelFetcher? = null): DeliveranceLLMService {
-            println("[DeliveranceLLMService] Loading model from ${modelPath.absolutePath}...")
+            println("[DeliveranceLLMService] Loading model from ${modelPath.absolutePath} ...")
             val metricRegistry = MetricRegistry()
             val tensorCache = TensorCache(metricRegistry)
             val model = ModelSupport.loadModel(
@@ -86,9 +85,8 @@ class DeliveranceLLMService private constructor(
                 KvBufferCacheSettings(true),
                 fetcher,
             )
-            println("[DeliveranceLLMService] Model loaded successfully.")
+            println("[DeliveranceLLMService] Model loaded.")
             return DeliveranceLLMService(model)
         }
     }
 }
-*/

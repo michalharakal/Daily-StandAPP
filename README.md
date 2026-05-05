@@ -69,6 +69,9 @@ The `:benchmark` module evaluates local LLM backends for standup summary generat
 - At least one backend available:
   - **LM Studio** or **Ollama** running locally or on a remote machine, or
   - **SKAINET** with a GGUF model file on disk
+- Optional benchmark-only alternative engines:
+  - **Deliverance** — pure-Java JVM inference. Requires `./scripts/setup-bench-engines.sh` (clones the repo + `mvn install -DskipTests` into `~/.m2`), then build with `-Pdeliverance.enabled=true`.
+  - **qxotic** — alternative JVM inference. Same pattern (placeholder until upstream POM publishes).
 
 ### Unit Tests
 

@@ -1,9 +1,6 @@
 package de.jug_da.standapp.benchmark
 
-import de.jug_da.standapp.llm.LLMBackendType
-import de.jug_da.standapp.llm.LLMConfig
 import de.jug_da.standapp.llm.LLMService
-import de.jug_da.standapp.llm.LLMServiceFactory
 import dev.standapp.engine.control.PromptBuilder
 import dev.standapp.engine.control.QualityScorer
 import dev.standapp.engine.entity.PromptType
@@ -12,10 +9,16 @@ import java.io.File
 
 /**
  * Orchestrates benchmark runs: loads cases, calls backends, collects scores and metrics.
+ *
+ * `backends` maps a human-readable name (e.g. "SKAINET", "REST_API (local)",
+ * "DELIVERANCE") to a *factory* that produces an [LLMService]. Using factories
+ * (rather than `(LLMBackendType, LLMConfig)` pairs) lets benchmark-only engines
+ * — Deliverance, qxotic — plug in via reflection without their classes needing
+ * to live in the production `LLMBackendType` enum.
  */
 class BenchmarkRunner(
     private val benchDir: File,
-    private val backends: Map<String, Pair<LLMBackendType, LLMConfig>>,
+    private val backends: Map<String, () -> LLMService>,
     private val runsPerCase: Int = 5,
     private val warmupRuns: Int = 0,
     private val caseFilter: Set<String>? = null,
@@ -39,12 +42,11 @@ class BenchmarkRunner(
         println("Runs per case: $runsPerCase (+$warmupRuns warm-up, discarded)")
         println()
 
-        for ((backendName, backendSpec) in backends) {
-            val (backendType, config) = backendSpec
+        for ((backendName, factory) in backends) {
             println("═══ Backend: $backendName ═══")
 
             val service: LLMService = try {
-                LLMServiceFactory.create(backendType, config)
+                factory()
             } catch (e: Exception) {
                 println("  SKIP — failed to create backend: ${e.message}")
                 continue

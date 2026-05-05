@@ -19,3 +19,7 @@ captures
 
 # Embedded LLM weights — fetched on demand via `uv run scripts/download-model.py`
 llm/src/jvmMain/resources/models/*.gguf
+
+# Benchmark-only alternative-engine clones (Deliverance, qxotic). Installed
+# into ~/.m2 by scripts/setup-bench-engines.sh; not part of the project tree.
+external/

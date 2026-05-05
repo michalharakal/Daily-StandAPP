@@ -1,7 +1,10 @@
 package de.jug_da.standapp.benchmark
 
+import de.jug_da.standapp.benchmark.engines.BenchmarkEngineRegistry
 import de.jug_da.standapp.llm.LLMBackendType
 import de.jug_da.standapp.llm.LLMConfig
+import de.jug_da.standapp.llm.LLMService
+import de.jug_da.standapp.llm.LLMServiceFactory
 import dev.standapp.engine.entity.PromptType
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -24,6 +27,11 @@ import java.io.File
  * - BENCH_CLOUD_MODEL       — cloud model name (default: gpt-4o-mini)
  * - BENCH_CLOUD_API_KEY     — optional cloud Bearer token (falls back to OPENAI_API_KEY)
  * - MCP_LLM_MODEL_PATH      — GGUF model path for SKAINET backend
+ * - BENCH_DELIVERANCE_MODEL — HuggingFace owner/name for the DELIVERANCE engine,
+ *                              e.g. "TinyLlama/TinyLlama-1.1B-Chat-v1.0".
+ *                              Requires building with `-Pdeliverance.enabled=true`
+ *                              and `scripts/setup-bench-engines.sh` having installed
+ *                              the deliverance jars to ~/.m2 first.
  */
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
@@ -59,32 +67,52 @@ fun main() {
         ?.split(",")
         ?.map { it.trim().uppercase() }
 
-    // Build backend configurations
-    val backends = mutableMapOf<String, Pair<LLMBackendType, LLMConfig>>()
+    // Build backend factories. Each entry produces an LLMService on demand.
+    val backends = mutableMapOf<String, () -> LLMService>()
 
     if (requestedBackends == null || "SKAINET" in requestedBackends) {
         // SKAINET: empty modelPath now means "use the embedded Llama 3.2 1B GGUF resource".
-        backends["SKAINET"] = LLMBackendType.SKAINET to LLMConfig(modelPath = modelPath)
+        backends["SKAINET"] = {
+            LLMServiceFactory.create(LLMBackendType.SKAINET, LLMConfig(modelPath = modelPath))
+        }
     }
 
     if (requestedBackends == null || "REST_API" in requestedBackends) {
-        backends["REST_API (local)"] = LLMBackendType.REST_API to LLMConfig(
-            baseUrl = localUrl,
-            modelName = localModel,
-            apiKey = localApiKey,
-        )
+        backends["REST_API (local)"] = {
+            LLMServiceFactory.create(
+                LLMBackendType.REST_API,
+                LLMConfig(baseUrl = localUrl, modelName = localModel, apiKey = localApiKey),
+            )
+        }
     }
 
     // Mandatory cloud baseline
     if (cloudUrl != null) {
-        backends["REST_API (cloud)"] = LLMBackendType.REST_API to LLMConfig(
-            baseUrl = cloudUrl,
-            modelName = cloudModel,
-            apiKey = cloudApiKey,
-        )
+        backends["REST_API (cloud)"] = {
+            LLMServiceFactory.create(
+                LLMBackendType.REST_API,
+                LLMConfig(baseUrl = cloudUrl, modelName = cloudModel, apiKey = cloudApiKey),
+            )
+        }
     } else {
         println("WARN: BENCH_CLOUD_URL not set — cloud baseline will be skipped")
         println("      Set BENCH_CLOUD_URL to an OpenAI-compatible endpoint for mandatory cloud comparison")
+    }
+
+    // Benchmark-only alternative engines (Deliverance, qxotic) plug in via
+    // reflection. If their conditional source set wasn't included at build
+    // time (i.e. -Pdeliverance.enabled=true), the registry simply returns
+    // null and we print a hint.
+    val deliveranceModel = System.getenv("BENCH_DELIVERANCE_MODEL")
+    if (deliveranceModel != null && (requestedBackends == null || "DELIVERANCE" in requestedBackends)) {
+        val factory = BenchmarkEngineRegistry.deliveranceFactory(deliveranceModel)
+        if (factory != null) {
+            backends["DELIVERANCE"] = factory
+        } else {
+            println("WARN: BENCH_DELIVERANCE_MODEL=$deliveranceModel set but DeliveranceLLMService is not on the classpath.")
+            println("      Re-run with: ./gradlew :benchmark:jvmRun -Pdeliverance.enabled=true")
+            println("      And first install the deliverance jars: ./scripts/setup-bench-engines.sh")
+        }
     }
 
     if (backends.isEmpty()) {
