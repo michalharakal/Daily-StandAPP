@@ -152,7 +152,8 @@ java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.
 |----------|---------|-------------|
 | `BENCH_DIR` | `./bench` | Directory containing `case-XX.json` test files |
 | `BENCH_BACKENDS` | all | Comma-separated list: `SKAINET`, `REST_API` |
-| `BENCH_RUNS` | `5` | Number of repeated runs per case (for determinism scoring) |
+| `BENCH_RUNS` | `5` | Number of measured runs per case (for determinism scoring) |
+| `BENCH_WARMUP` | `0` | Discarded warm-up runs before measurement (cold-start JIT/class-load bias) |
 | `BENCH_CASES` | all | Comma-separated case IDs, e.g. `case-01,case-08` |
 | `BENCH_PROMPTS` | both | Comma-separated prompt types: `SUMMARY`, `JSON` |
 | `BENCH_LOCAL_URL` | `http://localhost:1234` | Local REST endpoint URL (LM Studio, Ollama, etc.) |

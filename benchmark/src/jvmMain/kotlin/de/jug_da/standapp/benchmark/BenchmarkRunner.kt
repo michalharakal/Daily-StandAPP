@@ -17,6 +17,7 @@ class BenchmarkRunner(
     private val benchDir: File,
     private val backends: Map<String, Pair<LLMBackendType, LLMConfig>>,
     private val runsPerCase: Int = 5,
+    private val warmupRuns: Int = 0,
     private val caseFilter: Set<String>? = null,
     private val promptTypes: List<PromptType> = PromptType.entries,
     private val timeoutMs: Long = 30_000,
@@ -35,7 +36,7 @@ class BenchmarkRunner(
         }
         println("Backends: ${backends.keys.joinToString()}")
         println("Prompt types: ${promptTypes.joinToString()}")
-        println("Runs per case: $runsPerCase")
+        println("Runs per case: $runsPerCase (+$warmupRuns warm-up, discarded)")
         println()
 
         for ((backendName, backendSpec) in backends) {
@@ -58,6 +59,27 @@ class BenchmarkRunner(
 
                 for (promptType in promptTypes) {
                     val prompt = promptBuilder.buildUserPrompt(commitInfos, promptType)
+
+                    // Warm-up runs neutralise JIT compilation, class loading, and
+                    // KV-cache allocation costs that bias the first measured runs.
+                    // Results are discarded; they do not feed determinism either.
+                    for (warmupIdx in 1..warmupRuns) {
+                        val warmStart = System.currentTimeMillis()
+                        try {
+                            withTimeoutOrNull(timeoutMs) {
+                                service.generate(
+                                    prompt = prompt,
+                                    maxTokens = LLMService.DEFAULT_MAX_TOKENS,
+                                    temperature = LLMService.DEFAULT_TEMPERATURE,
+                                    topP = LLMService.DEFAULT_TOP_P,
+                                )
+                            }
+                        } catch (e: Exception) {
+                            println("  WARMUP-ERROR ${case.id}/$promptType warmup $warmupIdx: ${e.message}")
+                        }
+                        val warmMs = System.currentTimeMillis() - warmStart
+                        println("  ~ ${case.id}/$promptType warmup $warmupIdx — ${warmMs}ms (discarded)")
+                    }
 
                     for (runIdx in 1..runsPerCase) {
                         val heapBefore = Metrics.heapUsageMb()

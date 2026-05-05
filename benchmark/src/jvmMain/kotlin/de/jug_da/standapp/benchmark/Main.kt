@@ -12,7 +12,9 @@ import java.io.File
  * Environment variables:
  * - BENCH_DIR               — path to bench/ directory (default: ./bench)
  * - BENCH_BACKENDS          — comma-separated backend names to test (default: all)
- * - BENCH_RUNS              — number of runs per case (default: 5)
+ * - BENCH_RUNS              — number of measured runs per case (default: 5)
+ * - BENCH_WARMUP             — discarded warm-up runs before measurement (default: 0).
+ *                              Use to neutralise JIT/class-loading bias on cold starts.
  * - BENCH_CASES             — comma-separated case ids to run (default: all)
  * - BENCH_PROMPTS           — comma-separated prompt types: SUMMARY,JSON (default: both)
  * - BENCH_LOCAL_URL         — local REST endpoint URL (default: http://localhost:1234)
@@ -26,6 +28,7 @@ import java.io.File
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
     val runsPerCase = System.getenv("BENCH_RUNS")?.toIntOrNull() ?: 5
+    val warmupRuns = (System.getenv("BENCH_WARMUP")?.toIntOrNull() ?: 0).coerceAtLeast(0)
     val caseFilter = System.getenv("BENCH_CASES")
         ?.split(",")
         ?.map { it.trim() }
@@ -96,6 +99,7 @@ fun main() {
         benchDir = benchDir,
         backends = backends,
         runsPerCase = runsPerCase,
+        warmupRuns = warmupRuns,
         caseFilter = caseFilter,
         promptTypes = promptFilter,
     )
