@@ -12,6 +12,23 @@ IMPORTANT: *Privacy is the core principle.* All AI processing runs locally using
 
 The documentation follows the https://arc42.org[arc42] template for software architecture documentation.
 
+[TIP]
+====
+**Looking for the practitioner-facing handbook?** This site has two sibling
+modules:
+
+* **Architecture** (this module, arc42-organised) — *what the system is*:
+  building blocks, runtime view, ADRs, risks. You're reading it now.
+* xref:prompt-engineering:index.adoc[**Prompt Engineering Handbook**]
+  (Divio-organised) — *how to use the system well*: model selection,
+  chat templates, tool-call parsers, the four engine workshop tutorials,
+  and the inference-stages explanation.
+
+The left-side navigation collapses each module independently; expand
+"Prompt Engineering" to see its tutorials, how-tos, reference, and
+explanation pages.
+====
+
 == Quick Navigation
 
 [cols="1,3"]
@@ -53,6 +70,35 @@ The documentation follows the https://arc42.org[arc42] template for software arc
 
 |xref:12-glossary.adoc[12. Glossary]
 |Important domain and technical terms
+|===
+
+== Companion Module: Prompt Engineering Handbook
+
+xref:prompt-engineering:index.adoc[*Prompt Engineering Handbook*] is the
+practitioner-facing companion to this arc42 module. Where the
+architecture chapters describe *what the system is*, the handbook
+describes *how to use it well*.
+
+[cols="1,3"]
+|===
+|Section |Description
+
+|xref:prompt-engineering:tutorials/getting-started.adoc[Tutorials]
+|Learning by doing — including a 4-exercise workshop that runs the
+benchmark suite against four different LLM engines (SKAINET, Ollama/LM
+Studio, Deliverance, qxotic) to demonstrate engine-independence.
+
+|xref:prompt-engineering:how-to/add-a-new-tool.adoc[How-to guides]
+|Add a new tool to the agent loop, switch chat templates, tune prompts
+for a 1B model, debug with stage logs.
+
+|xref:prompt-engineering:reference/chat-templates.adoc[Reference]
+|Chat-template formats per family, tool-call parser strategies, stage
+logs, model-selection matrix, prompt templates.
+
+|xref:prompt-engineering:explanation/inference-stages.adoc[Explanation]
+|Inference stages (tokens → prefill → decode), agent-loop internals,
+why prompts matter on small models, the 2026-05-05 negative sample.
 |===
 
 == Architecture Overview
