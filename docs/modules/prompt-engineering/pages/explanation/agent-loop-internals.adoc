@@ -69,7 +69,7 @@ different prompts gives wrong results. The choice is between:
 * Maintain prefix-shared cache and only prefill the new tokens (faster
   but requires careful prompt design and per-round invariants).
 
-skainet-transformers picks the simple option. This is fine for short
+SKaiNET-transformers picks the simple option. This is fine for short
 conversations; it's the dominant cost for long ones (see
 xref:explanation/why-prompts-matter-on-small-models.adoc[the prefill
 math]).

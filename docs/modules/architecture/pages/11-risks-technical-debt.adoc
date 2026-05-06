@@ -59,7 +59,7 @@ On first run, `EmbeddedModelLoader` copies ~1.3 GB out of the JAR to `~/.cache/s
 |Low
 
 |TR-08
-|*skainet-transformers API Stability*
+|*SKaiNET-transformers API Stability*
 Library is at 0.23.x (composite-build at 0.23.1, Maven pin at 0.23.2); `JavaAgentLoop`, `JavaTool`, and `ChatTemplate` are stable but pre-1.0.
 |Minor-version bumps may rename builder methods or template names.
 |BOM-pin both `skainet` and `skainet-transformers` versions. Hold a single golden sample (`SKaiNET-transformers/llm-apps/kllama-java-sample`) as the migration reference.

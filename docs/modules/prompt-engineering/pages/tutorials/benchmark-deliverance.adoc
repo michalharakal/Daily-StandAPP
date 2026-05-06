@@ -124,7 +124,7 @@ the same hardware:
 * **Auto pass rate** is typically comparable to SKAINET on TinyLlama
   1.1B — both are sub-2B models with limited structural fidelity.
 * **Latency** is usually 1.5–3× SKAINET's, because Deliverance's pure
-  Java inference doesn't have skainet's native FFM kernels. Same model
+  Java inference doesn't have SKaiNET's native FFM kernels. Same model
   weights, slower runtime.
 * **Determinism** depends on the sampling implementation; Deliverance's
   `GeneratorParameters.withTemperature()` honours the value strictly.

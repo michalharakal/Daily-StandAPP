@@ -326,7 +326,7 @@ MCP_LLM_REST_API_KEY=optional-key
 
 ---
 
-== ADR-010: Adopt skainet-transformers Agent Loop with Embedded Model
+== ADR-010: Adopt SKaiNET-transformers Agent Loop with Embedded Model
 
 === Status
 Accepted (2026-04-30)
@@ -338,11 +338,11 @@ The previous LLM path called `KLlamaSession.generate(prompt, config)` once with 
 * The model had no way to ask for additional data — the operator had to pre-decide author / date window / depth.
 * Distribution required users to download a multi-GB GGUF and set `MCP_LLM_MODEL_PATH` themselves.
 
-Maven Central now has skainet 0.21.0 plus a sibling library, skainet-transformers 0.21.1, that exposes `JavaAgentLoop`, `JavaTool`, and `JavaTools.definition()` — a tool-calling agent loop layered on the existing kllama runtime.
+Maven Central now has SKaiNET 0.21.0 plus a sibling library, SKaiNET-transformers 0.21.1, that exposes `JavaAgentLoop`, `JavaTool`, and `JavaTools.definition()` — a tool-calling agent loop layered on the existing kllama runtime.
 
 === Decision
 
-. **Upgrade** to skainet 0.21.0 and adopt skainet-transformers 0.21.1, BOM-managed (per the `skainet-consumer-setup` skill: BOM at `sk.ainet`, libraries at `sk.ainet.core` / `sk.ainet.llm`).
+. **Upgrade** to SKaiNET 0.21.0 and adopt SKaiNET-transformers 0.21.1, BOM-managed (per the `skainet-consumer-setup` skill: BOM at `sk.ainet`, libraries at `sk.ainet.core` / `sk.ainet.llm`).
 . **Add** a `JavaAgentLoop`-based path *alongside* the single-shot SKAINET path
 (see ADR-011 for the opt-in coexistence). When opted in, the CLI hands the
 model a high-level task and the model calls `get_recent_commits` itself.
@@ -358,7 +358,7 @@ model a high-level task and the model calls `get_recent_commits` itself.
 * (+) Single tool-calling code path; tools can be reused by future MCP / web surfaces.
 * (-) Fat JAR is large (~2.0 GB). See §11 risks.
 * (-) First run extracts the GGUF to `~/.cache/standapp/models/` (5-15 s). Idempotent on later runs.
-* (-) Locks us to skainet-transformers' Llama 3 chat-template; switching to a non-Llama family means re-validating the agent loop.
+* (-) Locks us to SKaiNET-transformers' Llama 3 chat-template; switching to a non-Llama family means re-validating the agent loop.
 * (-) JDK 21+ with Panama Vector remains required — same constraint as before.
 
 === Related
@@ -383,7 +383,7 @@ runtime went back to a single `KLlamaSession.generate(...)` call with a
 hand-built Llama 3 turn-tag prompt.
 
 That rollback erased the visible tool-calling surface but kept all the wiring
-(skainet-transformers in `build.gradle.kts`, `JavaAgentLoop` accessible at
+(SKaiNET-transformers in `build.gradle.kts`, `JavaAgentLoop` accessible at
 runtime). Two things now make adding it back useful:
 
 * The `mcp-server` module already exposes git tools to *external* clients;

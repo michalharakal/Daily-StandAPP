@@ -193,7 +193,7 @@ The repo ships a build-time hook that downloads the GGUF *into the source tree* 
 
 |Architecture
 |Llama 3.2
-|Auto-detected by skainet-transformers; chat template is `llama3`.
+|Auto-detected by SKaiNET-transformers; chat template is `llama3`.
 
 |First-run extraction
 |`~/.cache/standapp/models/`

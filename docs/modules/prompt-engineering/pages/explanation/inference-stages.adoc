@@ -232,7 +232,7 @@ re-prefilling on every round.
 
 There's a known optimization (*prefix-shared KV caches* — keep state
 for the unchanged prefix and only prefill the new TOOL message
-suffix) that we don't implement and skainet-transformers'
+suffix) that we don't implement and SKaiNET-transformers'
 `AgentLoop.run` doesn't either. It's an upstream improvement
 opportunity, not a configuration we can flip on.
 

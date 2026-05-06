@@ -76,7 +76,7 @@ graph TB
 
 |`llm`
 |LLM inference abstraction with pluggable backends. SKAINET path runs an embedded Llama 3.2 1B Instruct (Q8_0 GGUF) inside a `JavaAgentLoop` with tool calling.
-|skainet 0.21.0, skainet-transformers 0.21.1 (`JavaAgentLoop`, `JavaTool`), REST API (Ktor Client), Coroutines
+|SKaiNET 0.21.0, SKaiNET-transformers 0.21.1 (`JavaAgentLoop`, `JavaTool`), REST API (Ktor Client), Coroutines
 
 |`data`
 |Git repository access
@@ -132,7 +132,7 @@ graph TB
         end
 
         subgraph "jvmMain / agent loop (opt-in)"
-            AGENT[JavaAgentLoop<br/>skainet-transformers]
+            AGENT[JavaAgentLoop<br/>SKaiNET-transformers]
             SESS[KLlamaSession<br/>kllama runtime]
             TOOL[GetRecentCommitsTool]
         end
@@ -188,7 +188,7 @@ graph TB
 |`SKaiNetLLMService`
 |Default SKAINET path. Wraps a `KLlamaSession`; `generate()` calls
 `session.generate(wrappedPrompt, config)` once. Wrapping is `formatLlama3Turn`
-inline (the chat template is hand-rolled, not delegated to skainet-transformers).
+inline (the chat template is hand-rolled, not delegated to SKaiNET-transformers).
 Emits `[STAGE/...]` logs for system/user/wrapped prompts, prefill TTFT, and
 final answer. Implements `AutoCloseable`.
 
@@ -200,7 +200,7 @@ renders the round-0 chat template for inspection, and delegates to
 `[STAGE/...]`. Implements `AutoCloseable`.
 
 |`GetRecentCommitsTool`
-|`Tool` (skainet-transformers public interface) wrapping `getAllCommitsInPeriod`
+|`Tool` (SKaiNET-transformers public interface) wrapping `getAllCommitsInPeriod`
 / `commitsByAuthorAndPeriod` from the `data` module. Schema: `{days: int,
 author?: string}`. The repo path is captured at construction time, never asked
 of the model. Caps results at 50 commits and emits `[GitTool]` log lines.

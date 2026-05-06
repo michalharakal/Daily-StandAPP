@@ -125,7 +125,7 @@ This is unconfirmed. Investigation needed:
   the agent loop doesn't set up.
 
 Tracked at xref:architecture:11-risks-technical-debt.adoc[TR-08]
-(skainet-transformers API stability includes runtime-construction
+(SKaiNET-transformers API stability includes runtime-construction
 differences).
 
 === Bug 2: Parser missed the fence-wrapped multi-line JSON
@@ -201,7 +201,7 @@ In rough order of expected payoff:
 . **Investigate the kernel-provider load.** Add a one-line log in
   `ToolCallingLLMService` that calls into the kernel SPI directly and
   reports which provider is selected. If the native CPU kernel is
-  available but not chosen, that's an upstream bug in skainet-transformers
+  available but not chosen, that's an upstream bug in SKaiNET-transformers
   worth filing.
 . **Pre-strip code fences in the parser wrapper.** A small wrapper
   around `agent.chat` that intercepts the streamed tokens and strips

@@ -129,7 +129,7 @@ extra logging to `ToolCallingLLMService` or wait for upstream to expose
 
 The single-shot equivalent of the rendered chat template. Unlike the
 agent-loop path, this is built by hand in `formatLlama3Turn` rather than
-delegated to skainet-transformers. Useful when comparing what the
+delegated to SKaiNET-transformers. Useful when comparing what the
 default path sends vs the agent-loop path.
 
 === `[STAGE/PREFILL DONE]`

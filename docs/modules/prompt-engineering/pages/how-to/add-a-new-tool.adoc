@@ -15,7 +15,7 @@ whatever. This page walks through adding a `Tool` end-to-end.
 
 == The interface
 
-Implement `sk.ainet.apps.kllama.chat.Tool` from skainet-transformers:
+Implement `sk.ainet.apps.kllama.chat.Tool` from SKaiNET-transformers:
 
 [source,kotlin]
 ----

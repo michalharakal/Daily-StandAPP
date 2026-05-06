@@ -27,7 +27,7 @@
 |Pure Java, no native dependencies, mature and stable
 
 |*LLM Engine*
-|SKaiNET 0.21.0 + skainet-transformers 0.21.1
+|SKaiNET 0.21.0 + SKaiNET-transformers 0.21.1
 |Pure Kotlin, no Python/native deps, SIMD via Vector API. The `skainet-transformers` agent loop adds tool calling on top of the kllama runtime.
 
 |*LLM Inference Pattern*
@@ -44,7 +44,7 @@
 
 |*Distribution*
 |Self-contained shadow JAR (`StandAPP-cli/build/libs/standapp-*-all.jar`)
-|`com.gradleup.shadow` packages all dependencies plus the embedded GGUF into a single ~2.0 GB JAR. `mergeServiceFiles()` preserves skainet 0.21's `KernelProvider` SPI registrations.
+|`com.gradleup.shadow` packages all dependencies plus the embedded GGUF into a single ~2.0 GB JAR. `mergeServiceFiles()` preserves SKaiNET 0.21's `KernelProvider` SPI registrations.
 |===
 
 == 4.2 Architecture Approach
@@ -122,7 +122,7 @@ val summary = service.generate(prompt = "Summarise the standup for repo X for th
 * (-) Requires JDK 21+ for Vector API
 * (-) One-time model download required (~4GB for 7B models)
 
-=== Decision 2: Pluggable LLM Architecture with skainet-transformers Agent Loop
+=== Decision 2: Pluggable LLM Architecture with SKaiNET-transformers Agent Loop
 
 *Problem*: Need local LLM inference that can dynamically pull data (git history) instead of relying on a pre-built prompt, while keeping the option to fall back to a remote endpoint for development.
 

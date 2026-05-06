@@ -72,7 +72,7 @@ JSON-compatible.
 
 When in doubt, prefer `qwen` or `chatml` — both go through the
 `HermesToolCallParserStrategy`, which has the broadest test coverage in
-skainet-transformers.
+SKaiNET-transformers.
 
 == How resolution works
 
