@@ -12,6 +12,7 @@ const crypto = require('crypto')
 module.exports.register = function ({ config }) {
   const logger = this.getLogger('mermaid-extension')
   const puppeteerConfig = path.join(__dirname, 'puppeteer-config.json')
+  const mermaidConfig = path.join(__dirname, 'mermaid-config.json')
 
   this.on('contentClassified', ({ contentCatalog }) => {
     const tempDir = '/tmp/mermaid-diagrams'
@@ -45,11 +46,20 @@ module.exports.register = function ({ config }) {
           // Write mermaid code to temp file
           fs.writeFileSync(inputFile, diagramCode)
 
-          // Render with mermaid-cli (with --no-sandbox for Docker)
-          execSync(`mmdc -i "${inputFile}" -o "${outputFile}" -b transparent -p "${puppeteerConfig}"`, {
-            stdio: 'pipe',
-            timeout: 60000
-          })
+          // Render with mermaid-cli. -c pins the rendering font to a
+          // generic family so the SVG's glyph-width budget matches what
+          // viewer browsers actually measure (otherwise the rightmost
+          // characters get clipped). -w widens the canvas so wide
+          // sequenceDiagram nodes (e.g. multi-line participant labels)
+          // don't run out of horizontal space inside the bounding box.
+          execSync(
+            `mmdc -i "${inputFile}" -o "${outputFile}" ` +
+              `-b transparent ` +
+              `-p "${puppeteerConfig}" ` +
+              `-c "${mermaidConfig}" ` +
+              `-w 1600`,
+            { stdio: 'pipe', timeout: 60000 }
+          )
 
           // Read generated SVG
           const svg = fs.readFileSync(outputFile, 'utf8')

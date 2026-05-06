@@ -1,0 +1,6 @@
+{
+  "_comment": "Pin the font used during SVG generation to a generic family that resolves on every platform. Without this, mermaid-cli measures text in headless Chromium with one font (e.g. trebuchet ms if installed, FreeFont otherwise) and emits font-family='trebuchet ms' in the SVG. Browsers viewing the rendered SVG then substitute *their* default sans-serif, which has different glyph metrics, and the rightmost characters get clipped because the SVG's bounding box was sized for the original font's metrics.",
+  "theme": "default",
+  "fontFamily": "sans-serif",
+  "themeCSS": "* { font-family: sans-serif !important; }"
+}
