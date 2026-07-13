@@ -1,0 +1,179 @@
+= Requirements: Upgrade, Pipeline DSL, E2E CLI, Benchmark
+:navtitle: Requirements
+
+Requirements for the July 2026 iteration. Each requirement has a stable ID
+(`REQ-nn`) referenced by the xref:design.adoc[design document] (`DES-nn`) and
+the xref:tasks.adoc[implementation tasks] (`T-nn`).
+
+== Scope
+
+Four work streams, in order:
+
+. Bring all upstream dependencies to their latest released versions.
+. Express pre- and post-processing as a typed Kotlin pipeline DSL
+  ("everything as code", the SKaiNET philosophy).
+. Finish the end-to-end CLI: git directory in, standup summary out.
+. Run the full benchmark across all local inference engines and publish the
+  report.
+
+== Functional requirements
+
+=== Dependency currency
+
+[cols="1,5a", options="header"]
+|===
+| ID | Requirement
+
+| REQ-01
+| All third-party dependencies are upgraded to the latest released version
+available on 2026-07-13: Kotlin 2.4.0, Gradle 9.6.1, Ktor 3.5.1,
+kotlinx-coroutines 1.11.0, kotlinx-serialization 1.11.0, kotlinx-io 0.9.1,
+JGit 7.7.0.202606012155-r, MCP Kotlin SDK 0.8.3, Koog 1.0.0,
+shadow plugin 9.5.1.
+
+| REQ-02
+| SKaiNET is upgraded to 0.36.0 (core and transformers, unified version). The
+per-artifact version pins that worked around the broken 0.21.x transformers
+BOM are replaced by the fixed upstream BOMs.
+
+| REQ-03
+| The Deliverance benchmark engine is rebuilt from the latest upstream `main`
+(0.0.11-SNAPSHOT at planning time) and `DeliveranceLLMService` is adapted to
+its current API. `scripts/setup-bench-engines.sh` derives the version from the
+upstream pom instead of hard-coding it.
+
+| REQ-04
+| Deprecated `kotlinx.datetime.Instant` usages are migrated to
+`kotlin.time.Instant`; the `@file:Suppress("DEPRECATION")` annotations they
+required are removed.
+
+| REQ-05
+| Stale documentation is corrected: no claims about a JLama backend
+(never existed in code), current SKaiNET versions in the architecture pages,
+retired technical-debt entries for the fixed transformers BOM.
+|===
+
+=== Pipeline DSL ("everything as code")
+
+[cols="1,5a", options="header"]
+|===
+| ID | Requirement
+
+| REQ-10
+| A typed Kotlin pipeline DSL in `:standapp-ai-engine` composes the stages
+`preprocess → prompt → infer → postprocess` over the types
+`List<CommitInfo> → prompt String → raw String → StandupSummary → ScoredResult`.
+Stage configuration is plain Kotlin code (builder lambdas with `@DslMarker`),
+no configuration files.
+
+| REQ-11
+| The inference stage is injected as a `suspend (system: String, user: String) -> String`
+function. `:standapp-ai-engine` gains no dependency on `:llm`, `:data`, or any
+inference library.
+
+| REQ-12
+| The prompt stage supports both existing prompt types (`SUMMARY` markdown,
+`JSON`) and swapping between them is a one-line change in pipeline code.
+Prompt bytes produced for a given input are identical to the current
+`PromptBuilder`/`CommitFormatter` output.
+
+| REQ-13
+| Post-processing parses LLM output into the existing `StandupSummary` model:
+markdown output via the `## Yesterday` / `## Today` / `## Blockers` headings,
+JSON output via the schema already validated by `QualityScorer`. Strict
+parsing failures raise a typed exception; lenient mode falls back to the raw
+text. An opt-in retry stage re-runs inference when strict parsing fails.
+
+| REQ-14
+| Quality scoring (`QualityScorer`) is available as an opt-in pipeline stage;
+the pipeline derives the valid commit-ID set from its own input.
+
+| REQ-15
+| CLI and benchmark run LLM interactions through the same pipeline
+implementation (single code path).
+|===
+
+=== End-to-end CLI
+
+[cols="1,5a", options="header"]
+|===
+| ID | Requirement
+
+| REQ-20
+| The CLI accepts: `--repo/-r <dir>`, `--author/-a <name>`, `--days/-d <n>`,
+`--since <YYYY-MM-DD>`, `--until <YYYY-MM-DD>`, `--format md\|json\|text`,
+`--backend <name>`, `--model <path>`, `--output <file>`, `--score`,
+`--max-tokens <n>`, `--temperature <f>`, `--tool-calling`, `--help/-h`.
+`--since`/`--until` take precedence over `--days`.
+
+| REQ-21
+| Output formats: `md` (markdown summary), `json` (serialized `ScoredResult`),
+`text` (plain sections). Output goes to stdout or to `--output <file>`. When
+machine-readable output is requested, token streaming does not pollute stdout.
+
+| REQ-22
+| `--score` prints a check-by-check quality report to stderr.
+
+| REQ-23
+| Exit codes: `0` success, `2` usage error, `3` git error or no commits found,
+`4` LLM/backend error, `5` validation failure (failed quality checks or
+exhausted parse retries).
+
+| REQ-24
+| `--backend` and `--model` override the `MCP_LLM_BACKEND` /
+`MCP_LLM_MODEL_PATH` environment variables; the env vars keep working.
+`--tool-calling` supersedes `STANDAPP_TOOL_CALLING=1` (env kept as fallback).
+|===
+
+=== Benchmark
+
+[cols="1,5a", options="header"]
+|===
+| ID | Requirement
+
+| REQ-30
+| A full benchmark run is executed across all local engines — SKAINET
+(embedded GGUF), REST_API (local Ollama), DELIVERANCE, QXOTIC — over all 15
+cases, both prompt types, 5 measured runs plus 1 warm-up each.
+
+| REQ-31
+| The per-run timeout is configurable via `BENCH_TIMEOUT_MS` (the fixed 30 s
+default is known to be exceeded by local engines).
+
+| REQ-32
+| The run produces `benchmark-results/benchmark-report.md` and
+`benchmark-results/benchmark-results.csv`, plus a written comparison summary.
+|===
+
+== Non-functional requirements
+
+[cols="1,5a", options="header"]
+|===
+| ID | Requirement
+
+| REQ-40
+| Privacy first: the default flow performs no network calls; all inference is
+local. (REST_API remains an explicit opt-in.)
+
+| REQ-41
+| Existing tests keep passing without semantic changes: `ScoringTest`,
+`CommitFormatterTest`, `MetricsTest`, `LLMSummarizerStreamTest`,
+`GitClientTest`. `CommitFormatter` output format and `QualityScorer` semantics
+are frozen.
+
+| REQ-42
+| Each upgrade batch is an independently revertible commit with a verification
+gate that passed before commit.
+
+| REQ-43
+| Benchmark results remain comparable with earlier runs: identical prompts,
+identical scoring, same case files.
+
+| REQ-44
+| The code stays readable as talk-demo material: the DSL favours small,
+explicit types over generality; no new CLI argument-parsing dependency.
+
+| REQ-45
+| New logic (parser, pipeline, CLI argument parsing) is covered by unit tests
+runnable without a model download.
+|===

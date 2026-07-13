@@ -1,0 +1,182 @@
+= Design: Upgrade, Pipeline DSL, E2E CLI, Benchmark
+:navtitle: Design
+
+Derived from xref:requirements.adoc[the requirements]; each section states the
+`REQ-nn` it satisfies. Implementation is tracked in xref:tasks.adoc[tasks].
+
+== DES-01 Upgrade strategy: ordered, revertible batches
+
+_Satisfies: REQ-01, REQ-02, REQ-04, REQ-42_
+
+Build infrastructure first, then the interlocked Kotlin/kotlinx family as one
+atomic batch (SKaiNET 0.36.0 is compiled against exactly Kotlin 2.4.0 +
+coroutines/serialization 1.11.0, so this batch must precede it), then
+independent low-risk bumps, then the API-churn upgrades each in an isolated
+commit:
+
+[cols="1,4,4", options="header"]
+|===
+| Batch | Content | Verification gate
+
+| A | Gradle wrapper 9.5.0 → 9.6.1 (`./gradlew wrapper`, run twice)
+  | `./gradlew help` + `:data:jvmTest :benchmark:jvmTest :llm:jvmTest`
+
+| B | Kotlin 2.4.0, coroutines 1.11.0, serialization 1.11.0, kotlinx-io 0.9.1;
+    catalog-literal cleanup in `benchmark/build.gradle.kts`;
+    `kotlinx.datetime.Instant` → `kotlin.time.Instant` (~12 files)
+  | `./gradlew clean build` + module tests + `./gradlew -q javaToolchains`
+
+| C | Ktor 3.5.1, JGit 7.7.0.202606012155-r, shadow 9.5.1;
+    `authorIdent.when` → `whenAsInstant` in `GitClient.jvm.kt`
+  | `:data:jvmTest`, `:cloud-api:server:build`, shadow jar retains
+    `KernelProvider` SPI entry
+
+| D | MCP SDK 0.8.3: types package move, `Tool.Input` → `ToolSchema`,
+    nullable `request.arguments`, kotlinx-io `StdioServerTransport`
+  | `:mcp-server:jvmJar` + stdio JSON-RPC `initialize` smoke
+
+| E | SKaiNET 0.36.0: BOM coordinate `sk.ainet:skainet-bom`, add
+    `sk.ainet.transformers:skainet-transformers-bom` platform, drop
+    per-artifact pins (upstream BOM fixed)
+  | `:llm:jvmTest`, shadow jar, manual inference smoke — raw and
+    tool-calling paths, tok/s sanity
+
+| F | Koog 1.0.0 (`cloud-api:agent` only)
+  | `:cloud-api:agent:build`, run against local `:cloud-api:server`
+
+| G | Deliverance 0.0.11-SNAPSHOT: setup script derives version from pom,
+    resets clone to latest main, requires JDK 25 for Maven;
+    `DeliveranceLLMService` migrated to `ArrayQueueTensorAllocator`,
+    `WrappedForkJoinPool`, `ToolCallParser` APIs
+  | setup script + compile/run with `-Pdeliverance.enabled=true`;
+    plain `:benchmark:jvmTest` stays green
+
+| H | Documentation truth sweep (REQ-05)
+  | docs build
+|===
+
+Fallback for batch E (highest behavioural risk): revert the single commit;
+bisect the 0.32.1–0.35.0 releases; or clone `../SKaiNET-transformers` — the
+existing composite-build guard in `settings.gradle.kts` substitutes it
+automatically.
+
+== DES-02 SummaryParser: LLM output → StandupSummary
+
+_Satisfies: REQ-13_
+
+New `dev.standapp.engine.control.SummaryParser` (object) with
+`parse(raw, promptType, date, author, strict): StandupSummary`, plus
+`parseMarkdown` / `parseJson` and `class SummaryParseException`.
+
+* Markdown: split on the three required headings (same case-insensitive line
+  rule as `QualityScorer.hasRequiredHeadings`); bullet lines become
+  `SummaryItem`s; commit IDs extracted with the same pattern `QualityScorer`
+  uses. Section → status heuristic: Yesterday → `DONE`, Today →
+  `IN_PROGRESS`, Blockers → `UNKNOWN`.
+* JSON: strip optional markdown fences first (small models emit them), parse
+  into the schema `QualityScorer.isJsonSchemaCompliant` already validates,
+  map categories → `SummarySection`, blockers → trailing section.
+* `strict = true` throws `SummaryParseException`; lenient returns
+  `StandupSummary(raw = raw, sections = emptyList(), …)`.
+
+`QualityScorer` and `CommitFormatter` are not modified (REQ-41).
+
+== DES-03 Pipeline DSL
+
+_Satisfies: REQ-10, REQ-11, REQ-12, REQ-14_
+
+New package `dev.standapp.engine.pipeline`:
+
+[source,kotlin]
+----
+typealias Infer = suspend (system: String, user: String) -> String
+
+data class PipelineResult(
+    val prompt: String, val raw: String,
+    val result: ScoredResult, val attempts: Int,
+)
+
+val pipeline = standupPipeline {
+    preprocess  { shortIds(7); limit(50) }          // optional, default identity
+    prompt      { type = PromptType.JSON }          // optional, default SUMMARY
+    infer       { system, user -> service.generate(user, …) }   // required
+    postprocess { parseSummary(); score(); retryOnInvalid(2) }   // optional
+}
+val result: PipelineResult = pipeline.run(commits)
+----
+
+* `@DslMarker`-annotated builders: `StandupPipelineBuilder`,
+  `PreprocessBuilder` (`shortIds`, `limit`, `filter`), `PromptSpec`
+  (`type`, `system`, templates — defaults from `DefaultPrompts`),
+  `PostprocessSpec` (`parseSummary`, `score`, `retryOnInvalid`).
+* `run()` = preprocess → `PromptBuilder.buildUserPrompt` (unchanged prompt
+  bytes, REQ-12) → attempt loop: infer, strict-parse while retries remain,
+  lenient on the last attempt → optional `QualityScorer.score` with
+  `inputIds` computed from the preprocessed commits (REQ-14).
+* Exceptions from `infer` propagate untouched — the benchmark's timeout
+  handling builds on this.
+* Missing `infer` fails at build time (`IllegalStateException`).
+
+Module dependencies unchanged: kotlinx-coroutines + kotlinx-serialization
+only (REQ-11); `kotlinx-coroutines-test` added to `commonTest`.
+
+== DES-04 llm module: streaming sink and backend parsing
+
+_Satisfies: REQ-21, REQ-24_
+
+* `SKaiNetLLMService.create(…, onToken: ((String) -> Unit)? = null)` — default
+  preserves today's stdout streaming; the CLI passes a stderr or no-op sink
+  for `--format json` / `--output` so stdout stays machine-clean.
+* `LLMServiceFactory.create(backendType, config, onToken)` threads the sink.
+* `LLMBackendType.parse(raw)` companion helper shares the validation table
+  with `fromEnv()` so `--backend` and the env var behave identically.
+
+No changes to `LLMService`, `RestApiLLMService`, `ToolCallingLLMService`.
+
+== DES-05 CLI architecture
+
+_Satisfies: REQ-20 – REQ-24, REQ-44_
+
+Three files in `de.jug_da.app.cli`:
+
+* `CliArgs.kt` — hand-rolled parser (no new dependency, REQ-44) producing an
+  immutable `CliArgs` data class; `CliUsageException` on bad input.
+* `OutputRenderer.kt` — `renderMarkdown` / `renderJson`
+  (`ScoredResult` is `@Serializable`) / `renderText` /
+  `renderScoreReport` (stderr).
+* `Main.kt` — thin orchestrator: parse args → resolve time window
+  (`--since`/`--until` win over `--days`) → fetch commits via the existing
+  `GitClient.jvm.kt` helpers (the unfinished `GitService` abstraction stays
+  unused) → build `LLMService` (flags override env) → build and run the
+  pipeline (DES-03) → render → exit code.
+
+Exit codes as constants, documented in `--help`: 0 / 2 usage / 3 git /
+4 LLM / 5 validation.
+
+The `--tool-calling` path keeps its separate agent-loop flow
+(`createToolCallingForGit`) — it is inherently a different topology (the
+model fetches commits itself) and is documented as bypassing the prompt
+stage.
+
+== DES-06 Benchmark on the pipeline
+
+_Satisfies: REQ-15, REQ-31, REQ-43_
+
+`BenchmarkRunner` drops its manual `PromptBuilder`/`QualityScorer` calls and
+builds one pipeline per (service, promptType). The timeout moves inside the
+injected infer lambda: `withTimeoutOrNull(timeoutMs) { … } ?: throw
+InferenceTimeoutException()` (benchmark-local class), counted as today.
+Latency is measured around `pipeline.run` (prompt building is a string
+replace — negligible). Prompt bytes and scoring are unchanged, keeping
+results comparable (REQ-43). `Main.kt` reads `BENCH_TIMEOUT_MS` (REQ-31).
+
+== DES-07 Full benchmark run
+
+_Satisfies: REQ-30, REQ-32, REQ-40_
+
+Prerequisite check (embedded GGUF, Ollama reachable, `setup-bench-engines.sh`
+artifacts, engine models) reported before the long run; then
+`BENCH_BACKENDS=SKAINET,REST_API,DELIVERANCE,QXOTIC` with
+`-Pdeliverance.enabled=true -Pqxotic.enabled=true`, `BENCH_WARMUP=1`,
+`BENCH_TIMEOUT_MS` raised appropriately. Deliverables: report, CSV, prose
+comparison.
