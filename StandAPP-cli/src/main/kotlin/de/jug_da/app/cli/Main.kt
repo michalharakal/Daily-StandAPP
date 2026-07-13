@@ -119,7 +119,10 @@ internal fun run(args: Array<String>): Int {
     // The pipeline as code — preprocess, prompt, infer, and postprocess are
     // all declared right here (see dev.standapp.engine.pipeline).
     val pipeline = standupPipeline {
-        preprocess { shortIds(7) }
+        // firstMessageLine keeps prefill sane on real repos: multi-paragraph
+        // commit bodies multiply prompt tokens (and CPU prefill cost) without
+        // adding summarisable signal.
+        preprocess { shortIds(7); firstMessageLine(120) }
         prompt { type = if (cli.format == OutputFormat.JSON) PromptType.JSON else PromptType.SUMMARY }
         infer { _, user -> service.generate(user, cli.maxTokens, cli.temperature, LLMService.DEFAULT_TOP_P) }
         postprocess {

@@ -110,6 +110,20 @@ class StandupPipelineTest {
     }
 
     @Test
+    fun firstMessageLine_truncates_multiline_bodies_in_prompt() = runTest {
+        val verbose = commits.map {
+            it.copy(message = it.message + "\n\nLong explanatory body\nwith several lines that must not reach the prompt")
+        }
+        val pipeline = standupPipeline {
+            preprocess { firstMessageLine(20) }
+            infer { _, _ -> validMarkdown }
+        }
+        val result = pipeline.run(verbose)
+        assertFalse(result.prompt.contains("Long explanatory body"))
+        assertTrue(result.prompt.contains("Message: Fix broken CI pipel\n") || result.prompt.contains("Fix broken CI pipel"))
+    }
+
+    @Test
     fun default_postprocess_passes_raw_through() = runTest {
         val pipeline = standupPipeline {
             infer { _, _ -> "anything" }

@@ -73,6 +73,20 @@ class PreprocessBuilder {
         steps += { it.take(n) }
     }
 
+    /**
+     * Reduce each commit message to its first line, capped at [maxLength]
+     * chars. Real-world commit bodies run to paragraphs — on a small local
+     * model that multiplies prefill cost (each prompt token is a full
+     * forward pass) without adding summarisable signal.
+     */
+    fun firstMessageLine(maxLength: Int = 120) {
+        steps += { commits ->
+            commits.map { commit ->
+                commit.copy(message = commit.message.lineSequence().first().take(maxLength))
+            }
+        }
+    }
+
     fun filter(predicate: (CommitInfo) -> Boolean) {
         steps += { it.filter(predicate) }
     }
