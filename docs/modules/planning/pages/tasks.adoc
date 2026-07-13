@@ -14,91 +14,91 @@ implements, and names its verification gate. Status values: `open`,
 | Create planning docs (this module): requirements, design, tasks, nav
 | —
 | Antora docs build
-| in progress
+| done
 
 | T-02
 | Gradle wrapper 9.5.0 → 9.6.1
 | DES-01/A; REQ-01, REQ-42
 | `./gradlew help` + `:data:jvmTest :benchmark:jvmTest :llm:jvmTest`
-| open
+| done
 
 | T-03
 | Kotlin 2.4.0 + kotlinx family 1.11.0/0.9.1; catalog-literal cleanup;
   `kotlin.time.Instant` migration
 | DES-01/B; REQ-01, REQ-04
 | `./gradlew clean build` + module tests + `javaToolchains`
-| open
+| done
 
 | T-04
 | Ktor 3.5.1, JGit 7.7.0, shadow 9.5.1; `whenAsInstant` fix
 | DES-01/C; REQ-01
 | `:data:jvmTest`, `:cloud-api:server:build`, KernelProvider in shadow jar
-| open
+| done
 
 | T-05
 | MCP Kotlin SDK 0.8.3 migration in `standapp-server.kt`
 | DES-01/D; REQ-01
 | `:mcp-server:jvmJar` + stdio `initialize` smoke
-| open
+| done
 
 | T-06
 | SKaiNET 0.36.0: BOM coordinates, drop per-artifact pins
 | DES-01/E; REQ-02
 | `:llm:jvmTest` + manual inference smoke (raw + tool-calling)
-| open
+| done
 
 | T-07
 | Koog 1.0.0 migration in `AgentMain.kt`
 | DES-01/F; REQ-01
 | `:cloud-api:agent:build` + run against local server
-| open
+| done
 
 | T-08
 | Deliverance rebuild from upstream main + API migration
 | DES-01/G; REQ-03
 | setup script + `-Pdeliverance.enabled=true` compile & one-case run;
   plain `:benchmark:jvmTest` green
-| open
+| done
 
 | T-09
 | Docs/CLAUDE.md truth sweep (JLama, SKaiNET versions, TR-08)
 | DES-01/H; REQ-05
 | docs build
-| open
+| done
 
 | T-10
 | `SummaryParser` + `SummaryParserTest`
 | DES-02; REQ-13, REQ-45
 | `:standapp-ai-engine:allTests`
-| open
+| done
 
 | T-11
 | Pipeline DSL (`StandupPipeline`, `PipelineDsl`) + `StandupPipelineTest`
 | DES-03; REQ-10–12, REQ-14, REQ-45
 | `:standapp-ai-engine:allTests`
-| open
+| done
 
 | T-12
 | `onToken` sink in `SKaiNetLLMService`/factory; `LLMBackendType.parse`
 | DES-04; REQ-21, REQ-24
 | `:llm:jvmTest` (unchanged tests green)
-| open
+| done
 
 | T-13
 | CLI: `CliArgs`, `OutputRenderer`, `Main` rewrite, exit codes, `CliArgsTest`
 | DES-05; REQ-20–24, REQ-44, REQ-45
 | `:StandAPP-cli:test` + manual e2e runs (md/json/error paths)
-| open
+| done
 
 | T-14
 | `BenchmarkRunner` refactor onto the pipeline; `BENCH_TIMEOUT_MS`
 | DES-06; REQ-15, REQ-31, REQ-43
 | `:benchmark:jvmTest` green + one-case smoke run
-| open
+| done
 
 | T-15
 | Full benchmark run across SKAINET, REST_API, DELIVERANCE, QXOTIC + report
 | DES-07; REQ-30, REQ-32
 | `benchmark-report.md` + CSV delivered
-| open
+| in progress
 |===
