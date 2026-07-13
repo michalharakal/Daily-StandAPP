@@ -57,9 +57,17 @@ internal fun run(args: Array<String>): Int {
         return EXIT_GIT
     }
 
-    // Streaming tokens must not pollute machine-readable stdout.
+    // Streaming tokens must not pollute machine-readable stdout. The same
+    // goes for model-load chatter (factory/engine printlns, library banners):
+    // when stdout carries the result, everything else is diverted to stderr
+    // for the whole generation phase (restored before the final emit).
     val streamTokens = cli.format == OutputFormat.MD && cli.output == null
     val tokenSink: ((String) -> Unit)? = if (streamTokens) null else { _ -> }
+    val redirectStdout = !streamTokens
+
+    val realOut = System.out
+    if (redirectStdout) System.setOut(PrintStream(java.io.FileOutputStream(java.io.FileDescriptor.err), true))
+    try {
 
     val service = try {
         when {
@@ -78,12 +86,12 @@ internal fun run(args: Array<String>): Int {
     // prompt. Verifies the inference path without the full prefill cost.
     if (System.getenv("STANDAPP_TINY_PROMPT") == "1") {
         val reply = runBlocking { service.generate("Say hello in three words.", cli.maxTokens, cli.temperature, LLMService.DEFAULT_TOP_P) }
-        println(reply)
+        realOut.println(reply)
         return EXIT_OK
     }
 
     if (toolCalling) {
-        return runToolCalling(cli, service)
+        return runToolCalling(cli, service, realOut)
     }
 
     val (start, end) = resolveWindow(cli)
@@ -131,7 +139,7 @@ internal fun run(args: Array<String>): Int {
         System.err.println("(model output needed ${result.attempts} attempts)")
     }
 
-    emit(OutputRenderer.render(result, cli.format), cli.output)
+    emit(OutputRenderer.render(result, cli.format), cli.output, realOut)
 
     var exit = EXIT_OK
     result.result.scores?.let { scores ->
@@ -144,13 +152,17 @@ internal fun run(args: Array<String>): Int {
         exit = EXIT_VALIDATION
     }
     return exit
+
+    } finally {
+        if (redirectStdout) System.setOut(realOut)
+    }
 }
 
 /**
  * Tool-calling keeps its own short prompt and skips the pipeline's prompt
  * stage by design: the model fetches commits itself via `get_recent_commits`.
  */
-private fun runToolCalling(cli: CliArgs, service: LLMService): Int {
+private fun runToolCalling(cli: CliArgs, service: LLMService, realOut: PrintStream): Int {
     val prompt = buildString {
         append("Summarise the work done in this git repository over the last ${cli.days} day(s). ")
         append("Call the `get_recent_commits` tool exactly once to fetch the commits")
@@ -164,7 +176,7 @@ private fun runToolCalling(cli: CliArgs, service: LLMService): Int {
         System.err.println("Error during generation: ${e.message}")
         return EXIT_LLM
     }
-    emit(summary.trim(), cli.output)
+    emit(summary.trim(), cli.output, realOut)
     return EXIT_OK
 }
 
@@ -186,12 +198,12 @@ private fun buildConfig(cli: CliArgs): LLMConfig = LLMConfig(
     apiKey = System.getenv("MCP_LLM_REST_API_KEY") ?: System.getenv("OPENAI_API_KEY"),
 )
 
-private fun emit(text: String, outputFile: String?) {
+private fun emit(text: String, outputFile: String?, out: PrintStream) {
     if (outputFile != null) {
         File(outputFile).writeText(text + "\n")
         System.err.println("Summary written to $outputFile")
     } else {
-        println(text)
+        out.println(text)
     }
 }
 
