@@ -4,7 +4,7 @@ import ai.koog.agents.core.agent.AIAgent
 import ai.koog.prompt.executor.clients.openai.OpenAIClientSettings
 import ai.koog.prompt.executor.clients.openai.OpenAILLMClient
 import ai.koog.prompt.executor.clients.openai.OpenAIModels
-import ai.koog.prompt.executor.llms.SingleLLMPromptExecutor
+import ai.koog.prompt.executor.llms.MultiLLMPromptExecutor
 import com.example.llm.server.createLocalAIServer
 import kotlinx.coroutines.runBlocking
 
@@ -16,7 +16,9 @@ fun main(): Unit = runBlocking {
     try {
         val settings = OpenAIClientSettings(baseUrl = "http://localhost:8080")
         val client = OpenAILLMClient(apiKey = "local-no-key-needed", settings = settings)
-        val executor = SingleLLMPromptExecutor(client)
+        // Koog 1.0 dropped SingleLLMPromptExecutor; the vararg-client
+        // MultiLLMPromptExecutor constructor is the single-client path now.
+        val executor = MultiLLMPromptExecutor(client)
 
         val agent = AIAgent(
             promptExecutor = executor,
