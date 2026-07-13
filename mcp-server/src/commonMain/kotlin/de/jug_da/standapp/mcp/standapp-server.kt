@@ -1,13 +1,10 @@
-@file:Suppress("DEPRECATION")
-
 package de.jug_da.standapp.mcp
 
 import de.jug_da.data.git.*
 import de.jug_da.standapp.mcp.tools.GetCommitsByAuthorInput
 import de.jug_da.standapp.mcp.tools.GetAllCommitsInput
 import de.jug_da.standapp.mcp.tools.SchemaUtils
-import io.ktor.utils.io.streams.*
-import io.modelcontextprotocol.kotlin.sdk.*
+import io.modelcontextprotocol.kotlin.sdk.types.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
@@ -15,6 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlin.time.Instant
 import kotlinx.io.asSink
+import kotlinx.io.asSource
 import kotlinx.io.buffered
 import kotlinx.serialization.json.*
 
@@ -37,15 +35,15 @@ fun `run mcp server`() {
         description = """
             Get Git commits by a specific author within a time period. Returns commit information including ID, author, date, and message.
         """.trimIndent(),
-        inputSchema = Tool.Input(
+        inputSchema = ToolSchema(
             properties = SchemaUtils.getCommitsByAuthorInputSchema(),
             required = listOf("repoDir", "author", "startDate", "endDate")
         )
     ) { request ->
-        val repoDir = request.arguments["repoDir"]?.jsonPrimitive?.content
-        val author = request.arguments["author"]?.jsonPrimitive?.content
-        val startDateStr = request.arguments["startDate"]?.jsonPrimitive?.content
-        val endDateStr = request.arguments["endDate"]?.jsonPrimitive?.content
+        val repoDir = request.arguments?.get("repoDir")?.jsonPrimitive?.content
+        val author = request.arguments?.get("author")?.jsonPrimitive?.content
+        val startDateStr = request.arguments?.get("startDate")?.jsonPrimitive?.content
+        val endDateStr = request.arguments?.get("endDate")?.jsonPrimitive?.content
 
         if (repoDir == null || author == null || startDateStr == null || endDateStr == null) {
             return@addTool CallToolResult(
@@ -77,14 +75,14 @@ fun `run mcp server`() {
         description = """
             Get all Git commits within a time period from any author. Returns commit information including ID, author, date, and message.
         """.trimIndent(),
-        inputSchema = Tool.Input(
+        inputSchema = ToolSchema(
             properties = SchemaUtils.getAllCommitsInputSchema(),
             required = listOf("repoDir", "startDate", "endDate")
         )
     ) { request ->
-        val repoDir = request.arguments["repoDir"]?.jsonPrimitive?.content
-        val startDateStr = request.arguments["startDate"]?.jsonPrimitive?.content
-        val endDateStr = request.arguments["endDate"]?.jsonPrimitive?.content
+        val repoDir = request.arguments?.get("repoDir")?.jsonPrimitive?.content
+        val startDateStr = request.arguments?.get("startDate")?.jsonPrimitive?.content
+        val endDateStr = request.arguments?.get("endDate")?.jsonPrimitive?.content
 
         if (repoDir == null || startDateStr == null || endDateStr == null) {
             return@addTool CallToolResult(
@@ -112,7 +110,7 @@ fun `run mcp server`() {
 
     // Create a transport using standard IO for server communication
     val transport = StdioServerTransport(
-        System.`in`.asInput(),
+        System.`in`.asSource().buffered(),
         System.out.asSink().buffered()
     )
 
