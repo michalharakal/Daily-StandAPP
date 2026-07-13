@@ -8,8 +8,8 @@ koog = "0.6.1"
 mcp-kotlin = "0.8.3"
 orgEclipseJgit = "7.7.0.202606012155-r"
 deliverance = "0.0.4-SNAPSHOT"
-skainet = "0.22.1"
-skainet-transformers = "0.23.2"
+skainet = "0.36.0"
+skainet-transformers = "0.36.0"
 slf4jSimple = "2.0.17"
 ktor = "3.5.1"
 shadow = "9.5.1"
@@ -44,8 +44,9 @@ koog-agents = { module = "ai.koog:koog-agents", version.ref = "koog" }
 deliverance-core = { module = "io.teknek.deliverance:core", version.ref = "deliverance" }
 deliverance-safetensors = { module = "io.teknek.deliverance:safetensors", version.ref = "deliverance" }
 
-# SKaiNET — BOM-managed. Both the BOM and libs are published under sk.ainet.core.
-skainet-bom = { module = "sk.ainet.core:skainet-bom", version.ref = "skainet" }
+# SKaiNET — BOM-managed. Since 0.36 the core BOM lives under the sk.ainet group;
+# the library artifacts stay under sk.ainet.core.
+skainet-bom = { module = "sk.ainet:skainet-bom", version.ref = "skainet" }
 skainet-lang-core = { module = "sk.ainet.core:skainet-lang-core" }
 skainet-backend-cpu = { module = "sk.ainet.core:skainet-backend-cpu" }
 # 0.22.0+: native FFM kernel provider (FP32 SGEMM + Q4_K matmul). Sibling to
@@ -56,12 +57,12 @@ skainet-io-core = { module = "sk.ainet.core:skainet-io-core" }
 skainet-io-gguf = { module = "sk.ainet.core:skainet-io-gguf" }
 
 # SKaiNET-transformers — agent loop + tool calling (sk.ainet.transformers group).
-# Note: the published 0.21.1 BOM references an unpublished sk.ainet:skainet-bom:0.21.0,
-# so we hard-pin per-artefact versions for transformers and rely solely on the
-# core BOM. Revisit when an upstream BOM fix ships.
-skainet-tx-runtime-kllama = { module = "sk.ainet.transformers:skainet-transformers-runtime-kllama", version.ref = "skainet-transformers" }
-skainet-tx-agent = { module = "sk.ainet.transformers:skainet-transformers-agent", version.ref = "skainet-transformers" }
-skainet-tx-inference-llama = { module = "sk.ainet.transformers:skainet-transformers-inference-llama", version.ref = "skainet-transformers" }
+# BOM-managed since 0.36: the transformers BOM is self-consistent again
+# (the 0.21.x BOM referenced an unpublished core BOM — that debt is retired).
+skainet-tx-bom = { module = "sk.ainet.transformers:skainet-transformers-bom", version.ref = "skainet-transformers" }
+skainet-tx-runtime-kllama = { module = "sk.ainet.transformers:skainet-transformers-runtime-kllama" }
+skainet-tx-agent = { module = "sk.ainet.transformers:skainet-transformers-agent" }
+skainet-tx-inference-llama = { module = "sk.ainet.transformers:skainet-transformers-inference-llama" }
 
 
 [plugins]
