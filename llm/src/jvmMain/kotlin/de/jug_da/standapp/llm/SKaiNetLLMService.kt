@@ -20,6 +20,7 @@ import java.nio.file.Path
 class SKaiNetLLMService private constructor(
     private val session: KLlamaSession,
     private val systemPrompt: String,
+    private val onToken: (String) -> Unit,
 ) : LLMService, AutoCloseable {
 
     override suspend fun generate(
@@ -55,8 +56,7 @@ class SKaiNetLLMService private constructor(
                 val ttfb = (System.nanoTime() - started) / 1_000_000
                 System.err.println("[STAGE/PREFILL DONE] first token after ${ttfb}ms")
             }
-            System.out.print(token)
-            System.out.flush()
+            onToken(token)
         }
         val totalMs = (System.nanoTime() - started) / 1_000_000
         System.err.println("[STAGE/COMPLETE] $tokensProduced tokens in ${totalMs}ms (${"%.2f".format(tokensProduced * 1000.0 / totalMs)} tok/s)")
@@ -88,14 +88,26 @@ class SKaiNetLLMService private constructor(
             "You are a helpful assistant that writes concise daily standup " +
                     "summaries from a list of git commits."
 
+        /** Default token sink: stream to stdout as tokens arrive. */
+        private val STDOUT_SINK: (String) -> Unit = { token ->
+            System.out.print(token)
+            System.out.flush()
+        }
+
+        /**
+         * [onToken] receives each generated token as it is produced.
+         * Defaults to streaming to stdout; pass a stderr or no-op sink when
+         * stdout must stay machine-readable (e.g. `--format json`).
+         */
         fun create(
             modelPath: Path,
             systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
+            onToken: ((String) -> Unit)? = null,
         ): SKaiNetLLMService {
             println("[SKaiNetLLMService] Loading GGUF model from $modelPath …")
             val session = KLlamaJava.loadGGUF(modelPath, null)
             println("[SKaiNetLLMService] Model loaded; raw KLlamaSession path (no agent loop).")
-            return SKaiNetLLMService(session, systemPrompt)
+            return SKaiNetLLMService(session, systemPrompt, onToken ?: STDOUT_SINK)
         }
     }
 }

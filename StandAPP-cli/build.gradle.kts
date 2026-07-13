@@ -54,6 +54,7 @@ dependencies {
 
     implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.slf4j.simple)
 }
 

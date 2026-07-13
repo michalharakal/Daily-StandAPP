@@ -3,169 +3,238 @@ package de.jug_da.app.cli
 import de.jug_da.data.git.commitsByAuthorAndPeriod
 import de.jug_da.data.git.getAllCommitsInPeriod
 import de.jug_da.standapp.llm.LLMBackendType
+import de.jug_da.standapp.llm.LLMConfig
 import de.jug_da.standapp.llm.LLMService
 import de.jug_da.standapp.llm.LLMServiceFactory
-import dev.standapp.engine.control.PromptBuilder
 import dev.standapp.engine.entity.CommitInfo
 import dev.standapp.engine.entity.PromptType
+import dev.standapp.engine.pipeline.PipelineResult
+import dev.standapp.engine.pipeline.standupPipeline
 import kotlinx.coroutines.runBlocking
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.plus
+import kotlinx.datetime.todayIn
+import java.io.File
+import java.io.PrintStream
+import kotlin.system.exitProcess
+import kotlin.time.Clock
 import kotlin.time.Instant
 
+const val EXIT_OK = 0
+const val EXIT_USAGE = 2
+const val EXIT_GIT = 3
+const val EXIT_LLM = 4
+const val EXIT_VALIDATION = 5
+
 fun main(args: Array<String>) {
-    val config = parseArgs(args)
+    exitProcess(run(args))
+}
 
-    println("Daily StandAPP - Standup Summary Generator")
-    println("=".repeat(45))
-    println("Repository: ${config.repoDir}")
-    println("Period:     ${config.days} day(s)")
-    if (config.author != null) println("Author:     ${config.author}")
-    println()
-
-    val toolCalling = System.getenv("STANDAPP_TOOL_CALLING") == "1"
-    val backend = LLMBackendType.fromEnv()
-    println("Generating standup summary (backend: $backend, tool-calling=$toolCalling)…")
-    println()
-
-    val service = try {
-        if (toolCalling) {
-            LLMServiceFactory.createToolCallingForGit(repoDir = config.repoDir)
-        } else {
-            LLMServiceFactory.create()
-        }
-    } catch (e: Exception) {
+internal fun run(args: Array<String>): Int {
+    val cli = try {
+        CliArgs.parse(args)
+    } catch (e: CliUsageException) {
         System.err.println("Error: ${e.message}")
         System.err.println()
-        System.err.println("Set MCP_LLM_BACKEND=REST_API to use a remote OpenAI-compatible endpoint.")
-        return
+        printUsage(System.err)
+        return EXIT_USAGE
+    }
+    if (cli.help) {
+        printUsage(System.out)
+        return EXIT_OK
     }
 
-    // STANDAPP_TINY_PROMPT=1 → bypass the heavy summarisation template
-    // and just send a one-line prompt. Useful for verifying the inference
-    // path is alive without paying the prefill cost of a 1700-token prompt.
-    val summaryPrompt = when {
-        System.getenv("STANDAPP_TINY_PROMPT") == "1" -> "Say hello in three words."
-        toolCalling -> buildToolCallingPrompt(config)
-        else -> buildSummarisationPrompt(config) ?: run {
-            println("No commits found in the last ${config.days} day(s).")
-            return
+    // Human-facing status goes to stderr so stdout stays clean for the
+    // rendered summary (pipe- and --format json-friendly).
+    val toolCalling = cli.toolCalling || System.getenv("STANDAPP_TOOL_CALLING") == "1"
+    val backend = cli.backend ?: LLMBackendType.fromEnv()
+    System.err.println("Daily StandAPP — repo=${cli.repoDir} backend=$backend toolCalling=$toolCalling format=${cli.format}")
+
+    if (!File(cli.repoDir, ".git").exists()) {
+        System.err.println("Error: '${cli.repoDir}' is not a git repository (no .git directory).")
+        return EXIT_GIT
+    }
+
+    // Streaming tokens must not pollute machine-readable stdout.
+    val streamTokens = cli.format == OutputFormat.MD && cli.output == null
+    val tokenSink: ((String) -> Unit)? = if (streamTokens) null else { _ -> }
+
+    val service = try {
+        when {
+            toolCalling -> LLMServiceFactory.createToolCallingForGit(repoDir = cli.repoDir)
+            cli.backend != null || cli.modelPath != null ->
+                LLMServiceFactory.create(backend, buildConfig(cli), tokenSink)
+            else -> LLMServiceFactory.create(tokenSink)
         }
+    } catch (e: Exception) {
+        System.err.println("Error creating LLM backend: ${e.message}")
+        System.err.println("Set MCP_LLM_BACKEND=REST_API (or --backend rest_api) to use a remote endpoint.")
+        return EXIT_LLM
     }
 
-    val summary = runBlocking {
-        service.generate(
-            prompt = summaryPrompt,
-            temperature = LLMService.DEFAULT_TEMPERATURE,
-            topP = LLMService.DEFAULT_TOP_P,
-        )
+    // STANDAPP_TINY_PROMPT=1 → bypass summarisation and send a one-line
+    // prompt. Verifies the inference path without the full prefill cost.
+    if (System.getenv("STANDAPP_TINY_PROMPT") == "1") {
+        val reply = runBlocking { service.generate("Say hello in three words.", cli.maxTokens, cli.temperature, LLMService.DEFAULT_TOP_P) }
+        println(reply)
+        return EXIT_OK
     }
 
-    println(summary)
-}
-
-/**
- * Tool-calling prompt: keep it short. The model is expected to call
- * `get_recent_commits` to fetch the actual commit list, then summarise.
- * Including the author hint only when set lets the model pass it through.
- */
-private fun buildToolCallingPrompt(config: CliConfig): String = buildString {
-    append("Summarise the work done in this git repository over the last ${config.days} day(s). ")
-    append("Call the `get_recent_commits` tool exactly once to fetch the commits")
-    if (config.author != null) {
-        append(" (pass author=\"${config.author}\")")
+    if (toolCalling) {
+        return runToolCalling(cli, service)
     }
-    append(", then write a concise standup report with three markdown sections: ")
-    append("`## Yesterday`, `## Today`, `## Blockers`. Reference commit IDs where useful.")
-}
 
-private fun buildSummarisationPrompt(config: CliConfig): String? {
-    val nowMs = System.currentTimeMillis()
-    val now = Instant.fromEpochMilliseconds(nowMs)
-    val start = Instant.fromEpochMilliseconds(nowMs - config.days * 86_400_000L)
-
-    val gitInfos = if (config.author != null) {
-        commitsByAuthorAndPeriod(config.repoDir, config.author, start, now)
+    val (start, end) = resolveWindow(cli)
+    val gitInfos = if (cli.author != null) {
+        commitsByAuthorAndPeriod(cli.repoDir, cli.author, start, end)
     } else {
-        getAllCommitsInPeriod(config.repoDir, start, now)
+        getAllCommitsInPeriod(cli.repoDir, start, end)
     }
-    if (gitInfos.isEmpty()) return null
-    println("Found ${gitInfos.size} commit(s).")
-    println()
+    if (gitInfos.isEmpty()) {
+        System.err.println("No commits found in the selected period ($start .. $end).")
+        return EXIT_GIT
+    }
+    System.err.println("Found ${gitInfos.size} commit(s).")
 
     val commits = gitInfos.map {
         CommitInfo(
-            id = it.id.take(7),
+            id = it.id,
             authorName = it.authorName,
             authorEmail = it.authorEmail,
             date = it.whenDate.toString(),
             message = it.message,
         )
     }
-    return PromptBuilder().buildUserPrompt(commits, PromptType.SUMMARY)
-}
 
-private data class CliConfig(
-    val repoDir: String,
-    val author: String? = null,
-    val days: Int = 1,
-)
-
-private fun parseArgs(args: Array<String>): CliConfig {
-    var repoDir = "."
-    var author: String? = null
-    var days = 1
-
-    val iter = args.iterator()
-    while (iter.hasNext()) {
-        when (val arg = iter.next()) {
-            "--repo", "-r" -> repoDir = iter.next()
-            "--author", "-a" -> author = iter.next()
-            "--days", "-d" -> days = iter.next().toInt()
-            "--help", "-h" -> {
-                printUsage()
-                kotlin.system.exitProcess(0)
-            }
-            else -> {
-                // First positional argument is repo dir
-                if (!arg.startsWith("-")) repoDir = arg
-            }
+    // The pipeline as code — preprocess, prompt, infer, and postprocess are
+    // all declared right here (see dev.standapp.engine.pipeline).
+    val pipeline = standupPipeline {
+        preprocess { shortIds(7) }
+        prompt { type = if (cli.format == OutputFormat.JSON) PromptType.JSON else PromptType.SUMMARY }
+        infer { _, user -> service.generate(user, cli.maxTokens, cli.temperature, LLMService.DEFAULT_TOP_P) }
+        postprocess {
+            parseSummary()
+            if (cli.score) score()
+            if (cli.format == OutputFormat.JSON) retryOnInvalid(maxAttempts = 2)
         }
     }
 
-    return CliConfig(repoDir = repoDir, author = author, days = days)
+    val result: PipelineResult = try {
+        runBlocking { pipeline.run(commits) }
+    } catch (e: Exception) {
+        System.err.println("Error during generation: ${e.message}")
+        return EXIT_LLM
+    }
+    if (result.attempts > 1) {
+        System.err.println("(model output needed ${result.attempts} attempts)")
+    }
+
+    emit(OutputRenderer.render(result, cli.format), cli.output)
+
+    var exit = EXIT_OK
+    result.result.scores?.let { scores ->
+        System.err.println()
+        System.err.println(OutputRenderer.renderScoreReport(scores))
+        if (scores.passCount < scores.totalChecks) exit = EXIT_VALIDATION
+    }
+    if (cli.format == OutputFormat.JSON && result.result.summary.sections.isEmpty()) {
+        System.err.println("Warning: model output could not be parsed as JSON after ${result.attempts} attempt(s); raw text emitted.")
+        exit = EXIT_VALIDATION
+    }
+    return exit
 }
 
-private fun printUsage() {
-    println("""
+/**
+ * Tool-calling keeps its own short prompt and skips the pipeline's prompt
+ * stage by design: the model fetches commits itself via `get_recent_commits`.
+ */
+private fun runToolCalling(cli: CliArgs, service: LLMService): Int {
+    val prompt = buildString {
+        append("Summarise the work done in this git repository over the last ${cli.days} day(s). ")
+        append("Call the `get_recent_commits` tool exactly once to fetch the commits")
+        if (cli.author != null) append(" (pass author=\"${cli.author}\")")
+        append(", then write a concise standup report with three markdown sections: ")
+        append("`## Yesterday`, `## Today`, `## Blockers`. Reference commit IDs where useful.")
+    }
+    val summary = try {
+        runBlocking { service.generate(prompt, cli.maxTokens, cli.temperature, LLMService.DEFAULT_TOP_P) }
+    } catch (e: Exception) {
+        System.err.println("Error during generation: ${e.message}")
+        return EXIT_LLM
+    }
+    emit(summary.trim(), cli.output)
+    return EXIT_OK
+}
+
+private fun resolveWindow(cli: CliArgs): Pair<Instant, Instant> {
+    val tz = TimeZone.currentSystemDefault()
+    return if (cli.since != null) {
+        val untilDay = cli.until ?: Clock.System.todayIn(tz)
+        cli.since.atStartOfDayIn(tz) to untilDay.plus(1, DateTimeUnit.DAY).atStartOfDayIn(tz)
+    } else {
+        val now = Clock.System.now()
+        Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - cli.days * 86_400_000L) to now
+    }
+}
+
+private fun buildConfig(cli: CliArgs): LLMConfig = LLMConfig(
+    modelPath = cli.modelPath ?: System.getenv("MCP_LLM_MODEL_PATH").orEmpty(),
+    baseUrl = System.getenv("MCP_LLM_REST_BASE_URL") ?: "http://localhost:11434",
+    modelName = System.getenv("MCP_LLM_REST_MODEL") ?: "llama3.2:3b",
+    apiKey = System.getenv("MCP_LLM_REST_API_KEY") ?: System.getenv("OPENAI_API_KEY"),
+)
+
+private fun emit(text: String, outputFile: String?) {
+    if (outputFile != null) {
+        File(outputFile).writeText(text + "\n")
+        System.err.println("Summary written to $outputFile")
+    } else {
+        println(text)
+    }
+}
+
+private fun printUsage(out: PrintStream) {
+    out.println(
+        """
         Usage: standapp [OPTIONS] [REPO_DIR]
 
-        Generate a daily standup summary from Git commit history.
+        Generate a daily standup summary from Git commit history using a local LLM.
 
         Arguments:
-          REPO_DIR              Path to git repository (default: current directory)
+          REPO_DIR                Path to git repository (default: current directory)
 
         Options:
-          -r, --repo DIR        Path to git repository
-          -a, --author NAME     Filter commits by author name
-          -d, --days N          Number of days to look back (default: 1)
-          -h, --help            Show this help message
+          -r, --repo DIR          Path to git repository
+          -a, --author NAME       Filter commits by author name
+          -d, --days N            Look back N days from now (default: 1)
+              --since YYYY-MM-DD  Explicit window start (wins over --days)
+              --until YYYY-MM-DD  Explicit window end, inclusive (requires --since)
+          -f, --format FMT        Output format: md (default) | json | text
+          -b, --backend NAME      LLM backend: skainet | rest_api (overrides MCP_LLM_BACKEND)
+          -m, --model PATH        GGUF model path (overrides MCP_LLM_MODEL_PATH, SKAINET only)
+          -o, --output FILE       Write the summary to FILE instead of stdout
+              --score             Print a quality report to stderr (failed checks exit 5)
+              --max-tokens N      Generation budget (default: 512)
+              --temperature F     Sampling temperature (default: 0.1; SKAINET clamps to >= 0.6)
+              --tool-calling      Let the model fetch commits itself via the agent loop (SKAINET only)
+          -h, --help              Show this help
 
-        Environment variables:
-          MCP_LLM_BACKEND       Optional. SKAINET (default, embedded Llama 3.2 1B) or REST_API.
-          MCP_LLM_MODEL_PATH    Optional. Override the embedded GGUF (SKAINET only).
-          MCP_LLM_REST_BASE_URL REST endpoint (default: http://localhost:11434)
-          MCP_LLM_REST_MODEL    Model name for REST API (default: llama3.2:3b)
-          STANDAPP_TOOL_CALLING Set to 1 to drive the model through the tool-calling
-                                agent loop (registers a `get_recent_commits` git tool
-                                and lets the model fetch commits on demand). SKAINET only.
-          STANDAPP_TINY_PROMPT  Set to 1 to bypass summarisation (smoke-test inference path).
+        Exit codes:
+          0 success   2 usage error   3 git error / no commits
+          4 LLM/backend error   5 validation failure (--score or unparseable JSON)
 
-        Example (uses embedded model):
-          standapp --repo /path/to/repo --days 7
+        Environment variables (flags win over env):
+          MCP_LLM_BACKEND, MCP_LLM_MODEL_PATH, MCP_LLM_REST_BASE_URL,
+          MCP_LLM_REST_MODEL, MCP_LLM_REST_API_KEY,
+          STANDAPP_TOOL_CALLING=1 (legacy for --tool-calling),
+          STANDAPP_TINY_PROMPT=1 (inference smoke test)
 
-        Example (tool calling, with verbose stage logs to stderr):
-          STANDAPP_TOOL_CALLING=1 standapp --repo /path/to/repo --days 7
-
-        Example (REST backend):
-          MCP_LLM_BACKEND=REST_API standapp --repo /path/to/repo --days 7
-    """.trimIndent())
+        Examples:
+          standapp --repo /path/to/repo --days 7 --score
+          standapp --repo . --since 2026-07-01 --until 2026-07-11 --format json -o standup.json
+          MCP_LLM_BACKEND=REST_API standapp --repo . --days 7
+        """.trimIndent()
+    )
 }

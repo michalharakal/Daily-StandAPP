@@ -19,8 +19,13 @@ object LLMServiceFactory {
     /**
      * Create an [LLMService] from explicit configuration (no env vars).
      * Used by the benchmark module to iterate backends programmatically.
+     * [onToken] overrides the SKAINET token sink (default: stdout streaming).
      */
-    fun create(backendType: LLMBackendType, config: LLMConfig): LLMService {
+    fun create(
+        backendType: LLMBackendType,
+        config: LLMConfig,
+        onToken: ((String) -> Unit)? = null,
+    ): LLMService {
         println("[LLMServiceFactory] Creating backend: $backendType (programmatic)")
         return when (backendType) {
             LLMBackendType.SKAINET -> {
@@ -29,7 +34,7 @@ object LLMServiceFactory {
                 } else {
                     EmbeddedModelLoader.extract()
                 }
-                SKaiNetLLMService.create(modelPath)
+                SKaiNetLLMService.create(modelPath, onToken = onToken)
             }
             LLMBackendType.REST_API -> {
                 RestApiLLMService(
@@ -65,7 +70,7 @@ object LLMServiceFactory {
         )
     }
 
-    fun create(): LLMService {
+    fun create(onToken: ((String) -> Unit)? = null): LLMService {
         val backend = LLMBackendType.fromEnv()
         println("[LLMServiceFactory] Selected backend: $backend")
 
@@ -78,7 +83,7 @@ object LLMServiceFactory {
                 } else {
                     EmbeddedModelLoader.extract()
                 }
-                SKaiNetLLMService.create(modelPath)
+                SKaiNetLLMService.create(modelPath, onToken = onToken)
             }
 
             LLMBackendType.REST_API -> {
