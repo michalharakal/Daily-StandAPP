@@ -79,8 +79,9 @@ First-time output (truncated):
 
 The `mvn install` step takes 3–8 minutes on first run. Repeat
 invocations are nearly instant — the script checks
-`~/.m2/repository/io/teknek/deliverance/core/0.0.4-SNAPSHOT/core-0.0.4-SNAPSHOT.jar`
-and skips if present.
+`~/.m2/repository/io/teknek/deliverance/core/0.0.11-SNAPSHOT/core-0.0.11-SNAPSHOT.jar`
+and skips if present. Building Deliverance requires a JDK 25 (upstream
+compiles with `--release 25`); the script refuses early otherwise.
 
 === 2. Run the benchmark with Deliverance enabled
 
@@ -95,7 +96,19 @@ BENCH_RUNS=3 \
 `BENCH_DELIVERANCE_MODEL` takes a HuggingFace `owner/name` path.
 Deliverance auto-downloads the model on first generate() call —
 expect a 60–120 s pause at the start of the first case while the
-model lands in `~/.cache/deliverance/`. Subsequent runs reuse it.
+model lands in `~/.deliverance/`. Subsequent runs reuse it.
+
+When running the fat JAR directly, Deliverance 0.0.11 additionally
+needs `java.nio` opened (its `UnsafeDirectByteBuffer` uses
+`MethodHandles.privateLookupIn` on JDK internals):
+
+[source,bash]
+----
+java --add-modules jdk.incubator.vector \
+     --add-opens java.base/java.nio=ALL-UNNAMED \
+     --enable-native-access=ALL-UNNAMED \
+     -jar benchmark/build/libs/benchmark-jvm.jar
+----
 
 If you forget the `-Pdeliverance.enabled=true` flag you'll see:
 

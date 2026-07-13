@@ -38,8 +38,10 @@ install_engine() {
         echo "→ cloning ${name} into ${EXTERNAL_DIR}/${name}"
         git clone --depth=20 "${repo_url}" "${EXTERNAL_DIR}/${name}"
     else
-        echo "→ ${name} clone exists, fetching latest"
-        (cd "${EXTERNAL_DIR}/${name}" && git fetch --all --quiet)
+        echo "→ ${name} clone exists, updating to latest upstream"
+        (cd "${EXTERNAL_DIR}/${name}" && \
+            git fetch --depth=20 origin --quiet && \
+            git reset --hard "origin/$(git rev-parse --abbrev-ref origin/HEAD | cut -d/ -f2)" --quiet)
     fi
 
     echo "→ mvn install ${name} (skipping test execution; this can take a few minutes)"
@@ -55,14 +57,36 @@ install_engine() {
             -fae \
             "${extra_args[@]}" \
             -q)
+    if [[ ! -f "${M2}/${check_artifact}" ]]; then
+        echo "✗ ${name}: expected artifact ${check_artifact} missing after install."
+        echo "  The upstream version has probably changed — align the version in"
+        echo "  this script AND in gradle/libs.versions.toml with the clone's pom:"
+        echo "    grep -m1 '<version>' ${EXTERNAL_DIR}/${name}/pom.xml"
+        return 1
+    fi
     echo "✓ ${name} installed"
 }
 
+# Deliverance builds with maven.compiler.release=25 — refuse early with a
+# clear message instead of failing halfway through the reactor.
+JAVA_MAJOR="$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)"
+if (( JAVA_MAJOR < 25 )); then
+    echo "✗ JDK 25+ required to build Deliverance (java on PATH is ${JAVA_MAJOR})."
+    echo "  Point JAVA_HOME/PATH at a JDK 25 before running this script."
+    exit 1
+fi
+
 # Deliverance — pure-Java JVM inference. Apache 2.0.
+# DELIVERANCE_VERSION must match `deliverance` in gradle/libs.versions.toml;
+# the post-install artifact check above trips loudly when upstream bumps it.
+# Only core+safetensors (and their -am dependencies math/tensor) are needed —
+# skips the unrelated web/sketches/plugin modules of the reactor.
+DELIVERANCE_VERSION="0.0.11-SNAPSHOT"
 install_engine \
     "deliverance" \
     "https://github.com/edwardcapriolo/deliverance.git" \
-    "io/teknek/deliverance/core/0.0.4-SNAPSHOT/core-0.0.4-SNAPSHOT.jar"
+    "io/teknek/deliverance/core/${DELIVERANCE_VERSION}/core-${DELIVERANCE_VERSION}.jar" \
+    -pl core,safetensors -am
 
 # qxotic — JVM-native LLM inference toolkit. Apache 2.0.
 # Different shape from Deliverance: qxotic's "library" surface (jota, gguf,
@@ -71,11 +95,16 @@ install_engine \
 # Our QxoticLLMService wraps that CLI as a subprocess (one process per
 # generate() call). We capture the runtime classpath here so the wrapper does
 # not need its own Maven invocation per call.
+# -Dnative.skip.build=true skips the cmake/Metal/CUDA native backend builds
+# (the metal one needs the Xcode Metal toolchain); the benchmark only uses the
+# CPU Q8_0 path, which is pure JVM. -Dnative.skip.tests=true is needed too:
+# the native-backend modules gate surefire on their own property, which
+# ignores -DskipTests, and their tests require the just-skipped native libs.
 install_engine \
     "qxotic" \
     "https://github.com/qxoticai/qxotic.git" \
     "com/qxotic/examples/0.1.0/examples-0.1.0.jar" \
-    -pl examples -am
+    -pl examples -am -Dnative.skip.build=true -Dnative.skip.tests=true
 
 # Capture the qxotic examples-module runtime classpath so the subprocess
 # wrapper can `java -cp $(cat)` without re-resolving every call. The dep

@@ -6,10 +6,13 @@ import io.teknek.deliverance.DType
 import io.teknek.deliverance.generator.GeneratorParameters
 import io.teknek.deliverance.model.AbstractModel
 import io.teknek.deliverance.model.ModelSupport
+import io.teknek.deliverance.math.WrappedForkJoinPool
 import io.teknek.deliverance.safetensors.fetch.ModelFetcher
+import io.teknek.deliverance.tensor.ArrayQueueTensorAllocator
 import io.teknek.deliverance.tensor.KvBufferCacheSettings
-import io.teknek.deliverance.tensor.TensorCache
 import io.teknek.deliverance.tensor.operations.ConfigurableTensorProvider
+import io.teknek.deliverance.toolcallparser.DefaultToolCallParser
+import java.util.concurrent.ForkJoinPool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -48,9 +51,12 @@ class DeliveranceLLMService private constructor(
             io.teknek.deliverance.safetensors.prompt.PromptContext.of(prompt)
         }
 
+        // 0.0.11: ntokens became the TOTAL context budget (prompt must fit
+        // inside it, defaults to the model's context length); the generated-
+        // token cap is the separate maxTokens parameter.
         val params = GeneratorParameters()
             .withTemperature(temperature)
-            .withNtokens(maxTokens)
+            .withMaxTokens(maxTokens)
 
         val response = model.generate(UUID.randomUUID(), ctx, params) { _, _, _, _ -> }
         response.responseText
@@ -74,16 +80,22 @@ class DeliveranceLLMService private constructor(
         fun createFromPath(modelPath: File, fetcher: ModelFetcher? = null): DeliveranceLLMService {
             println("[DeliveranceLLMService] Loading model from ${modelPath.absolutePath} ...")
             val metricRegistry = MetricRegistry()
-            val tensorCache = TensorCache(metricRegistry)
+            // 0.0.11: TensorCache was replaced by the TensorAllocator interface;
+            // tensor ops and model loading now also take an explicit fork-join
+            // pool and a ToolCallParser.
+            val allocator = ArrayQueueTensorAllocator(metricRegistry)
+            val pool = WrappedForkJoinPool(ForkJoinPool.commonPool())
             val model = ModelSupport.loadModel(
                 modelPath,
                 DType.F32,
                 DType.I8,
-                ConfigurableTensorProvider(tensorCache),
+                ConfigurableTensorProvider(allocator, pool),
                 metricRegistry,
-                tensorCache,
+                allocator,
                 KvBufferCacheSettings(true),
                 fetcher,
+                DefaultToolCallParser(),
+                pool,
             )
             println("[DeliveranceLLMService] Model loaded.")
             return DeliveranceLLMService(model)

@@ -39,7 +39,7 @@ object BenchmarkEngineRegistry {
             val createMethod = klass.declaredMethods.firstOrNull {
                 it.name == "create" && it.parameterCount == 2
             } ?: error("DeliveranceLLMService.create(owner, name) not found via reflection")
-            createMethod.invoke(null, owner, name) as LLMService
+            invokeUnwrapped { createMethod.invoke(null, owner, name) as LLMService }
         }
     }
 
@@ -53,8 +53,21 @@ object BenchmarkEngineRegistry {
             val createMethod = klass.declaredMethods.firstOrNull {
                 it.name == "create" && it.parameterCount == 1
             } ?: error("QxoticLLMService.create(spec) not found via reflection")
-            createMethod.invoke(null, modelSpec) as LLMService
+            invokeUnwrapped { createMethod.invoke(null, modelSpec) as LLMService }
         }
+    }
+
+    /**
+     * Reflective calls wrap the engine's real failure in an
+     * InvocationTargetException whose message is null — unwrap it so the
+     * runner's "failed to create backend" log names the actual cause.
+     */
+    private fun invokeUnwrapped(call: () -> LLMService): LLMService = try {
+        call()
+    } catch (e: java.lang.reflect.InvocationTargetException) {
+        val target = e.targetException
+        target.printStackTrace()
+        throw if (target is Exception) target else RuntimeException(target)
     }
 
     private fun loadOptional(fqcn: String): Class<*>? = try {
