@@ -6,13 +6,13 @@ kotlinxIo = "0.9.1"
 kotlinx-serialization = "1.11.0"
 koog = "0.6.1"
 mcp-kotlin = "0.7.2"
-orgEclipseJgit = "7.1.0.202411261347-r"
+orgEclipseJgit = "7.7.0.202606012155-r"
 deliverance = "0.0.4-SNAPSHOT"
 skainet = "0.22.1"
 skainet-transformers = "0.23.2"
 slf4jSimple = "2.0.17"
-ktor = "3.3.0"
-shadow = "9.4.1"
+ktor = "3.5.1"
+shadow = "9.5.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
