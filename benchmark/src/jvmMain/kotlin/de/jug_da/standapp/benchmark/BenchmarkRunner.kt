@@ -1,14 +1,20 @@
 package de.jug_da.standapp.benchmark
 
 import de.jug_da.standapp.llm.LLMService
-import dev.standapp.engine.control.PromptBuilder
-import dev.standapp.engine.control.QualityScorer
 import dev.standapp.engine.entity.PromptType
+import dev.standapp.engine.pipeline.standupPipeline
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 
+/** Benchmark-local marker so timeouts stay distinguishable from engine errors. */
+private class InferenceTimeoutException : RuntimeException("inference timed out")
+
 /**
  * Orchestrates benchmark runs: loads cases, calls backends, collects scores and metrics.
+ *
+ * Each (backend, prompt type) combination runs through the same
+ * [standupPipeline] the CLI uses — single code path, identical prompt bytes
+ * to the pre-pipeline runner, so results stay comparable across runs.
  *
  * `backends` maps a human-readable name (e.g. "SKAINET", "REST_API (local)",
  * "DELIVERANCE") to a *factory* that produces an [LLMService]. Using factories
@@ -30,7 +36,6 @@ class BenchmarkRunner(
         .filter { caseFilter == null || it.id in caseFilter }
     private val results = mutableListOf<Reporting.CaseResult>()
     private val allOutputs = mutableMapOf<String, MutableList<String>>() // backend -> outputs for determinism
-    private val promptBuilder = PromptBuilder()
 
     suspend fun run() {
         println("Loaded ${cases.size} benchmark cases from ${benchDir.absolutePath}")
@@ -60,7 +65,25 @@ class BenchmarkRunner(
                 val commitInfos = case.commits.map { it.toCommitInfo() }
 
                 for (promptType in promptTypes) {
-                    val prompt = promptBuilder.buildUserPrompt(commitInfos, promptType)
+                    // Same pipeline the CLI declares — no preprocess step, so
+                    // the prompt bytes match the pre-pipeline runner exactly.
+                    val pipeline = standupPipeline {
+                        prompt { type = promptType }
+                        infer { _, user ->
+                            withTimeoutOrNull(timeoutMs) {
+                                service.generate(
+                                    prompt = user,
+                                    maxTokens = LLMService.DEFAULT_MAX_TOKENS,
+                                    temperature = LLMService.DEFAULT_TEMPERATURE,
+                                    topP = LLMService.DEFAULT_TOP_P,
+                                )
+                            } ?: throw InferenceTimeoutException()
+                        }
+                        postprocess {
+                            parseSummary() // lenient — a malformed output is scored, never fatal
+                            score()
+                        }
+                    }
 
                     // Warm-up runs neutralise JIT compilation, class loading, and
                     // KV-cache allocation costs that bias the first measured runs.
@@ -68,14 +91,7 @@ class BenchmarkRunner(
                     for (warmupIdx in 1..warmupRuns) {
                         val warmStart = System.currentTimeMillis()
                         try {
-                            withTimeoutOrNull(timeoutMs) {
-                                service.generate(
-                                    prompt = prompt,
-                                    maxTokens = LLMService.DEFAULT_MAX_TOKENS,
-                                    temperature = LLMService.DEFAULT_TEMPERATURE,
-                                    topP = LLMService.DEFAULT_TOP_P,
-                                )
-                            }
+                            pipeline.run(commitInfos)
                         } catch (e: Exception) {
                             println("  WARMUP-ERROR ${case.id}/$promptType warmup $warmupIdx: ${e.message}")
                         }
@@ -86,19 +102,14 @@ class BenchmarkRunner(
                     for (runIdx in 1..runsPerCase) {
                         val heapBefore = Metrics.heapUsageMb()
                         val startTime = System.currentTimeMillis()
-                        var failedWithError = false
 
-                        val output: String? = try {
-                            withTimeoutOrNull(timeoutMs) {
-                                service.generate(
-                                    prompt = prompt,
-                                    maxTokens = LLMService.DEFAULT_MAX_TOKENS,
-                                    temperature = LLMService.DEFAULT_TEMPERATURE,
-                                    topP = LLMService.DEFAULT_TOP_P,
-                                )
-                            }
+                        val outcome = try {
+                            pipeline.run(commitInfos)
+                        } catch (e: InferenceTimeoutException) {
+                            timeoutCount++
+                            println("  TIMEOUT ${case.id}/$promptType run $runIdx (${System.currentTimeMillis() - startTime}ms)")
+                            null
                         } catch (e: Exception) {
-                            failedWithError = true
                             errorCount++
                             println("  ERROR ${case.id}/$promptType run $runIdx: ${e.message}")
                             null
@@ -106,19 +117,11 @@ class BenchmarkRunner(
 
                         val latencyMs = System.currentTimeMillis() - startTime
                         val heapAfter = Metrics.heapUsageMb()
+                        if (outcome == null) continue
 
-                        if (output == null) {
-                            if (!failedWithError) {
-                                timeoutCount++
-                                println("  TIMEOUT ${case.id}/$promptType run $runIdx (${latencyMs}ms)")
-                            }
-                            continue
-                        }
-
-                        backendOutputs.add(output)
-
-                        val inputIds = case.commits.map { it.id }.toSet()
-                        val autoScore = QualityScorer.score(output, promptType, inputIds)
+                        backendOutputs.add(outcome.raw)
+                        val autoScore = outcome.result.scores
+                            ?: error("pipeline was built with score() — scores must be present")
 
                         results.add(
                             Reporting.CaseResult(
@@ -127,13 +130,13 @@ class BenchmarkRunner(
                                 promptType = promptType,
                                 run = runIdx,
                                 latencyMs = latencyMs,
-                                charCount = output.length,
+                                charCount = outcome.raw.length,
                                 autoScore = autoScore,
                             )
                         )
 
                         val passSymbol = if (autoScore.allPassed) "✓" else "✗"
-                        println("  $passSymbol ${case.id}/$promptType #$runIdx — ${latencyMs}ms, ${output.length} chars, heap ${heapBefore}->${heapAfter}MB")
+                        println("  $passSymbol ${case.id}/$promptType #$runIdx — ${latencyMs}ms, ${outcome.raw.length} chars, heap ${heapBefore}->${heapAfter}MB")
                     }
                 }
             }

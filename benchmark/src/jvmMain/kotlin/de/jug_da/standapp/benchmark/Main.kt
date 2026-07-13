@@ -39,6 +39,9 @@ import java.io.File
  *                              `scripts/setup-bench-engines.sh` having cloned + built
  *                              qxotic, with external/qxotic-classpath.txt produced.
  * - BENCH_QXOTIC_TIMEOUT_MS  — Override the qxotic subprocess timeout (default 600000).
+ * - BENCH_TIMEOUT_MS        — Per-run generation timeout in ms (default 30000).
+ *                              Local CPU engines routinely exceed 30 s on the
+ *                              larger cases — raise this for full runs.
  */
 fun main() {
     val benchDir = File(System.getenv("BENCH_DIR") ?: "bench")
@@ -142,6 +145,8 @@ fun main() {
         return
     }
 
+    val timeoutMs = System.getenv("BENCH_TIMEOUT_MS")?.toLongOrNull()?.takeIf { it > 0 } ?: 30_000L
+
     val runner = BenchmarkRunner(
         benchDir = benchDir,
         backends = backends,
@@ -149,6 +154,7 @@ fun main() {
         warmupRuns = warmupRuns,
         caseFilter = caseFilter,
         promptTypes = promptFilter,
+        timeoutMs = timeoutMs,
     )
 
     runBlocking {
