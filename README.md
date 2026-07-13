@@ -4,23 +4,40 @@
 
 ## Standapp CLI
 
-Generate a daily standup summary from a git repo.
+Generate a daily standup summary from a git repo. Commits flow through a
+typed pipeline declared as Kotlin DSL code
+(`dev.standapp.engine.pipeline.standupPipeline`):
+preprocess → prompt → infer → postprocess.
 
 ```bash
-# Default: CLI fetches commits, hands the model a fully-formed prompt.
+# Default: markdown summary, streamed tokens, embedded Llama 3.2 1B.
 ./gradlew :StandAPP-cli:run --args="--repo /path/to/repo --days 7"
+
+# Structured JSON (parsed + validated, retries once on invalid output),
+# quality report on stderr, summary written to a file:
+./gradlew :StandAPP-cli:run --args="--repo . --days 7 --format json -o standup.json --score"
+
+# Explicit date window, plain-text output:
+./gradlew :StandAPP-cli:run --args="--repo . --since 2026-07-01 --until 2026-07-11 --format text"
 ```
+
+Key flags: `--format md|json|text`, `--since/--until` (win over `--days`),
+`--backend skainet|rest_api`, `--model <gguf>`, `--output <file>`, `--score`,
+`--max-tokens`, `--temperature`, `--tool-calling`. Run `--help` for the full
+list. Exit codes: `0` ok, `2` usage, `3` git error/no commits, `4` LLM error,
+`5` failed quality checks or unparseable JSON. Machine-readable output stays
+clean: status and stage logs go to stderr.
 
 ### Tool-calling mode (opt-in)
 
-Setting `STANDAPP_TOOL_CALLING=1` switches the SKAINET backend to a
-`JavaAgentLoop`-driven path. The model fetches commits itself by calling a
-`get_recent_commits` tool. Stage logs go to stderr; the streamed answer goes to
-stdout.
+`--tool-calling` (or legacy `STANDAPP_TOOL_CALLING=1`) switches the SKAINET
+backend to a `JavaAgentLoop`-driven path. The model fetches commits itself by
+calling a `get_recent_commits` tool. Stage logs go to stderr; the streamed
+answer goes to stdout.
 
 ```bash
-STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
-  --args="--repo /path/to/repo --days 7" 2>stages.log
+./gradlew :StandAPP-cli:run \
+  --args="--repo /path/to/repo --days 7 --tool-calling" 2>stages.log
 ```
 
 `stages.log` will contain `[STAGE/INPUT]`, `[STAGE/RENDERED CHAT TEMPLATE
