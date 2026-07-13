@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package de.jug_da.app.cli
 
 import de.jug_da.data.git.commitsByAuthorAndPeriod
@@ -11,7 +9,7 @@ import dev.standapp.engine.control.PromptBuilder
 import dev.standapp.engine.entity.CommitInfo
 import dev.standapp.engine.entity.PromptType
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 fun main(args: Array<String>) {
     val config = parseArgs(args)

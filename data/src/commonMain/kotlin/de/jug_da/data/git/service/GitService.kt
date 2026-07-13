@@ -1,8 +1,6 @@
-@file:Suppress("DEPRECATION")
-
 package de.jug_da.data.git.service
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 data class GitInfo(val commitText: String)
 

@@ -65,7 +65,7 @@ kotlin {
                 kotlin.srcDir("src/jvmMain/qxotic")
             }
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+                implementation(libs.kotlinx.serialization.json)
                 if (deliveranceEnabled) {
                     implementation(libs.deliverance.core)
                     implementation(libs.deliverance.safetensors)
@@ -79,7 +79,7 @@ kotlin {
 
         jvmTest.dependencies {
             implementation(libs.kotlin.test.junit)
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }

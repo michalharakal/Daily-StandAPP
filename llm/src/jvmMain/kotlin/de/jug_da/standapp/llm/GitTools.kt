@@ -2,7 +2,7 @@ package de.jug_da.standapp.llm
 
 import de.jug_da.data.git.commitsByAuthorAndPeriod
 import de.jug_da.data.git.getAllCommitsInPeriod
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

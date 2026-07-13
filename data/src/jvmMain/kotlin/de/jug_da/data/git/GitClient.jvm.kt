@@ -1,11 +1,8 @@
-@file:Suppress("DEPRECATION")
-
 package de.jug_da.data.git
 
-import kotlinx.datetime.Instant
 import org.eclipse.jgit.api.Git
 import java.io.File
-import java.util.Date
+import kotlin.time.Instant
 
 actual fun commitsByAuthorAndPeriod(
     repoDir: String,
@@ -16,19 +13,19 @@ actual fun commitsByAuthorAndPeriod(
     return try {
         val git = Git.open(File(repoDir))
         git.use { gitRepo ->
-            val startDate = Date.from(java.time.Instant.ofEpochMilli(start.toEpochMilliseconds()))
-            val endDate = Date.from(java.time.Instant.ofEpochMilli(end.toEpochMilliseconds()))
+            val startInstant = java.time.Instant.ofEpochMilli(start.toEpochMilliseconds())
+            val endInstant = java.time.Instant.ofEpochMilli(end.toEpochMilliseconds())
             gitRepo.log().call().filter { commit ->
-                val whenDate = commit.authorIdent.`when`
+                val whenInstant = commit.authorIdent.whenAsInstant
                 commit.authorIdent.name == author &&
-                        !whenDate.before(startDate) &&
-                        !whenDate.after(endDate)
+                        !whenInstant.isBefore(startInstant) &&
+                        !whenInstant.isAfter(endInstant)
             }.map { commit ->
                 GitInfo(
                     id = commit.id.name,
                     authorName = commit.authorIdent.name,
                     authorEmail = commit.authorIdent.emailAddress,
-                    whenDate = kotlinx.datetime.Instant.fromEpochMilliseconds(commit.authorIdent.whenAsInstant.toEpochMilli()),
+                    whenDate = Instant.fromEpochMilliseconds(commit.authorIdent.whenAsInstant.toEpochMilli()),
                     message = commit.fullMessage.trim()
                 )
             }
@@ -46,17 +43,17 @@ actual fun getAllCommitsInPeriod(
     return try {
         val git = Git.open(File(repoDir))
         git.use { gitRepo ->
-            val startDate = Date.from(java.time.Instant.ofEpochMilli(start.toEpochMilliseconds()))
-            val endDate = Date.from(java.time.Instant.ofEpochMilli(end.toEpochMilliseconds()))
+            val startInstant = java.time.Instant.ofEpochMilli(start.toEpochMilliseconds())
+            val endInstant = java.time.Instant.ofEpochMilli(end.toEpochMilliseconds())
             gitRepo.log().call().filter { commit ->
-                val whenDate = commit.authorIdent.`when`
-                !whenDate.before(startDate) && !whenDate.after(endDate)
+                val whenInstant = commit.authorIdent.whenAsInstant
+                !whenInstant.isBefore(startInstant) && !whenInstant.isAfter(endInstant)
             }.map { commit ->
                 GitInfo(
                     id = commit.id.name,
                     authorName = commit.authorIdent.name,
                     authorEmail = commit.authorIdent.emailAddress,
-                    whenDate = kotlinx.datetime.Instant.fromEpochMilliseconds(commit.authorIdent.`when`.toInstant().toEpochMilli()),
+                    whenDate = Instant.fromEpochMilliseconds(commit.authorIdent.whenAsInstant.toEpochMilli()),
                     message = commit.fullMessage.trim()
                 )
             }

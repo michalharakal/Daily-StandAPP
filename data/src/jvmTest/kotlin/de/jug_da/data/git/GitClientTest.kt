@@ -1,8 +1,6 @@
-@file:Suppress("DEPRECATION")
-
 package de.jug_da.data.git
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.PersonIdent
 import kotlin.io.path.createTempDirectory
