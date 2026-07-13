@@ -76,7 +76,7 @@ graph TB
 
 |`llm`
 |LLM inference abstraction with pluggable backends. SKAINET path runs an embedded Llama 3.2 1B Instruct (Q8_0 GGUF) inside a `JavaAgentLoop` with tool calling.
-|SKaiNET 0.21.0, SKaiNET-transformers 0.21.1 (`JavaAgentLoop`, `JavaTool`), REST API (Ktor Client), Coroutines
+|SKaiNET 0.36.0 (`JavaAgentLoop`, `JavaTool`), REST API (Ktor Client), Coroutines
 
 |`data`
 |Git repository access

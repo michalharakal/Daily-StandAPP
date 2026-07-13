@@ -405,9 +405,9 @@ an opt-in env var. Keep `SKaiNetLLMService` (raw single-shot) as the default.
   The `repoDir` is captured at construction time, never asked of the model.
 . **Source-level dependency.** `settings.gradle.kts` already includes
   `../SKaiNET-transformers` as a composite build, so `ToolCallingLLMService`
-  compiles against whatever version is checked out locally (currently 0.23.1).
-  The Maven coordinates pin in `gradle/libs.versions.toml` (now `0.23.2`)
-  matters only when the composite include is removed.
+  compiles against whatever version is checked out locally when that directory
+  exists. The Maven coordinates pin in `gradle/libs.versions.toml` (0.36.0 as
+  of 2026-07) applies whenever the composite checkout is absent.
 . **Stage logging on both paths.** Every prompt-life-cycle transition emits
   a `[STAGE/...]` line on stderr — see §8.7 for the table. Without this it
   is hopeless to debug what the model is doing.

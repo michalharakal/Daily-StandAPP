@@ -27,7 +27,7 @@
 |Pure Java, no native dependencies, mature and stable
 
 |*LLM Engine*
-|SKaiNET 0.21.0 + SKaiNET-transformers 0.21.1
+|SKaiNET 0.36.0 (unified core + transformers)
 |Pure Kotlin, no Python/native deps, SIMD via Vector API. The `skainet-transformers` agent loop adds tool calling on top of the kllama runtime.
 
 |*LLM Inference Pattern*
@@ -44,7 +44,7 @@
 
 |*Distribution*
 |Self-contained shadow JAR (`StandAPP-cli/build/libs/standapp-*-all.jar`)
-|`com.gradleup.shadow` packages all dependencies plus the embedded GGUF into a single ~2.0 GB JAR. `mergeServiceFiles()` preserves SKaiNET 0.21's `KernelProvider` SPI registrations.
+|`com.gradleup.shadow` packages all dependencies plus the embedded GGUF into a single ~2.0 GB JAR. `mergeServiceFiles()` preserves SKaiNET's `KernelProvider` SPI registrations.
 |===
 
 == 4.2 Architecture Approach
