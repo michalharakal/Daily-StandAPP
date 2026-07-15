@@ -45,10 +45,20 @@ class QxoticLLMService private constructor(
         // qxotic's CLI requires --enable-native-access for FFM and
         // --add-modules=jdk.incubator.vector for Panama kernels. These are
         // the same flags `:StandAPP-cli` already uses for its run task.
+        // The CLI's default C kernels (com.qxotic.llama.cgemv=true) need
+        // libjota_c.dylib. The backend jars ship no macOS natives, so the
+        // library must come from a local cmake build via java.library.path:
+        //   cd external/qxotic && mvn install -pl jota/jota-backend-c \
+        //     -Dnative.skip.build=false -DskipTests -Dnative.skip.tests=true
+        // Measured on an M-series CPU: ~2.8 tok/s with the native lib vs
+        // ~0.4 tok/s on the pure-JVM fallback.
+        val nativeLibDir = System.getenv("BENCH_QXOTIC_LIBPATH")
+            ?: "external/qxotic/jota/jota-backend-c/src/main/native/build"
         val cmd = listOf(
             javaBinary,
             "--enable-native-access=ALL-UNNAMED",
             "--add-modules=jdk.incubator.vector",
+            "-Djava.library.path=$nativeLibDir",
             "-cp", classpath,
             "com.qxotic.jota.examples.llama.Llama32CliQ8_0",
             "--model", modelGgufPath,
