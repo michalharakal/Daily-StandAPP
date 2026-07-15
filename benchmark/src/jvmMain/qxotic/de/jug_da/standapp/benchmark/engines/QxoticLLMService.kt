@@ -65,8 +65,11 @@ class QxoticLLMService private constructor(
             "--system-prompt", LLMService.SYSTEM_PROMPT,
             "--prompt", prompt,
             "--max-tokens", maxTokens.toString(),
-            "--temperature", "%.3f".format(temperature),
-            "--top-p", "%.3f".format(topP),
+            // Locale.ROOT: the default-locale format renders "0,100" on
+            // comma-decimal systems (de_DE, ...) and the CLI's number parser
+            // rejects it — this silently killed every benchmark run.
+            "--temperature", "%.3f".format(java.util.Locale.ROOT, temperature),
+            "--top-p", "%.3f".format(java.util.Locale.ROOT, topP),
             "--seed", "42",
         )
 
