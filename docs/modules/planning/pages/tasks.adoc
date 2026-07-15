@@ -100,5 +100,5 @@ implements, and names its verification gate. Status values: `open`,
 | Full benchmark run across SKAINET, REST_API, DELIVERANCE, QXOTIC + report
 | DES-07; REQ-30, REQ-32
 | `benchmark-report.md` + CSV delivered
-| in progress
+| done
 |===

@@ -1,0 +1,166 @@
+case_id,backend,prompt_type,run,latency_ms,char_count,json_parseable,json_schema_compliant,headings_present,all_ids_valid,no_hallucinated_ids,faithfulness,completeness,structure,actionability,clarity,total_human,total_auto_pass
+case-01,REST_API (local),SUMMARY,1,21457,4959,,,false,true,true,,,,,,,2
+case-01,REST_API (local),SUMMARY,2,6270,1508,,,false,true,true,,,,,,,2
+case-01,REST_API (local),SUMMARY,3,5530,1386,,,false,true,true,,,,,,,2
+case-01,REST_API (local),JSON,1,6437,1649,false,false,,true,true,,,,,,,2
+case-01,REST_API (local),JSON,2,4506,1086,false,false,,true,true,,,,,,,2
+case-01,REST_API (local),JSON,3,4529,1376,false,false,,true,true,,,,,,,2
+case-02,REST_API (local),SUMMARY,1,2442,938,,,false,true,true,,,,,,,2
+case-02,REST_API (local),SUMMARY,2,2966,946,,,false,true,true,,,,,,,2
+case-02,REST_API (local),SUMMARY,3,2982,946,,,false,true,true,,,,,,,2
+case-02,REST_API (local),JSON,1,35273,5401,false,false,,true,true,,,,,,,2
+case-02,REST_API (local),JSON,2,42499,8217,false,false,,true,true,,,,,,,2
+case-02,REST_API (local),JSON,3,6184,1192,false,false,,true,true,,,,,,,2
+case-03,REST_API (local),SUMMARY,1,2923,1039,,,false,true,true,,,,,,,2
+case-03,REST_API (local),SUMMARY,2,1437,386,,,false,true,true,,,,,,,2
+case-03,REST_API (local),SUMMARY,3,2193,770,,,false,true,true,,,,,,,2
+case-03,REST_API (local),JSON,1,4478,1120,false,false,,true,true,,,,,,,2
+case-03,REST_API (local),JSON,2,6482,1829,false,false,,true,false,,,,,,,1
+case-03,REST_API (local),JSON,3,6697,1556,false,false,,true,false,,,,,,,1
+case-04,REST_API (local),SUMMARY,1,4703,1132,,,false,true,false,,,,,,,1
+case-04,REST_API (local),SUMMARY,2,3481,874,,,false,true,false,,,,,,,1
+case-04,REST_API (local),SUMMARY,3,4043,1066,,,false,true,false,,,,,,,1
+case-04,REST_API (local),JSON,1,9849,2264,false,false,,true,true,,,,,,,2
+case-04,REST_API (local),JSON,2,4438,1490,false,false,,true,false,,,,,,,1
+case-04,REST_API (local),JSON,3,8359,1950,false,false,,true,true,,,,,,,2
+case-05,REST_API (local),SUMMARY,1,9473,1971,,,false,true,true,,,,,,,2
+case-05,REST_API (local),SUMMARY,2,2591,814,,,false,true,true,,,,,,,2
+case-05,REST_API (local),SUMMARY,3,2917,892,,,false,true,true,,,,,,,2
+case-05,REST_API (local),JSON,1,3930,872,false,false,,true,true,,,,,,,2
+case-05,REST_API (local),JSON,2,3932,848,false,false,,true,true,,,,,,,2
+case-05,REST_API (local),JSON,3,5757,1842,false,false,,true,true,,,,,,,2
+case-06,REST_API (local),SUMMARY,1,1925,623,,,true,true,true,,,,,,,3
+case-06,REST_API (local),SUMMARY,2,1977,625,,,true,true,true,,,,,,,3
+case-06,REST_API (local),SUMMARY,3,1972,630,,,true,true,true,,,,,,,3
+case-06,REST_API (local),JSON,1,43029,14026,false,false,,true,true,,,,,,,2
+case-06,REST_API (local),JSON,2,2742,738,false,false,,true,true,,,,,,,2
+case-06,REST_API (local),JSON,3,5007,1694,false,false,,true,true,,,,,,,2
+case-07,REST_API (local),SUMMARY,1,2064,676,,,false,true,true,,,,,,,2
+case-07,REST_API (local),SUMMARY,2,2046,668,,,false,true,true,,,,,,,2
+case-07,REST_API (local),SUMMARY,3,1419,334,,,false,true,true,,,,,,,2
+case-07,REST_API (local),JSON,1,4566,1609,false,false,,true,true,,,,,,,2
+case-07,REST_API (local),JSON,2,7556,2397,false,false,,true,true,,,,,,,2
+case-07,REST_API (local),JSON,3,4949,1571,false,false,,true,true,,,,,,,2
+case-09,REST_API (local),SUMMARY,1,2459,759,,,false,true,true,,,,,,,2
+case-09,REST_API (local),SUMMARY,2,1473,393,,,false,true,true,,,,,,,2
+case-09,REST_API (local),SUMMARY,3,2319,751,,,false,true,true,,,,,,,2
+case-09,REST_API (local),JSON,1,8782,2564,false,false,,true,true,,,,,,,2
+case-09,REST_API (local),JSON,2,4539,1407,false,false,,true,true,,,,,,,2
+case-09,REST_API (local),JSON,3,4058,1249,false,false,,true,true,,,,,,,2
+case-10,REST_API (local),SUMMARY,1,1494,422,,,false,true,true,,,,,,,2
+case-10,REST_API (local),SUMMARY,2,1491,422,,,false,true,true,,,,,,,2
+case-10,REST_API (local),SUMMARY,3,1827,489,,,false,true,true,,,,,,,2
+case-10,REST_API (local),JSON,1,42625,9078,false,false,,true,true,,,,,,,2
+case-10,REST_API (local),JSON,2,4995,1504,false,false,,true,true,,,,,,,2
+case-10,REST_API (local),JSON,3,41753,8908,false,false,,true,true,,,,,,,2
+case-11,REST_API (local),SUMMARY,1,5135,1316,,,false,true,true,,,,,,,2
+case-11,REST_API (local),SUMMARY,2,1697,514,,,false,true,true,,,,,,,2
+case-11,REST_API (local),SUMMARY,3,5138,1317,,,false,true,true,,,,,,,2
+case-11,REST_API (local),JSON,1,5278,1793,false,false,,true,true,,,,,,,2
+case-11,REST_API (local),JSON,2,6453,2331,false,false,,true,true,,,,,,,2
+case-11,REST_API (local),JSON,3,6294,2115,false,false,,true,true,,,,,,,2
+case-12,REST_API (local),SUMMARY,1,3139,784,,,false,true,true,,,,,,,2
+case-12,REST_API (local),SUMMARY,2,4416,1215,,,false,true,true,,,,,,,2
+case-12,REST_API (local),SUMMARY,3,3738,910,,,false,true,true,,,,,,,2
+case-12,REST_API (local),JSON,1,3405,1044,false,false,,true,true,,,,,,,2
+case-12,REST_API (local),JSON,2,6349,2236,false,false,,true,true,,,,,,,2
+case-12,REST_API (local),JSON,3,41206,9991,false,false,,true,true,,,,,,,2
+case-13,REST_API (local),SUMMARY,1,2198,710,,,false,true,true,,,,,,,2
+case-13,REST_API (local),SUMMARY,2,3708,1359,,,false,true,true,,,,,,,2
+case-13,REST_API (local),SUMMARY,3,3088,915,,,false,true,true,,,,,,,2
+case-13,REST_API (local),JSON,1,6295,2336,false,false,,true,true,,,,,,,2
+case-13,REST_API (local),JSON,2,4768,1566,false,false,,true,true,,,,,,,2
+case-13,REST_API (local),JSON,3,41339,9206,false,false,,true,true,,,,,,,2
+case-14,REST_API (local),SUMMARY,1,4899,1905,,,false,true,true,,,,,,,2
+case-14,REST_API (local),SUMMARY,2,8498,3053,,,true,true,true,,,,,,,3
+case-14,REST_API (local),SUMMARY,3,7451,2770,,,false,true,true,,,,,,,2
+case-14,REST_API (local),JSON,1,5984,2063,false,false,,true,true,,,,,,,2
+case-14,REST_API (local),JSON,2,5719,2090,false,false,,true,true,,,,,,,2
+case-14,REST_API (local),JSON,3,6467,2062,false,false,,true,true,,,,,,,2
+case-15,REST_API (local),SUMMARY,1,5733,1318,,,false,true,true,,,,,,,2
+case-15,REST_API (local),SUMMARY,2,2568,742,,,false,true,true,,,,,,,2
+case-15,REST_API (local),SUMMARY,3,1768,506,,,false,true,true,,,,,,,2
+case-15,REST_API (local),JSON,1,2916,851,false,false,,true,true,,,,,,,2
+case-15,REST_API (local),JSON,2,3794,1227,false,false,,true,true,,,,,,,2
+case-15,REST_API (local),JSON,3,3741,1227,false,false,,true,true,,,,,,,2
+case-01,DELIVERANCE,SUMMARY,1,18451,799,,,false,true,true,,,,,,,2
+case-01,DELIVERANCE,SUMMARY,2,18314,799,,,false,true,true,,,,,,,2
+case-01,DELIVERANCE,SUMMARY,3,18329,799,,,false,true,true,,,,,,,2
+case-01,DELIVERANCE,JSON,1,38209,1346,false,false,,true,true,,,,,,,2
+case-01,DELIVERANCE,JSON,2,38174,1346,false,false,,true,true,,,,,,,2
+case-01,DELIVERANCE,JSON,3,38143,1346,false,false,,true,true,,,,,,,2
+case-02,DELIVERANCE,SUMMARY,1,18091,684,,,false,true,true,,,,,,,2
+case-02,DELIVERANCE,SUMMARY,2,17935,684,,,false,true,true,,,,,,,2
+case-02,DELIVERANCE,SUMMARY,3,17955,684,,,false,true,true,,,,,,,2
+case-02,DELIVERANCE,JSON,1,41333,1363,false,false,,true,true,,,,,,,2
+case-02,DELIVERANCE,JSON,2,41337,1363,false,false,,true,true,,,,,,,2
+case-02,DELIVERANCE,JSON,3,41489,1363,false,false,,true,true,,,,,,,2
+case-03,DELIVERANCE,SUMMARY,1,15073,491,,,false,true,true,,,,,,,2
+case-03,DELIVERANCE,SUMMARY,2,15118,491,,,false,true,true,,,,,,,2
+case-03,DELIVERANCE,SUMMARY,3,15034,491,,,false,true,true,,,,,,,2
+case-03,DELIVERANCE,JSON,1,29386,1287,false,false,,true,false,,,,,,,1
+case-03,DELIVERANCE,JSON,2,29332,1287,false,false,,true,false,,,,,,,1
+case-03,DELIVERANCE,JSON,3,29292,1287,false,false,,true,false,,,,,,,1
+case-04,DELIVERANCE,SUMMARY,1,11142,539,,,false,true,true,,,,,,,2
+case-04,DELIVERANCE,SUMMARY,2,11190,539,,,false,true,true,,,,,,,2
+case-04,DELIVERANCE,SUMMARY,3,11127,539,,,false,true,true,,,,,,,2
+case-04,DELIVERANCE,JSON,1,17584,698,false,false,,true,true,,,,,,,2
+case-04,DELIVERANCE,JSON,2,17635,698,false,false,,true,true,,,,,,,2
+case-04,DELIVERANCE,JSON,3,17618,698,false,false,,true,true,,,,,,,2
+case-05,DELIVERANCE,SUMMARY,1,30710,1060,,,false,true,true,,,,,,,2
+case-05,DELIVERANCE,SUMMARY,2,30682,1060,,,false,true,true,,,,,,,2
+case-05,DELIVERANCE,SUMMARY,3,30671,1060,,,false,true,true,,,,,,,2
+case-05,DELIVERANCE,JSON,1,34707,1374,false,false,,true,false,,,,,,,1
+case-05,DELIVERANCE,JSON,2,1297356,1374,false,false,,true,false,,,,,,,1
+case-05,DELIVERANCE,JSON,3,652065,1374,false,false,,true,false,,,,,,,1
+case-06,DELIVERANCE,SUMMARY,1,30370,1744,,,false,true,true,,,,,,,2
+case-06,DELIVERANCE,SUMMARY,2,30070,1744,,,false,true,true,,,,,,,2
+case-06,DELIVERANCE,SUMMARY,3,30183,1744,,,false,true,true,,,,,,,2
+case-06,DELIVERANCE,JSON,1,33067,1355,false,false,,true,true,,,,,,,2
+case-06,DELIVERANCE,JSON,2,33091,1355,false,false,,true,true,,,,,,,2
+case-06,DELIVERANCE,JSON,3,34842,1355,false,false,,true,true,,,,,,,2
+case-07,DELIVERANCE,SUMMARY,1,33132,1011,,,false,true,true,,,,,,,2
+case-07,DELIVERANCE,SUMMARY,2,32987,1011,,,false,true,true,,,,,,,2
+case-07,DELIVERANCE,SUMMARY,3,33020,1011,,,false,true,true,,,,,,,2
+case-07,DELIVERANCE,JSON,1,33358,995,false,false,,true,true,,,,,,,2
+case-07,DELIVERANCE,JSON,2,33426,995,false,false,,true,true,,,,,,,2
+case-07,DELIVERANCE,JSON,3,34349,995,false,false,,true,true,,,,,,,2
+case-09,DELIVERANCE,SUMMARY,1,38232,1055,,,false,true,true,,,,,,,2
+case-09,DELIVERANCE,SUMMARY,2,38287,1055,,,false,true,true,,,,,,,2
+case-09,DELIVERANCE,SUMMARY,3,38371,1055,,,false,true,true,,,,,,,2
+case-09,DELIVERANCE,JSON,1,43706,1288,false,false,,true,true,,,,,,,2
+case-09,DELIVERANCE,JSON,2,43665,1288,false,false,,true,true,,,,,,,2
+case-09,DELIVERANCE,JSON,3,43853,1288,false,false,,true,true,,,,,,,2
+case-10,DELIVERANCE,SUMMARY,1,88648,1068,,,false,true,true,,,,,,,2
+case-10,DELIVERANCE,SUMMARY,2,119337,1068,,,false,true,true,,,,,,,2
+case-10,DELIVERANCE,SUMMARY,3,117713,1068,,,false,true,true,,,,,,,2
+case-11,DELIVERANCE,SUMMARY,1,28537,1529,,,false,true,true,,,,,,,2
+case-11,DELIVERANCE,SUMMARY,2,28482,1529,,,false,true,true,,,,,,,2
+case-11,DELIVERANCE,SUMMARY,3,28547,1529,,,false,true,true,,,,,,,2
+case-11,DELIVERANCE,JSON,1,35819,1449,false,false,,true,true,,,,,,,2
+case-11,DELIVERANCE,JSON,2,35743,1449,false,false,,true,true,,,,,,,2
+case-11,DELIVERANCE,JSON,3,35601,1449,false,false,,true,true,,,,,,,2
+case-12,DELIVERANCE,SUMMARY,1,30891,1055,,,false,true,false,,,,,,,1
+case-12,DELIVERANCE,SUMMARY,2,31090,1055,,,false,true,false,,,,,,,1
+case-12,DELIVERANCE,SUMMARY,3,30975,1055,,,false,true,false,,,,,,,1
+case-12,DELIVERANCE,JSON,1,32315,1327,false,false,,true,true,,,,,,,2
+case-12,DELIVERANCE,JSON,2,31840,1327,false,false,,true,true,,,,,,,2
+case-12,DELIVERANCE,JSON,3,32939,1327,false,false,,true,true,,,,,,,2
+case-13,DELIVERANCE,SUMMARY,1,17353,628,,,false,true,true,,,,,,,2
+case-13,DELIVERANCE,SUMMARY,2,16969,628,,,false,true,true,,,,,,,2
+case-13,DELIVERANCE,SUMMARY,3,16923,628,,,false,true,true,,,,,,,2
+case-13,DELIVERANCE,JSON,1,35714,1333,false,false,,true,true,,,,,,,2
+case-13,DELIVERANCE,JSON,2,35948,1333,false,false,,true,true,,,,,,,2
+case-13,DELIVERANCE,JSON,3,35806,1333,false,false,,true,true,,,,,,,2
+case-14,DELIVERANCE,SUMMARY,1,26832,512,,,false,true,true,,,,,,,2
+case-14,DELIVERANCE,SUMMARY,2,26831,512,,,false,true,true,,,,,,,2
+case-14,DELIVERANCE,SUMMARY,3,26649,512,,,false,true,true,,,,,,,2
+case-14,DELIVERANCE,JSON,1,55089,1908,false,false,,true,true,,,,,,,2
+case-14,DELIVERANCE,JSON,2,54200,1908,false,false,,true,true,,,,,,,2
+case-14,DELIVERANCE,JSON,3,53394,1908,false,false,,true,true,,,,,,,2
+case-15,DELIVERANCE,SUMMARY,1,19096,801,,,false,true,true,,,,,,,2
+case-15,DELIVERANCE,SUMMARY,2,19126,801,,,false,true,true,,,,,,,2
+case-15,DELIVERANCE,SUMMARY,3,19340,801,,,false,true,true,,,,,,,2
+case-15,DELIVERANCE,JSON,1,23713,859,false,false,,true,true,,,,,,,2
+case-15,DELIVERANCE,JSON,2,24363,859,false,false,,true,true,,,,,,,2
+case-15,DELIVERANCE,JSON,3,24500,859,false,false,,true,true,,,,,,,2

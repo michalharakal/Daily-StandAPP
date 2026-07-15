@@ -24,3 +24,4 @@ llm/src/jvmMain/resources/models/*.gguf
 # into ~/.m2 by scripts/setup-bench-engines.sh; not part of the project tree.
 external/
 benchmark-results-smoke/
+benchmark-results-*.log
