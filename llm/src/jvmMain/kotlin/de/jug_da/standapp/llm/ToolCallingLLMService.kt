@@ -88,6 +88,11 @@ class ToolCallingLLMService private constructor(
                     maxToolRounds = 5,
                     maxTokensPerRound = maxTokens,
                     temperature = effectiveTemp,
+                    // Batched prefill (SKaiNET-transformers #226): ingest the
+                    // chat template via forwardBatched chunks instead of one
+                    // forward per token — the agent loop re-processes the full
+                    // conversation every round, so this dominates round latency.
+                    prefillStrategy = sk.ainet.apps.llm.PrefillStrategy.Batched(maxBatch = 64),
                 )
             )
             .template(templateName)
