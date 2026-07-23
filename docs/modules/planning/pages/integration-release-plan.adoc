@@ -1,0 +1,185 @@
+= Integration & Release Plan — SKaiNET Upstream Program
+:navtitle: Integration & releases
+
+The gluing layer between xref:prd-skainet.adoc[PRD — SKaiNET core] and
+xref:prd-skainet-transformers.adoc[PRD — SKaiNET-transformers]: interface
+contracts, the architecture spike that fixes the program's direction, glue
+tasks, the release train, and the parallel-stream map. Daily-StandAPP serves
+as the program's end-to-end acceptance testbed.
+
+== Architecture decision (spike-gated)
+
+Convergence target: the `network {}` DSL is the *authoring* layer; the traced
+DAG is the *single execution IR* with two backends —
+
+. in-process `ComputeGraphExecutor` ("eager by graph"; same
+  `DefaultCpuOps`/Panama kernels, plus graph-level fusion via
+  `LLMFusionPass`/`LLMFusedOpHandlers`), and
+. DAG → StableHLO (`skainet-compile-hlo`) → IREE (local-task CPU HAL, later
+  Metal), weights via `.irpa`.
+
+Rationale: the dual-numerics bug class (position collapse, RoPE dual-path,
+`fusedDecodeAttention` recording escapes) exists *because* eager and traced
+paths diverge; a single IR eliminates it and makes every optimization serve
+CPU and GPU once. Commitment is **gated on SPIKE-1 evidence** — eager-only
+optimizations (TX-4 wiring, TX-5) do not start before the verdict.
+
+== SPIKE-1 — Execution-architecture spike
+
+Time-boxed (~2 weeks), the program's **first task**, joint core+TX, stream S4.
+
+Scope:
+
+. Run one llama/gemma decode step through `ComputeGraphExecutor` with
+  externalized KV state (a minimal hack of the `[1]`-shape OPTIMIZED trace is
+  acceptable for the spike).
+. Compile the same graph via `dag2hlo` → `iree-compile` local-task CPU HAL
+  and run it (the FunctionGemma `.vmfb` + `.irpa` assets from SKaiNET-embedded
+  are the starting point).
+. Measure both against the eager DIRECT baseline (TX-1 harness shapes) and
+  check greedy parity.
+
+**Decision criteria (fixed before measuring):** if graph-executor *or*
+IREE-CPU decode is within **1.5×** of eager (or faster) AND
+KV-state-as-graph-I/O shows no blocker → **graph-first**: TX-5 cancelled,
+TX-4 reduces to kernel work (CORE-2), R2 scope shifts to graph-path
+productization. Otherwise → **bridge-then-retire**: TX-4/TX-5 proceed as
+specced; the compiler track continues in S4 at lower priority. Verdict is
+recorded in this document.
+
+== Interface contracts
+
+Frozen during the R1 window; owned by core, versioned in its docs; additive
+changes only within the release train.
+
+[cols="1,2,4", options="header"]
+|===
+| ID | Name | Content
+
+| CT-A
+| Kernel SPI stability
+| `backend-api` matmul/GEMM signatures (`m,n,k`, strides) and dispatch
+semantics stable across the train. Consumers: TX-2, TX-4, all of S1.
+
+| CT-B
+| Zero-copy views
+| `ops.narrow`/slice guarantee (no hidden copies) that TX KV buffer-direct
+reads rely on. Produced by CORE-3; consumed by TX-3/TX-5.
+
+| CT-C
+| Stateful graph I/O
+| Naming/shape convention for KV state-in/state-out. Co-signed by CORE-4
+(core) and TX-3/TX-10 (transformers) *before* either implements.
+
+| CT-D
+| Version pairing + soak policy
+| TX pins core via `sk.ainet:skainet-bom`; pre-1.0 minor bumps; behavior
+flips (e.g. prefill default) ship opt-in one release before default.
+|===
+
+== Glue tasks
+
+[cols="1,4,1", options="header"]
+|===
+| ID | Task | Depends on
+
+| G-1
+| *Tri-repo dev loop.* Clone `../SKaiNET` (transformers `settings.gradle.kts`
+already `includeBuild`s it; Daily-StandAPP composite-includes transformers);
+document the three-level chain + a bootstrap script. Prerequisite for
+SPIKE-1.
+| —
+
+| G-2
+| *Cross-repo canary CI.* A transformers job building against core@develop so
+kernel-SPI drift surfaces before release day.
+| G-1
+
+| G-3
+| *Cross-repo acceptance gates.* TX equivalence tests are the acceptance for
+core kernel changes; nightly perf publish from the TX-1 + CORE-1 harnesses.
+| TX-1, CORE-1
+
+| G-4
+| *E2E testbed.* The Daily-StandAPP benchmark SKAINET lane is the program's
+end-to-end acceptance; rerun at every release gate and merge the row into
+`benchmark-results/benchmark-report-final.md`.
+| each R-gate
+|===
+
+== Release train
+
+Paired versions, each with a measurable acceptance gate.
+
+[cols="1,2,4,4", options="header"]
+|===
+| Release | Versions | Ships | Gate
+
+| R1 "Truth & Prefill"
+| tx 0.37.0 on core 0.36.x
+| Merged #238 (opt-in batched prefill), TX-1, TX-2. Daily-StandAPP drops the
+composite requirement, pins 0.37.0, commits the `Batched(64)` wiring cleanly.
+**SPIKE-1 runs inside the R1 window.**
+| Tool-calling smoke first-token measurably down; harness baselines
+published; spike verdict recorded here.
+
+| R2 "Decode"
+| tx 0.38.0 + core 0.37.0
+| TX-3, TX-6 (default flip after R1 soak), CORE-1–3, plus *either*
+TX-4+TX-5 (bridge verdict) *or* graph-path decode productization — hardened
+`ComputeGraphExecutor` shapes/state + graph-fusion passes (graph-first
+verdict).
+| **Benchmark-complete**: full 15-case SKAINET matrix, 0 timeouts at
+`BENCH_TIMEOUT_MS=180000`.
+
+| R3 "Agent & Sampling"
+| tx 0.39.0
+| TX-7, TX-8, TX-9.
+| Tool-calling demo first token < 10 s, full answer < 60 s; SKAINET p50 ≤
+Deliverance p50 (31 s).
+
+| R4 "Compiler Preview"
+| core 0.38.0 + tx 0.40.0
+| CORE-4–6, TX-10; Metal-HAL preview behind a flag.
+| IREE CPU-HAL greedy parity; Metal-HAL benchmark p50 within 2× LM Studio
+(4.5 s).
+|===
+
+== Parallel stream map
+
+Four workstreams; day-1-startable tasks in bold.
+
+[cols="1,3,4", options="header"]
+|===
+| Stream | Scope | Order
+
+| S1
+| Core kernels (strategy-neutral: kernels serve eager, graph executor, and
+IREE ukernel comparisons alike)
+| **CORE-1** → CORE-2; **CORE-3**
+
+| S2
+| TX runtime
+| **TX-1** → TX-2 → TX-3 → (TX-4/TX-5 only on bridge verdict) → TX-6
+
+| S3
+| TX agent/API
+| **TX-7**, **TX-9**; then TX-8 (waits on TX-3 from S2)
+
+| S4
+| Compiler/IREE (joint)
+| **G-1 → SPIKE-1** (the program's first decision point); then **CORE-4**,
+**CORE-6** (against the existing FunctionGemma `.vmfb`), CORE-5; then TX-10
+(waits on TX-3 + CORE-4)
+|===
+
+Cross-stream sync points: SPIKE-1 verdict (gates TX-4/TX-5, fixes R2 scope);
+CT-C sign-off (S2+S4, early); TX-3 landing (unblocks TX-8/TX-10); each
+release gate.
+
+== Spike verdict
+
+_To be recorded when SPIKE-1 completes: measured numbers (graph-executor vs
+IREE-CPU vs eager DIRECT on the TX-1 shapes), parity result, blockers found,
+and the resulting strategy (graph-first / bridge-then-retire) with the R2
+scope it implies._

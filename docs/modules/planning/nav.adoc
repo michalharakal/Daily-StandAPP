@@ -2,3 +2,8 @@
 * xref:requirements.adoc[Requirements]
 * xref:design.adoc[Design]
 * xref:tasks.adoc[Tasks]
+
+.Upstream program
+* xref:prd-skainet.adoc[PRD — SKaiNET core]
+* xref:prd-skainet-transformers.adoc[PRD — SKaiNET-transformers]
+* xref:integration-release-plan.adoc[Integration & releases]

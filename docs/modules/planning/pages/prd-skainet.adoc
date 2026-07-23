@@ -1,0 +1,123 @@
+= PRD: SKaiNET Core — LLM-Ready Engine
+:navtitle: PRD — SKaiNET core
+
+Product requirements for the SKaiNET core repository
+(https://github.com/SKaiNET-developers/SKaiNET[SKaiNET-developers/SKaiNET],
+artifacts `sk.ainet:skainet-bom` + `sk.ainet.core:*`) within the upstream
+performance program. Companion documents:
+xref:prd-skainet-transformers.adoc[PRD — SKaiNET-transformers] and
+xref:integration-release-plan.adoc[Integration & Release plan].
+
+== Goal
+
+Make the core engine's CPU kernels, benchmark truth, and compiler stack ready
+to serve LLM decode/prefill workloads at Deliverance-class speed and beyond —
+without the core repo owning any transformer/LLM logic itself. Core provides
+kernels, tensor-op contracts, the DAG/compile stack, and (via the program's
+architecture decision) the path to a single execution IR executed either
+in-process or through MLIR → IREE.
+
+== Non-goals
+
+* Transformer/LLM model logic (attention modules, KV caches, chat templates,
+  agent loop) — that is SKaiNET-transformers territory.
+* Hand-written GPU kernels (Metal/CUDA) — superseded by the IREE compiler
+  track per program decision.
+* Sampling algorithms — live in the transformers repo (`llm-core`).
+
+== Current state (verified 2026-07-23)
+
+* Kernel SPI in `skainet-backends/skainet-backend-api`
+  (`sk/ainet/backend/api/kernel/`) is a true GEMM interface:
+  `matmul(a, …, b, …, out, …, m, n, k)` computing `C(m,n) = A(m,k)·B(k,n)`
+  row-major with strides. Panama SIMD implementations exist in
+  `skainet-backend-cpu` for FP32, BF16, Q8_0, Q4_0, Q4_K, Q5_0, Q5_1, Q5_K,
+  Q6_K with scalar fallbacks; `skainet-backend-native-cpu` adds C kernels via
+  FFM. The API docs state "no fused-accumulate kernel is in scope yet."
+* Benchmark infrastructure exists: `skainet-backends/benchmarks/jvm-cpu-jmh`
+  (JMH: `KernelMatmulBench`, `QuantizedMatmulBench`, …), an
+  `engine-benchmarks.yml` CI workflow, and OpenBenchmarking profiles — but no
+  LLM-shaped scenarios (decode GEMV, prefill GEMM, lm_head).
+* Compile stack: `skainet-lang-dag` (graph DSL + `TraceToGraphProgram`),
+  `skainet-compile-dag` (`ComputeGraph`, executor, `LLMFusedOpHandlers`),
+  `skainet-compile-opt` (fusion/DCE/transpose-elimination passes),
+  `skainet-compile-hlo` (**StableHLO/MLIR export**: `StableHloConverter`,
+  `dag2hlo`, `MlirValidator`), `skainet-io-iree-params` (IREE `.irpa` weight
+  archives). No IREE compiler/runtime integration in core itself; the
+  embedded track invokes `iree-compile`/`iree-run-module` via shell.
+* Consumer-observed behavior (from the transformers side): the production
+  decode path is eager DIRECT mode; ~1.8 tok/s decode on Llama 3.2 1B Q8_0,
+  M-series CPU.
+
+== Tasks
+
+Stream assignments (S1 = core kernels, S4 = compiler/IREE) per the
+xref:integration-release-plan.adoc[stream map]. Every task is independently
+startable unless a dependency is listed.
+
+[cols="1,4,1,1,1", options="header"]
+|===
+| ID | Task | Size | Stream | Depends on
+
+| CORE-1
+| *LLM-shaped kernel benchmark scenarios.* Extend `jvm-cpu-jmh` +
+`engine-benchmarks.yml` with the three shapes that dominate LLM inference:
+decode GEMV (m=1, k=dim, n ∈ {dim, ffn, kv}), prefill GEMM
+(m ∈ {32, 64, 512}), lm_head (m=1, n=vocab ≈ 128k) — for Q8_0, Q4_K, FP32.
+_Acceptance:_ baselines published per release; CI regression gate on these
+scenarios.
+| S | S1 | —
+
+| CORE-2
+| *Quantized GEMM completeness + fused accumulate.* Verify m>1 efficiency of
+the quantized matmul kernels (blocked/tiled vs row-looped GEMV) and implement
+the fused-accumulate path the API docs call out as missing.
+_Acceptance:_ prefill-shape GEMM ≥ 3× the m×GEMV equivalent on Q8_0, measured
+via CORE-1.
+| M | S1 | CORE-1
+
+| CORE-3
+| *Zero-copy view contract (CT-B).* Document and enforce `ops.narrow`/slice
+view semantics (no hidden copies); add the guarantee to `backend-api` docs
+and tests. Enables buffer-direct KV reads in the transformers repo.
+_Acceptance:_ contract doc merged; view-semantics tests green.
+| S | S1 | —
+
+| CORE-4
+| *Stateful graph I/O (CT-C).* State-in/state-out convention in
+`skainet-lang-dag`/`skainet-compile-dag`: mutable module state (KV caches)
+becomes explicit graph inputs/outputs.
+_Acceptance:_ a toy stateful module round-trips trace → graph → execute with
+external state.
+| M–L | S4 | CT-C sign-off
+
+| CORE-5
+| *StableHLO decoder-op coverage + CPU-HAL CI smoke.* Audit
+`dag2hlo`/`StableHloConverter` coverage for the llama decode op set (SDPA,
+RoPE-as-ops, RMSNorm, quant handling); wire an `iree-compile` local-task
+CPU-HAL smoke into CI. The FunctionGemma sample from SKaiNET-embedded is the
+interim test graph until TX-10 delivers the llama graph.
+_Acceptance:_ gemma-sample graph compiles and executes with parity in CI.
+| M | S4 | CORE-4 (stateful parts only — stateless audit can start now)
+
+| CORE-6
+| *First-class IREE runtime bindings.* JVM FFM bindings to the IREE runtime,
+replacing the embedded track's `popen iree-run-module` pattern: load `.vmfb`
++ `.irpa`, device buffer management, invocation. HAL targets: local-task
+(CPU) first, Metal next.
+_Acceptance:_ run the existing FunctionGemma `.vmfb` from a JVM test.
+| L | S4 | — (testable against existing artifacts; ideal early parallel task)
+
+| CORE-7
+| *Release & publishing hygiene.* BOM alignment for the paired release train,
+sources jars for all artifacts, release notes carrying CORE-1 baselines.
+| S, continuous | cross | —
+|===
+
+== Success metrics
+
+* CORE-1 scenario suite runs in CI on every release; baselines in release notes.
+* Q8_0 prefill-shape GEMM ≥ 3× m×GEMV (CORE-2).
+* A decoder graph compiles StableHLO → IREE CPU-HAL and runs with greedy
+  parity in CI (CORE-5 + CORE-6).
+* No breaking kernel-SPI change within the release train (contract CT-A).

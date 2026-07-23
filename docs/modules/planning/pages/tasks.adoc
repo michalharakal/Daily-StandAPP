@@ -102,3 +102,12 @@ implements, and names its verification gate. Status values: `open`,
 | `benchmark-report.md` + CSV delivered
 | done
 |===
+
+== Follow-on: upstream program
+
+T-15 delivered the benchmark with the SKAINET row latency-only — closing that
+gap is now an upstream program across SKaiNET core and SKaiNET-transformers.
+See xref:prd-skainet.adoc[PRD — SKaiNET core],
+xref:prd-skainet-transformers.adoc[PRD — SKaiNET-transformers], and the
+xref:integration-release-plan.adoc[Integration & Release plan] (contracts,
+SPIKE-1 architecture decision, release train R1–R4).

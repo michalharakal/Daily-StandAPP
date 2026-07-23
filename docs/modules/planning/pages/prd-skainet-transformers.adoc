@@ -1,0 +1,162 @@
+= PRD: SKaiNET-transformers — Fast Llama Runtime & Agent Loop
+:navtitle: PRD — SKaiNET-transformers
+
+Product requirements for the SKaiNET-transformers repository
+(https://github.com/SKaiNET-developers/SKaiNET-transformers[SKaiNET-developers/SKaiNET-transformers],
+artifacts `sk.ainet.transformers:*`) within the upstream performance program.
+Companion documents: xref:prd-skainet.adoc[PRD — SKaiNET core] and
+xref:integration-release-plan.adoc[Integration & Release plan].
+
+== Goal
+
+Make the llama runtime and agent loop fast enough to complete the
+Daily-StandAPP benchmark (program phase "benchmark-complete": full 15-case
+matrix, zero timeouts at a 180 s budget), then reach Deliverance-class CPU
+parity, and give the agent path production ergonomics — while converging on
+the program's single-execution-IR architecture (spike-gated; see the
+integration plan).
+
+== Non-goals
+
+* Kernel implementations (GEMM/GEMV, quantized compute) — SKaiNET core.
+* MLIR/StableHLO lowering and IREE tooling — SKaiNET core / embedded.
+* Hand-written GPU kernels — superseded by the compiler track.
+
+== Current state (verified; file:line refs on `develop` post-#238)
+
+* `KLlamaJava.loadGGUF`: `QuantPolicy.NATIVE_OPTIMIZED`,
+  `OptimizedLLMMode.DIRECT`, never `compile()` (KLlamaJava.kt:69,85) —
+  quantized weights, FP32 activations, eager module-tree path.
+* KV cache on the production path is `AppendKVCache`: `ops.concat` of the
+  *entire* growing K and V every token × every layer (KVCache.kt:93-98) —
+  O(seqLen) realloc+copy per step. A contiguous/off-heap design
+  (`KvCacheJvm`: `OffheapKvCache`/`PagedKvCache`) exists but only the
+  deprecated `LlamaRuntime` uses it.
+* `fusedDecodeAttention` engages only for seqLen == 1 decode and still copies
+  the full K/V buffers each token × layer (`attn.fused_copy`,
+  MultiHeadAttention.kt:470-475).
+* lm_head is a full `[dim × vocab]` dense matmul every decode step
+  (`VoidDense`, PhaseProfile tag `lm_head`); tied embeddings resolved at
+  load time.
+* Sampling is temperature-only everywhere; `topP` is accepted in API shapes
+  and silently dropped (SkaiNetChatModel.kt:34-38).
+* Agent loop: `runtime.reset()` + full conversation re-render + re-prefill
+  *every round* (AgentLoop.kt:120-128); no prefix/KV-reuse infrastructure
+  exists.
+* Batched prefill (#226/#238) is merged, default still `Autoregressive`; the
+  latest published release (0.36.1) predates the merge.
+* Two profiling docs referenced from code comments
+  (`docs/upstream/A2-PROFILE.md`, `position_collapse_bug.md`) do not exist in
+  the tree; `weight-quantization.adoc` contradicts the 0.36.0 kernel reality.
+* Measured (Daily-StandAPP benchmark, M-series CPU, Llama 3.2 1B Q8_0):
+  ~1.8 tok/s decode; 225–492 s per 512-token generation; agent tool-calling
+  template ≈ 87 s to first token pre-#238.
+
+== Tasks
+
+Streams: S2 = runtime, S3 = agent/API, S4 = compiler track (shared with
+core). Spike-gated tasks do not start before the SPIKE-1 verdict (see
+integration plan).
+
+[cols="1,4,1,1,1", options="header"]
+|===
+| ID | Task | Size | Stream | Depends on
+
+| TX-1
+| *Perf truth harness.* PhaseProfile per-phase cost tables (one decode step +
+one 512-token prefill) committed as a doc (restores the dead `A2-PROFILE.md`
+reference); promote an `llm-performance` scenario to a threshold-gated CI
+perf smoke; adopt the `PrefillTimingDiagnostic` pattern.
+_Acceptance:_ per-phase table reproducible by one command; CI fails on
+regression beyond threshold. *First task — every other task proves its win
+against this.*
+| S–M | S2 | —
+
+| TX-2
+| *Kernel dispatch audit.* Trace one decode step on a Q8_0 GGUF: which kernel
+class executes for attention/FFN/lm_head matmuls
+(`DecoderGgufMemSegConverter` → `chooseQuantizedMatmulHeap`); fix any
+FP32-dequant or scalar fallback; fix the stale `weight-quantization.adoc`.
+_Acceptance:_ dispatch documented per matmul site; packed kernels verified
+hit (or fixed); measured delta recorded. Possible instant large win.
+| S–M | S2 | TX-1
+
+| TX-3
+| *KV-cache overhaul (strategy-neutral).* Replace `AppendKVCache`
+concat-per-token with a preallocated contiguous/off-heap cache behind the
+`KVCache` module interface (port the `KvCacheJvm` design). Design
+state-externalizable (CT-C) and view-based (CT-B) from day one — the storage
++ state design serves the eager path AND graph-state I/O, so it survives any
+SPIKE-1 verdict.
+_Acceptance:_ flat allocation profile across decode; measured tok/s gain at
+1–2K context. *The hinge task: TX-8, TX-10, and (if bridging) TX-5 build on
+it.*
+| M | S2 | TX-1
+
+| TX-4
+| *lm_head cost reduction (spike-gated).* Parallel/chunked full-vocab
+projection on existing kernels; adopt CORE-2 fused-accumulate GEMM when
+released; evaluate sampling-fused projection. Under a graph-first verdict
+this reduces to kernel work (CORE-2) + graph wiring.
+| M | S2 | TX-2, SPIKE-1 verdict
+
+| TX-5
+| *Decode attention copy elimination (spike-gated — cancelled under
+graph-first).* `fusedDecodeAttention` reads K/V buffer-direct from the TX-3
+cache (kills `attn.fused_copy`). Eager-only work; under graph-first the
+equivalent fusion happens at graph level (`LLMFusedOpHandlers`).
+| M | S2 | TX-3, SPIKE-1 verdict
+
+| TX-6
+| *Batched prefill default-on (release-gated).* Flip the `PrefillStrategy`
+default in `generateUntilStop`/`AgentConfig`/`GenerationConfig` after one
+release of opt-in soak (CT-D policy).
+| S | S2 | R1 shipped
+
+| TX-7
+| *Sampler completeness.* Top-p / top-k / repetition penalty in
+`SamplingUtils` + plumbing through `GenerationConfig`/`AgentConfig`/
+providers (today `topP` is silently dropped). Removes downstream
+temperature-clamp hacks; should measurably improve benchmark quality checks.
+_Acceptance:_ sampler unit tests; `topP` honored end-to-end.
+| S–M | S3 | — (fully parallel)
+
+| TX-8
+| *Agent-round KV/prefix reuse.* Conversation-session abstraction: keep the
+KV cache warm across agent rounds, append only new messages. Requires a
+template-render prefix-stability contract.
+_Acceptance:_ round N > 1 prefill cost proportional to new tokens only;
+agent-loop equivalence tests green.
+| L | S3 | TX-3
+
+| TX-9
+| *Agent observability + Kotlin DSL.* Expose `AgentListener` through
+`JavaAgentLoop.Builder` (events already wired internally); design the
+idiomatic `agentLoop { tool("…") { } }` `@DslMarker` DSL over `AgentLoop`,
+replacing the Map-based `JavaTool` bridge for Kotlin consumers.
+_Acceptance:_ structured tool-call events observable from both Java and
+Kotlin facades; DSL sample in docs.
+| M | S3 | —
+
+| TX-10
+| *Traceable llama decode graph.* Close eager-only trace-breakers (the RoPE
+ops-path is the template; audit `copyToFloatArray()` uses in the hot path);
+externalize KV state per CT-C; fixed-`[1]` decode + bucketed prefill shapes;
+hand the llama graph to CORE-5.
+_Acceptance:_ traced decode step passes eager-parity (greedy) equivalence.
+| L | S4 | TX-3, CORE-4
+
+| TX-11
+| *Docs truth sweep.* Restore/replace the missing profiling docs, fix the
+stale quant doc, document OPTIMIZED/HYBRID mode status honestly, per-release
+perf baselines from TX-1.
+| S, continuous | cross | —
+|===
+
+== Success metrics
+
+* Phase-1 gate: full 15-case Daily-StandAPP SKAINET matrix completes with
+  0 timeouts at `BENCH_TIMEOUT_MS=180000`.
+* Phase-2 gate: SKAINET p50 ≤ Deliverance p50 (31 s) on the same matrix.
+* Agent demo gate: tool-calling CLI first token < 10 s, full answer < 60 s.
+* No eager-vs-traced numerics divergence in equivalence suites at any release.
