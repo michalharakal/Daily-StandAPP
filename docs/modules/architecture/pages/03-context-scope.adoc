@@ -111,7 +111,7 @@ flowchart LR
     APICLIENT --> APISERVER
 
     DATA -->|"org.eclipse.jgit"| GIT
-    LLM -->|"SKaiNET kllama"| GGUF
+    LLM -->|"SKaiNET"| GGUF
 ----
 
 === Communication Channels
@@ -163,7 +163,7 @@ flowchart TD
     subgraph "Processing"
         FETCH[Fetch Commits<br/>JGit]
         FORMAT[Format for LLM]
-        INFER[LLM Inference<br/>kllama]
+        INFER[LLM Inference<br/>Qwen3 tool call + Llama 3.2 summary]
     end
 
     subgraph "Output"

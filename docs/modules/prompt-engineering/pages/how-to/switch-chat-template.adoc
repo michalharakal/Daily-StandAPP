@@ -2,104 +2,124 @@
 :toc: left
 :icons: font
 
-Drive the agent loop against a different model family by changing one
-string. The agent loop is template-agnostic; the same `Tool` registry
-works whether you target Llama, Qwen, Gemma, ChatML, or Apertus.
+Chat templates are chosen per model family and applied automatically; there
+is no CLI flag or template name to set. This page explains which template
+each stage uses, how a model file is matched to a family, and what to change
+if you want to drive a stage with a different family.
 
 == When this applies
 
-* Opt-in tool-calling path only.
-* You have a model GGUF that matches the family you want to target. The
-  embedded model is Llama 3.2 1B; *to use any other family you need a path
-  override.*
+* SKAINET backend only. The REST backend sends plain messages to an
+  OpenAI-compatible server, which applies its own template.
+* You have a GGUF that belongs to a family other than the one the stage
+  expects, or you want to try a different Qwen / Llama checkpoint.
 
-== The change
-
-`ToolCallingLLMService.create` takes a `templateName: String` parameter:
-
-[source,kotlin]
-----
-ToolCallingLLMService.create(
-    modelPath = …,
-    tools = listOf(myTool),
-    systemPrompt = …,
-    templateName = "qwen",  // <- change this
-)
-----
-
-`LLMServiceFactory.createToolCallingForGit` currently hardcodes `"llama3"`.
-To switch families from the CLI you'd add an env var or arg, then thread
-it through to the factory.
-
-== Supported template names
+== Which template runs where
 
 [cols="1,2,3"]
 |===
-|`templateName` |Model family it targets |Notes
+|Stage |Template |What it renders
 
-|`llama3`
-|Llama 3.x (3.0/3.1/3.2/3.3 instruct)
-|Default for the embedded model. Tool-call format defaults to
-single-line JSON; the parser also accepts `<\|python_tag\|>\{json\}` and
-`<function=name>\{args\}</function>` forms.
+|`qwen-commits` (tool call, Qwen3 0.6B)
+|`sk.ainet.apps.kllama.chat.QwenChatTemplate(enableThinking = false)`
+|`<\|im_start\|>system … <\|im_end\|>` turns, the tool schemas inside
+`<tools>…</tools>` in the system turn, and an empty `<think></think>`
+prefill so the model answers without a reasoning block. The model replies
+with `<tool_call>{"name":…,"arguments":{…}}</tool_call>`.
 
-|`qwen`
-|Qwen 3.x
-|`<tool_call>...</tool_call>` XML wrapper around a JSON body. Parser is
-the well-tested Hermes strategy — generally the *most reliable* template
-for tool calling against small open-weights models.
-
-|`gemma`
-|Gemma 2 / Gemma 3
-|`{"functionCall":{"name":"...", "args":{...}}}` JSON. Parser strategy
-exists but coverage is thinner than Hermes.
-
-|`gemma4`
-|Gemma 4
-|Custom `<\|tool_call>...<tool_call\|>` block with TypeScript-style
-arguments and a special `<\|"\|>` string delimiter. Custom parser; not
-JSON-compatible.
-
-|`chatml`
-|Hermes-style ChatML (Mistral Instruct, OpenHermes, NousHermes, others)
-|Same `<tool_call>` wrapper as Qwen. Works with the Hermes parser.
-
-|`apertus`
-|Apertus
-|TypeScript-style type declarations for tools; tool calls in a
-`<\|tools_prefix>...<\|tools_suffix>` block as `[{name: args_obj}, ...]`.
+|`llama` (summary, Llama 3.2 3B)
+|`sk.ainet.apps.kllama.chat.Llama3ChatTemplate()`
+|`<\|begin_of_text\|><\|start_header_id\|>system<\|end_header_id\|> …
+<\|eot_id\|>` turns for system and user, then the assistant header. No tools
+are rendered (`tools = emptyList()`). Generation stops on `<\|eot_id\|>` or
+`<\|end_of_text\|>`.
 |===
 
-When in doubt, prefer `qwen` or `chatml` — both go through the
-`HermesToolCallParserStrategy`, which has the broadest test coverage in
-SKaiNET-transformers.
+Both templates are instantiated inside the stage class
+(`QwenCommitsStage.runAgent`, `LlamaGenerateStage.generateWith`); nothing is
+resolved from GGUF metadata at runtime.
 
-== How resolution works
+== How a GGUF is matched to a family
 
-Internally the service calls
-`ToolCallingSupportResolver.resolveOrFallback(metadata, templateName)`. With
-an explicit `templateName` set, the resolver returns that family's provider
-directly — `ModelMetadata` is ignored on the explicit path. So the string
-you pass *is* what you get; no auto-detection in this configuration.
+`ModelSpec.family` is one of `ModelFamily.QWEN` (accepted GGUF architectures
+`qwen2`, `qwen3`, `qwen35`) or `ModelFamily.LLAMA` (`llama`, `mistral`).
+`LocalModel.load` reads the architecture from the GGUF header and refuses a
+file whose architecture is not in the family's accepted set:
 
-If the name is unknown, the resolver falls back to
-`GenericToolCallingSupport`, which produces a generic system message that
-many models handle but none handle perfectly.
+[source]
+----
+llama-3.2-3b-instruct: /path/x.gguf has architecture 'qwen3', expected one of [llama, mistral]
+----
+
+So you can swap checkpoints *within* a family freely — a Llama 3.1 8B
+Instruct GGUF via `--llama-model`, a Qwen3 1.7B via `--qwen-model` — and the
+right template is used automatically. What you cannot do is hand the
+summariser a Qwen file, or the tool stage a Llama file.
+
+== Swapping a checkpoint within a family
+
+[source,bash]
+----
+# Bigger summariser, same template
+./gradlew :StandAPP-cli:run --args="--repo . --days 7 \
+  --llama-model ~/models/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf"
+
+# Bigger tool model, same template
+./gradlew :StandAPP-cli:run --args="--repo . --days 7 \
+  --qwen-model hf://Qwen/Qwen3-1.7B-GGUF@main/Qwen3-1.7B-Q8_0.gguf"
+----
+
+The env equivalents are `STANDAPP_LLAMA_MODEL_PATH` and
+`STANDAPP_QWEN_MODEL_PATH`; `hf://` URIs go through the same cache as the
+defaults. Programmatically, pass a `ModelSpec` to the stage factory:
+
+[source,kotlin]
+----
+val bigLlama = ModelCatalog.LLAMA_3_2_3B.copy(
+    id = "llama-3.1-8b-instruct",
+    hfUri = "hf://bartowski/Meta-Llama-3.1-8B-Instruct-GGUF@main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    fileName = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    approxBytes = 4_920_000_000L,
+)
+val flow = standupFlow(models) {
+    summarize(llama(spec = bigLlama))
+}
+----
+
+== Driving a stage with a different family
+
+The template, the network loader and the stop-token set are all keyed on
+`ModelFamily`, so a new family means code, not configuration:
+
+. Add the family to `ModelFamily` with its accepted GGUF architectures and
+  extend the `when` in `LocalModel.load` with the matching
+  SKaiNET-transformers network loader and turn-ending tokens.
+. Write a `PipelineStage` that renders through the family's template.
+  SKaiNET-transformers 0.53 ships `Llama3ChatTemplate`, `QwenChatTemplate`,
+  `GemmaChatTemplate`, `Gemma4ChatTemplate`, `ChatMLTemplate`,
+  `ApertusChatTemplate`, `SmolLMChatTemplate` and `BitNetChatTemplate` in
+  `sk.ainet.apps.kllama.chat`; each pairs with a tool-call parser strategy
+  (xref:reference/tool-call-parsers.adoc[reference]).
+. Plug it in through the DSL: `commits = MyOtherToolStage(models)` or
+  `summarize(MyOtherGenerateStage(models))`. The rest of the flow is
+  unchanged.
+
+For the tool stage, prefer families that use the Hermes-style
+`<tool_call>` wrapper (Qwen, ChatML): that parser has the broadest test
+coverage in SKaiNET-transformers and is the reason the default tool model is
+a Qwen3 rather than a Llama.
 
 == Verifying after a switch
 
-. `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` should show delimiters from
-  the new family. For Qwen, expect `<tools>` and `<tool_call>` tags. For
-  Gemma 4, expect `<|tool>` blocks.
-. The tool definition should be embedded inline; `parameters` schema
-  should be present.
-. First model output (visible in the streamed tokens) should use the
-  family's response delimiter — e.g. `<tool_call>{"name":...,"arguments":...}</tool_call>`
-  for Qwen.
-
-If you see Llama 3 delimiters in the rendered template even though you
-asked for `qwen`, the explicit name wasn't picked up — check your call
-site.
+. `[MODEL LOAD] <id>: arch=… family=…` shows the architecture that was read
+  from the GGUF and the family it was accepted into.
+. `[STAGE/QWEN RENDERED PROMPT]` should show `<|im_start|>` turns and a
+  `<tools>` block; `[STAGE/SYSTEM PROMPT]` / `[STAGE/USER PROMPT]` on the
+  Llama side show the raw messages before `Llama3ChatTemplate` wraps them.
+. `[STAGE/QWEN RESPONSE]` should contain
+  `<tool_call>{"name":…,"arguments":…}</tool_call>`; if the model answers in
+  prose instead, the stage falls back (`[STAGE/FALLBACK]`) and you should
+  look at the system prompt or pick a larger checkpoint.
 
 == See also
 
@@ -108,4 +128,4 @@ site.
 * xref:reference/tool-call-parsers.adoc[Tool-call parsers] — which
   parser handles which family.
 * xref:reference/model-selection.adoc[Model selection] — which models
-  pair well with which template.
+  pair well with which stage.

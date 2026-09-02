@@ -3,13 +3,13 @@
 :toclevels: 3
 :icons: font
 
-[IMPORTANT]
+[NOTE]
 ====
-**Doc status (2026-05-05):** ADR-010 (full replacement with `JavaAgentLoop`) is
-*amended* — the agent-loop path is now opt-in (`STANDAPP_TOOL_CALLING=1`) rather
-than the default. ADR-011 records the opt-in coexistence decision. The 1B
-reliability problem from the original 2026-04-30 rollback note is unsolved; the
-opt-in lets us exercise tool calling without breaking the proven default path.
+**Doc status (2026-09):** <<adr-012,ADR-012>> replaces the single-model SKAINET
+designs with a two-model pipeline on SKaiNET 0.53 (Qwen3-0.6B tool stage +
+Llama-3.2-3B summary stage, models downloaded on first run). ADR-010 and
+ADR-011 are kept below as superseded records; the class and flag names they
+mention no longer exist in the code.
 ====
 
 == ADR-001: Privacy-First Architecture (Foundational)
@@ -68,7 +68,7 @@ graph LR
     COMMON --> WASM[Wasm<br/>Stub]
 ----
 
-== ADR-003: Pluggable LLM Architecture with SKaiNET kllama
+== ADR-003: Pluggable LLM Architecture with SKaiNET
 
 === Status
 Accepted
@@ -76,14 +76,14 @@ Accepted
 === Context
 Need local LLM inference without cloud dependencies. Options considered:
 * llama.cpp (C++ with JNI bindings)
-* JVM-native engines (SKaiNET kllama, Deliverance, qxotic)
+* JVM-native engines (SKaiNET, Deliverance, qxotic)
 * OpenAI-compatible local servers (Ollama, LM Studio, vLLM)
 
 === Decision
 Define `LLMService` interface for pluggable LLM backends. Use `LLMServiceFactory` to instantiate the production backends based on the `MCP_LLM_BACKEND` environment variable. Alternative JVM engines used only for benchmarking plug into the same interface from `:benchmark` so they don't pollute the production classpath.
 
 === Production Implementations
-* **SKaiNET kllama** (`SKaiNetLLMService`) - Pure Kotlin, GGUF model loading, SIMD via Vector API; also `ToolCallingLLMService` for opt-in agent loop (ADR-011).
+* **SKaiNET** (`LlamaChatLLMService` over `LlamaGenerateStage`) - Pure Kotlin model definitions, GGUF loading through SKaiNET-transformers, SIMD via Vector API plus native FFM kernels. The standup CLI drives the same stage inside the two-model pipeline of ADR-012.
 * **REST API** (`RestApiLLMService`) - OpenAI-compatible HTTP endpoints (Ollama, llama.cpp server, LM Studio, vLLM, OpenAI cloud)
 
 === Benchmark-Only Alternative Engines
@@ -99,8 +99,8 @@ Define `LLMService` interface for pluggable LLM backends. Use `LLMServiceFactory
 === Consequences
 * (+) Two production backends available; multiple in-benchmark alternatives prove the seam
 * (+) Benchmark module can compare backends side-by-side without changing the production build
-* (+) No native library management for the SKaiNET CPU path (Panama Vector); native FFM kernels are an opt-in upgrade
-* (-) Requires JDK 21+ for Vector API (SKaiNET)
+* (+) No manual native library management: the FFM kernel library ships inside the `skainet-backend-native-cpu` artefact and is extracted at runtime (Panama Vector kernels remain the fallback)
+* (-) Requires the JDK 25 toolchain (preview Vector API, native access) for SKaiNET
 * (-) Benchmark-only engines may lag releases on Maven Central; need nested-git + `mavenLocal()` install for them
 
 The interesting part of the architecture is not "we have an interface" — it's that the same `LLMService.generate(...)` call drives four engines that integrate the JVM in genuinely different ways (Kotlin in-process, HTTP, Java in-process, fork+exec subprocess), each pulling a model from a different source. The seam holds across all of them; that is the engine-independence claim:
@@ -113,7 +113,7 @@ flowchart LR
     IFACE("LLMService.generate<br/>prompt · maxTokens · temperature · topP")
 
     subgraph PROD["Production wiring (:llm)"]
-        SKAINET["SKaiNetLLMService<br/>in-process Kotlin<br/>Panama Vector + FFM kernels"]
+        SKAINET["LlamaChatLLMService<br/>in-process Kotlin<br/>Panama Vector + FFM kernels"]
         REST["RestApiLLMService<br/>OpenAI-compatible HTTP client"]
     end
 
@@ -122,7 +122,7 @@ flowchart LR
         QXOTIC["QxoticLLMService<br/>spawns Llama32CliQ8_0 subprocess<br/>-Pqxotic.enabled=true"]
     end
 
-    GGUF1["embedded Llama 3.2 1B Q8_0<br/>JAR resource"]
+    GGUF1["Llama-3.2-3B-Instruct Q4_K_M<br/>hf:// download → ~/.cache/standapp/models"]
     HTTP["Ollama · LM Studio · OpenAI · vLLM"]
     HFHUB["HuggingFace Hub<br/>auto-download"]
     GGUF2["local GGUF path<br/>BENCH_QXOTIC_MODEL"]
@@ -153,7 +153,7 @@ What the diagram tells you at a glance:
 
 * Solid boxes are production paths; dashed boxes are gated by Gradle properties at build time and never appear on the production classpath.
 * Dotted arrows indicate "leaves the JVM" — the REST path crosses the network, the qxotic path crosses a process boundary. The two solid in-process engines (SKAINET, Deliverance) stay inside the same JVM as the caller.
-* Each engine's *model source* is distinct — embedded JAR resource, OpenAI-shape HTTP server, HuggingFace download, or a path supplied by the operator. The seam doesn't care; only `generate(prompt, ...)` matters.
+* Each engine's *model source* is distinct — a GGUF pulled through SKaiNET's `hf://` resolver into the local cache, an OpenAI-shape HTTP server, a HuggingFace download by the engine itself, or a path supplied by the operator. The seam doesn't care; only `generate(prompt, ...)` matters.
 
 == ADR-004: MCP Protocol for AI Assistant Integration
 
@@ -268,7 +268,7 @@ tasks.named<Jar>("jvmJar") {
 Accepted
 
 === Context
-The existing LLM integration options (SKaiNET kllama, REST API client) are tightly coupled to the application's internal `LLMService` interface. External tools and standard OpenAI-compatible clients cannot interact with the system directly.
+The existing LLM integration options (SKaiNET, REST API client) are tightly coupled to the application's internal `LLMService` interface. External tools and standard OpenAI-compatible clients cannot interact with the system directly.
 
 === Decision
 Add a separate `cloud-api` module group providing an OpenAI-compatible REST API server, client, model DTOs, and Koog agent integration. The modules are:
@@ -311,7 +311,11 @@ Use environment variables as the primary configuration mechanism via `LLMService
 [source,bash]
 ----
 MCP_LLM_BACKEND=SKAINET          # or REST_API
-MCP_LLM_MODEL_PATH=/path/to/model.gguf
+STANDAPP_QWEN_MODEL_PATH=/path/to/Qwen3-0.6B-Q8_0.gguf            # optional, else hf:// download
+STANDAPP_LLAMA_MODEL_PATH=/path/to/Llama-3.2-3B-Instruct-Q4_K_M.gguf  # optional (MCP_LLM_MODEL_PATH = legacy alias)
+STANDAPP_MODEL_CACHE_DIR=~/.cache/standapp/models
+STANDAPP_OFFLINE=1               # optional: never download
+HF_TOKEN=optional-token
 MCP_LLM_REST_BASE_URL=http://localhost:11434
 MCP_LLM_REST_MODEL=llama3.2:3b
 MCP_LLM_REST_API_KEY=optional-key
@@ -329,7 +333,7 @@ MCP_LLM_REST_API_KEY=optional-key
 == ADR-010: Adopt SKaiNET-transformers Agent Loop with Embedded Model
 
 === Status
-Accepted (2026-04-30)
+Superseded by <<adr-012,ADR-012>> (2026-09). Originally accepted 2026-04-30; kept as a historical record — the embedded 1B model, `JavaAgentLoop` and `EmbeddedModelLoader` are gone.
 
 === Context
 The previous LLM path called `KLlamaSession.generate(prompt, config)` once with a fully pre-built prompt that the CLI assembled by pulling commits with JGit and stuffing them into a `PromptBuilder`. Three things made this brittle:
@@ -371,7 +375,7 @@ model a high-level task and the model calls `get_recent_commits` itself.
 == ADR-011: Tool Calling as Opt-In Second SKAINET Path
 
 === Status
-Accepted (2026-05-05)
+Superseded by <<adr-012,ADR-012>> (2026-09). Originally accepted 2026-05-05; kept as a historical record — `ToolCallingLLMService`, `SKaiNetLLMService` and `STANDAPP_TOOL_CALLING` no longer exist, and tool calling is the default path.
 
 === Context
 
@@ -439,3 +443,123 @@ an opt-in env var. Keep `SKaiNetLLMService` (raw single-shot) as the default.
 * `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/GitTools.kt` — `GetRecentCommitsTool`.
 * §6.2 (runtime view, opt-in) and §8.7 (chat templates + tool-call processing).
 * TR-09 in §11 — `AgentListener` not exposed via the public `JavaAgentLoop` facade.
+
+---
+
+[[adr-012]]
+== ADR-012: Two-Model Pipeline on SKaiNET 0.53 — Qwen3-0.6B Tool Stage + Llama-3.2-3B Summary Stage
+
+=== Status
+Accepted (2026-09). Supersedes ADR-010 and ADR-011.
+
+=== Context
+
+Both earlier SKAINET designs hinged on one small model doing two jobs. The
+embedded Llama 3.2 1B (ADR-010) could not reliably emit the tool-call JSON its
+chat template requires, so tool calling became opt-in (ADR-011) and the
+default stayed a hand-rolled single-shot prompt over the raw `KLlamaSession`.
+That compromise left several things unresolved:
+
+* The 1B summaries were mediocre and the hand-written Llama 3 turn tags drifted
+  from upstream's template.
+* Embedding the GGUF as a JAR resource made the CLI a ~2 GB artefact, needed a
+  `uv`/Python download step at build time, and pinned the project to one model.
+* The public `JavaAgentLoop` facade hid the `AgentListener` events, so tool
+  calls were never observable as such (the former TR-09).
+* SKaiNET had moved from 0.36 to 0.53: the decoder loader moved to
+  `skainet-transformers-core`, `skainet-data-source` gained a `DataPipeline`
+  DSL and an `hf://` resolver, Qwen3 got a network loader and a tool-capable
+  chat template, and the kllama Java facade rejected Qwen GGUFs.
+
+Meanwhile the app already had a pure `standapp-ai-engine` module (prompt
+templates, parser, scorer) that no backend was using as a pipeline.
+
+=== Decision
+
+. **Upgrade** to SKaiNET core + SKaiNET-transformers 0.53.0 from Maven Central
+  (BOM-managed); Kotlin 2.4.10, Ktor 3.5.2, Gradle 9.6.1, JDK 25 toolchain via
+  the foojay resolver. The `../SKaiNET-transformers` composite build is opt-in
+  (`-PuseLocalTransformers=true`), never implicit. Drop the kllama runtime
+  dependency.
+. **Split the work across two models**, each doing one job:
+  * *Tool stage* — Qwen3-0.6B (Q8_0) inside `sk.ainet.apps.kllama.chat.AgentLoop`
+    with `QwenChatTemplate(enableThinking = false)`, `maxToolRounds = 1`,
+    192 tokens, greedy sampling, batched prefill. It calls
+    `get_recent_commits(days, author?)`; `RecordingGitCommitsTool` records
+    the structured commit list and the model's prose is discarded.
+  * *Summary stage* — Llama-3.2-3B-Instruct (Q4_K_M) through
+    `Llama3ChatTemplate` and `generateUntilStop` with the Llama 3 stop set,
+    CLI temperature (default 0.1, no clamp) and top-p 0.9 paired with top-k 40.
+. **Express the flow as a SKaiNET `DataPipeline`** through the app DSL
+  `standupFlow { commits = qwenToolCall(); preprocess {}; prompt {};
+  summarize(llama()); postprocess {}; transform(name) {}; finish(name) {} }`.
+  Every step is a `PipelineStage`; `RetryingSummarizeStage` owns the
+  prompt → generate → parse retry loop and reuses `PromptBuilder`,
+  `SummaryParser` and `QualityScorer` from `standapp-ai-engine`.
+. **Always deliver a summary.** If Qwen produces no valid call the stage logs
+  `[STAGE/FALLBACK]` and fetches the commits directly (`DIRECT_FALLBACK`).
+  Explicit `--since/--until` windows, `--commits git` and the `REST_API`
+  backend use `GitCommitsStage` from the start.
+. **Download instead of embed.** Both GGUFs are resolved on first run through
+  `JvmDataSourceResolver` (`hf://` URIs) into `STANDAPP_MODEL_CACHE_DIR`
+  (default `~/.cache/standapp/models`), ~0.6 GB + ~2.0 GB. Overrides:
+  `--qwen-model` / `--llama-model`, `STANDAPP_QWEN_MODEL_PATH` /
+  `STANDAPP_LLAMA_MODEL_PATH`, legacy `MCP_LLM_MODEL_PATH` (Llama only),
+  `STANDAPP_OFFLINE=1`, `HF_TOKEN`. The shadow JAR shrinks to ~20 MB.
+. **Load through the transformers DSL path**: `DecoderGgufWeightLoader.loadToMapStreaming`
+  (packed, memory-mapped weights) → `QwenNetworkLoader` / `LlamaNetworkLoader.fromWeights`
+  → `OptimizedLLMRuntime(DIRECT)`, with `KernelPacks.install()` +
+  `FfmRowMajorKernelPack.install()` once per process. `ModelProvider.releasing()`
+  loads/uses/closes each model in turn; `caching()` (`--keep-models`) keeps
+  them resident.
+. **Remove, don't keep alongside**: the embedded 1B JAR resource,
+  `EmbeddedModelLoader`, `prepareModel` / `scripts/download-model.py`,
+  `SKaiNetLLMService`, `ToolCallingLLMService`, `createToolCallingForGit`,
+  `--tool-calling` / `STANDAPP_TOOL_CALLING`. `LlamaChatLLMService` implements
+  `LLMService` over the Llama stage so `:benchmark`, `LLMSummarizer` and the
+  `STANDAPP_TINY_PROMPT` smoke path keep working; `REST_API`, `:mcp-server`
+  and `cloud-api/*` keep compiling unchanged.
+. **JVM args**: `--enable-preview --add-modules jdk.incubator.vector
+  --enable-native-access=ALL-UNNAMED -Xmx12g`; KV caches capped at a
+  4096-token window. CI and Docker use JDK 25; the container sets
+  `java.io.tmpdir=/app/tmp` on an exec-capable tmpfs and mounts the model
+  cache writable.
+
+=== Consequences
+
+* (+) The model — not the CLI — turns the request into the git query, and the
+  tool guarantees a structured result; Qwen's prose never reaches the summary.
+* (+) Noticeably better summaries from the 3B model; the retry/score loop is
+  shared with every other backend through the engine module.
+* (+) The pipeline is extendable from Kotlin: extra tools
+  (`qwenToolCall(tools = …)`), custom `transform` / `finish` stages, or an
+  alternative generator (`summarize(llmService(...))`) without touching the
+  built-ins. `describe()` prints the chain.
+* (+) Structured `AgentListener` events (`onToolCalls`, `onToolResult`,
+  `onToolCallValidationFailed`) are logged — the former TR-09 (`AgentListener` hidden behind the Java facade) is closed.
+* (+) ~20 MB JAR, no build-time download step, no Python/`uv` dependency;
+  published Maven artefacts instead of a mandatory sibling checkout.
+* (-) First run downloads ~2.7 GB; a cold cache with `STANDAPP_OFFLINE=1` or
+  without network fails with exit code 4. Privacy is unchanged: no commit data
+  ever leaves the machine.
+* (-) Two model loads per run. `releasing()` keeps peak memory at one model
+  but reloads the summariser on every parse retry; `--keep-models` trades
+  memory for speed.
+* (-) CPU-only performance: on an i7-9750H the 3B summariser decodes at
+  ~0.3 s/token and prefill costs about the same per token (the row-major
+  kernel processes batched prefill row by row); the Qwen round adds ~40 s.
+* (-) The native kernel library must be extractable to an exec-capable temp
+  directory; otherwise the runtime silently falls back to slower kernels.
+* (-) A 0.6B model may still skip the tool or emit an invalid call — the
+  fallback hides this from the user, so `[STAGE/FALLBACK]` needs watching.
+* (-) Upstream sampler quirk: `sampleFromLogits(topK = 0, topP < 1)` is
+  quadratic in the vocabulary; the stage always pairs top-p with top-k 40.
+
+=== Related
+
+* `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/pipeline/StandupFlow.kt` — the DSL.
+* `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/pipeline/QwenCommitsStage.kt`, `LlamaGenerateStage.kt`, `RetryingSummarizeStage.kt` — the model stages.
+* `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/model/` — `ModelCatalog`, `ModelResolver`, `ModelProvider`, `LocalModel`, `KernelSetup`.
+* `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/GitTools.kt` — `RecordingGitCommitsTool`.
+* xref:planning:design.adoc[Design DES-08 … DES-10] and xref:planning:requirements.adoc[REQ-50 … REQ-55].
+* §6.2 / §6.3 (runtime view), §7.6 (model cache), §8.7 (tool calling, templates, stage logs), §11 (risks TR-04 … TR-11).

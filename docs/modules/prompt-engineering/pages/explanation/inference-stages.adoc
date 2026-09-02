@@ -2,8 +2,8 @@
 :toc: left
 :icons: font
 
-What happens between "you call `service.generate(prompt, ...)`" and "you
-get text back". This page is the level *below*
+What happens between "a pipeline stage hands the model a prompt" and
+"text comes back". This page is the level *below*
 xref:explanation/agent-loop-internals.adoc[Agent-loop internals] —
 where that page treats the model call as a black box, this one opens
 the box.
@@ -12,11 +12,14 @@ Knowing these stages lets you:
 
 * Read benchmark numbers without confusion (TTFT vs tok/s measure
   different things).
-* Diagnose stalls correctly (was it prefill or decode?).
-* Design prompts that don't pay quadratic costs you didn't intend.
-* Make sense of the
-  xref:explanation/negative-sample-2026-05-05.adoc[14-minute prefill]
-  in the negative sample.
+* Diagnose stalls correctly (was it model loading, prefill or decode?).
+* Design prompts that don't pay costs you didn't intend.
+* Make sense of why a summary takes minutes on a laptop CPU even though
+  the answer is 250 tokens long.
+
+Both models in the pipeline go through the same stages; the tool stage
+(Qwen3-0.6B) adds the tool branch, the summariser (Llama-3.2-3B) does
+not.
 
 == The full pipeline
 
@@ -85,81 +88,137 @@ sequenceDiagram
     end
 ----
 
-The numbered stages below correspond to phases in the diagram.
+The numbered stages below correspond to phases in the diagram. In this
+app the tool branch stops after "Execute tool": the loop runs one round
+and the tool's *recorded* result goes to the next pipeline stage, not
+back into the model.
+
+== 0. Model loading (before any of this)
+
+Nothing in the diagram can start until a `LocalModel` exists.
+`ModelProvider.withModel(spec)` resolves the GGUF (cache or first-run
+download, `[MODEL]` lines) and `LocalModel.load` builds the runtime
+(`[MODEL LOAD]` lines):
+
+. `KernelSetup.ensureInstalled()` — once per process —
+  `KernelPacks.install()` and `FfmRowMajorKernelPack.install()`. The
+  second installs the native FFM kernels; the bundled
+  `libskainet_kernels.so` is extracted to `java.io.tmpdir` and loaded
+  through the Foreign Function & Memory API (hence
+  `--enable-native-access=ALL-UNNAMED`). If that directory is mounted
+  `noexec` the load fails *silently* and everything falls back to the
+  decoding reference kernel — correct, but many times slower.
+. `DecoderGgufWeightLoader.loadToMapStreaming` streams the weights and
+  keeps them *packed* (Q8_0 / Q4_K / Q6_K) and memory-mapped. No
+  dequantised FP32 copy lives on the heap; the row-major kernels
+  consume the packed blocks directly.
+. `QwenNetworkLoader.fromWeights` / `LlamaNetworkLoader.fromWeights`
+  builds the network for the family; `OptimizedLLMRuntime` in
+  `OptimizedLLMMode.DIRECT` executes it.
+. The KV cache is sized for `min(contextLength, 4096)` tokens
+  (`LocalModel.MAX_INFERENCE_LEN`).
+
+With the default `ModelProvider.releasing()` this happens twice per run
+(Qwen, then Llama) and each model is closed before the next loads;
+`--keep-models` keeps both resident.
 
 == 1. Context assembly (orchestrator)
 
-Before the model sees anything, the orchestrator (in our codebase:
-`SKaiNetLLMService` or `ToolCallingLLMService`) builds the full
-*context string*. For the agent-loop path this is a Llama 3 turn-tagged
-template:
+Before the model sees anything, the pipeline stage builds the full
+*context string* through the family's chat template. For the tool stage,
+`QwenChatTemplate(enableThinking = false)` renders:
 
 [source]
 ----
-<|begin_of_text|>
-<|start_header_id|>system<|end_header_id|>
-You are a helpful assistant with tool calling capabilities…
-<tool definitions as JSON>
-<|eot_id|>
-<|start_header_id|>user<|end_header_id|>
-Summarise commits over the last 7 days.
-<|eot_id|>
-<|start_header_id|>assistant<|end_header_id|>
+<|im_start|>system
+You are a git assistant. You must call the get_recent_commits tool …
+
+# Tools
+…
+<tools>
+{"type":"function","function":{"name":"get_recent_commits",…}}
+</tools>
+…<|im_end|>
+<|im_start|>user
+Fetch the git commits from the last 7 day(s) using get_recent_commits. Pass days=7 as a number.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
 ----
 
-For the single-shot path it's a similar template without the tool
-schema. xref:reference/chat-templates.adoc[Reference: chat templates]
-shows what each model family expects.
+For the summariser, `Llama3ChatTemplate` renders system + user turns with
+no tool schema. xref:reference/chat-templates.adoc[Reference: chat
+templates] shows both in full; `[STAGE/QWEN RENDERED PROMPT]` and
+`[STAGE/SYSTEM PROMPT]`/`[STAGE/USER PROMPT]` log what was actually
+sent.
 
 The string is *just text* at this point — nothing model-specific yet.
 
 == 2. Tokenization
 
 `Tokenizer.encode(string)` maps the context string into a sequence of
-*token IDs* — integers in `[0, vocabSize)`. For Llama 3 the vocabulary
-is 128 256 entries and the tokenizer is byte-pair encoding (BPE).
+*token IDs* — integers in `[0, vocabSize)`. The tokenizer is built from
+the GGUF itself (`TokenizerFactory.fromGgufSource`), so it always matches
+the checkpoint. Llama 3's vocabulary has 128 256 entries, Qwen3's
+151 936; both are byte-pair encoding (BPE).
 
 Why this stage matters:
 
-* **Tokens are the unit of cost.** Every "1.6 KB string" you write in
-  the system prompt is really N tokens for some N — and prefill cost
-  scales with N, not with the byte count.
+* **Tokens are the unit of cost.** Every "1.4 KB string" of commit text
+  in the user prompt is really N tokens for some N — and prefill cost
+  scales with N, not with the byte count. `[STAGE/PROMPT]` reports
+  characters; `[STAGE/INPUT] promptTokens=…` reports the truth.
 * **Tokenization is reversible.** `tokenizer.decode(id)` reproduces the
   exact byte sequence the encoder consumed. The streaming output you
   see in the CLI is `decode(tokenId)` per generated token.
-* **Special tokens are real tokens.** `<|eot_id|>`,
-  `<|start_header_id|>`, `<|python_tag|>` etc. each occupy one token
-  ID. The chat template's structural overhead is small (~5–10 tokens
-  per turn) — most of your prompt is content, not wrapping.
+* **Special tokens are real tokens.** `<|eot_id|>`, `<|im_end|>`,
+  `<|begin_of_text|>` etc. each occupy one token ID. Because
+  `<|begin_of_text|>` is a control token in the vocabulary, the
+  summariser encodes the rendered template as-is and does not add a
+  second BOS. The chat template's structural overhead is small
+  (~5–10 tokens per turn) — most of your prompt is content, not wrapping.
+* **The window is checked here.** If the prompt alone does not fit the
+  4096-token window the stage refuses with a message telling you to use
+  `preprocess { limit(n); firstMessageLine(…) }`; if prompt + budget do
+  not fit, `maxTokens` is clamped (`[STAGE/WARN]`).
 
 == 3. Prefill stage
 
 The model takes the full input token sequence and runs it through the
-transformer *all at once* — one batched forward pass.
+transformer to fill the KV cache. `generateUntilStop` is called with
+`PrefillStrategy.Batched(64)`: the prompt is fed in chunks of 64 tokens
+rather than one token at a time.
 
 What happens internally:
 
 . **Embedding lookup.** Each token ID becomes a `dim`-wide float
-  vector. For Llama 3.2 1B, `dim = 2048`.
-. **Transformer layers.** Each of the model's L layers (Llama 3.2 1B
-  has 16) runs attention + feed-forward over the whole sequence in
-  parallel. The attention matrix is N×N where N is the input length —
-  this is where prefill becomes *quadratic* in prompt length.
+  vector. For Llama 3.2 3B, `dim = 3072`; for Qwen3-0.6B, `1024`.
+. **Transformer layers.** Each of the model's layers (28 for both of our
+  checkpoints) runs attention + feed-forward over the chunk. Attention
+  is quadratic in sequence length, feed-forward is linear.
 . **KV cache fill.** For every layer's attention, the *key* and
   *value* tensors for every input token get written to the
   pre-allocated KV cache. This is what lets decode stay linear later.
 
-Critical numbers to remember:
+Critical numbers to remember — measured on an i7-9750H (6C/12T) with the
+native FFM row-major kernels:
 
-* Prefill is the dominant cost when the prompt is long. For a 2000-token
-  prompt on a CPU with the SKaiNET native FFM kernel, prefill is
-  ~0.2–0.5 ms per input token (so ~0.4–1 s total). With the Panama
-  Vector fallback alone, it's ~50–80 ms per input token (~100–160 s
-  total). xref:explanation/why-prompts-matter-on-small-models.adoc[The
-  prefill math page] has the numbers in context.
+* **Prefill costs about as much per token as decode on this kernel:
+  ≈ 0.3 s per prompt token for Llama-3.2-3B Q4_K_M.** The row-major
+  kernel processes a batched prefill row by row, so batching saves the
+  per-call overhead but not the matmul work. A 400-token summariser
+  prompt therefore waits roughly two minutes before the first token.
+  This is the single biggest reason to keep the commit list short.
+* The Qwen tool round — a ~300-token tool prompt plus a ~30-token
+  answer on a 0.6B — takes ≈ 40 s end to end.
 * Prefill is wall-clock time the user *waits* for. There is nothing to
   display until the first token of decode arrives — that's
-  **time-to-first-token (TTFT)**, logged as `[STAGE/PREFILL DONE]`.
+  **time-to-first-token (TTFT)**, logged as `[STAGE/PREFILL DONE]`
+  (summariser) and `[STAGE/QWEN PREFILL DONE]` (tool stage). The
+  summariser additionally logs `[STAGE/PREFILL] done/total` every 512
+  tokens so a long prefill is visibly alive.
 
 == 4. Decode stage (autoregressive)
 
@@ -174,71 +233,109 @@ Once prefill finishes, decode generates one token at a time:
   positions, so the next forward pass only computes attention for the
   *one new position* against the cached keys/values. **This is why
   decode is linear**, not quadratic.
-. Repeat until the model emits the EOS token (e.g. `<|eot_id|>` for
-  Llama 3) or hits `maxTokens`.
+. Repeat until the model emits a stop token or hits `maxTokens`.
 
-Two key facts:
+How the two stages sample:
 
-* **Decode is the throughput stage.** Tokens-per-second numbers
-  (`28.02 tok/s` in the benchmark report) describe decode, not
-  prefill. A model can have fast decode and slow prefill; if your
-  prompt is short, fast decode wins.
-* **The KV cache is per-conversation.** It's allocated up front to a
-  maximum size (`numLayers × maxSeqLen × 2 × kvDim` floats). For
-  Llama 3.2 1B at the default 128 K context, that's roughly 2 GB of
-  GPU/RAM. This is why
-  xref:architecture:11-risks-technical-debt.adoc[the CLI sets `-Xmx24g`]
-  — the KV cache is the dominant heap user.
+[cols="1,2,2"]
+|===
+| |Tool stage (Qwen) |Summariser (Llama)
+
+|Temperature
+|`0.0` — greedy; there is exactly one right answer (the call)
+|`--temperature`, default `0.1`; no clamping
+
+|Top-p / top-k
+|n/a (greedy)
+|`topP = 0.9`, paired with `topK = 40`
+
+|Stop tokens
+|`<\|im_end\|>` (primary EOS for the agent loop)
+|`{<\|eot_id\|>, <\|end_of_text\|>}` via `generateUntilStop(eosTokenIds = …)`
+
+|Budget
+|`maxTokensPerRound = 192`
+|`--max-tokens`, default 512, clamped to the window
+|===
+
+[IMPORTANT]
+====
+**Why top-p is always paired with top-k.** Upstream's `sampleFromLogits`
+with `topK = 0` (meaning "all") and `topP < 1` sorts the full vocabulary
+with an insertion loop that is quadratic in the 128k Llama vocabulary —
+about 10 s *per token* measured. `LlamaGenerateStage` therefore passes
+`topK = 40` (llama.cpp's default) whenever nucleus sampling is active,
+and `topK = 0` only when `topP == 1`. If you ever see decode at several
+seconds per token with a healthy prefill, check the sampler settings
+before blaming the kernels.
+====
+
+Two more key facts:
+
+* **Decode is the throughput stage** — but `[STAGE/COMPLETE] … tok/s`
+  divides by the *total* wall time including prefill, so on a long
+  prompt the number looks worse than the per-token decode speed. On the
+  i7-9750H the 3B decodes at roughly 0.3 s per token (≈ 3 tok/s).
+* **The KV cache is per-generation.** Each `LlamaGenerateStage.process`
+  call starts with `runtime.reset()`; a JSON retry re-prefills the whole
+  prompt. The cache is allocated for the 4096-token window up front,
+  which together with the memory-mapped weights is why the CLI runs with
+  `-Xmx12g`.
 
 == 5. Tool-call branch
 
-If tool calling is active and the model emits a tool-call marker
-(`<tool_call>{...}</tool_call>` for Hermes-style, single-line JSON for
-Llama 3.2, etc. — see xref:reference/tool-call-parsers.adoc[the parser
-reference]), the orchestrator:
+Only the tool stage takes this branch. When Qwen's decode finishes, the
+agent loop:
 
-. **Parses** the tool call out of the raw decoded text.
-. **Validates** the arguments against the tool's JSON schema.
-. **Executes** the tool — in our codebase, `GetRecentCommitsTool`
-  calls JGit. This is where the diagram's `X` actor (External
-  Tool/API) is involved.
-. **Tokenizes** the tool result (a string) and appends it to the
-  conversation as a `TOOL` message.
-. **Re-renders** the *whole* conversation including the new TOOL
-  message.
+. **Parses** the tool call out of the raw decoded text —
+  `<tool_call>{…}</tool_call>`, handled by the Hermes strategy (see
+  xref:reference/tool-call-parsers.adoc[the parser reference]).
+  `[STAGE/TOOL CALLS]` shows what was parsed.
+. **Validates** the arguments against the tool's JSON schema
+  (`[STAGE/TOOL VALIDATION FAILED]` on failure — the tool does not run).
+. **Executes** the tool — `RecordingGitCommitsTool` calls JGit
+  (`[GitTool]` lines) and *records* the structured commit list on the
+  tool object. This is where the diagram's `X` actor is involved.
+. Returns the tool's short acknowledgement string as the tool result
+  (`[STAGE/TOOL RESULT]`).
 
-Crucially: the agent loop calls `runtime.reset()` here — it drops the
-KV cache from the prior round. The next round starts a *fresh*
-prefill over the entire (now-longer) conversation.
+In the general loop, step 4 would be followed by appending the result as
+a `TOOL` message, `runtime.reset()`, and a **second prefill** over the
+whole longer conversation. Here `maxToolRounds = 1`, so the loop returns
+right after executing the tools and no second prefill ever happens. The
+pipeline reads `tool.recorded` and moves on to `require-commits`,
+`preprocess` and the summariser. If nothing usable was recorded, the
+stage logs `[STAGE/FALLBACK]` and fetches the commits directly.
 
-== 6. Second prefill
+== 6. Second prefill (why we avoid it)
 
-This is the same prefill stage as step 3, but on a longer input
-(original prompt + tool call + tool result + assistant prefix). It
-pays the full quadratic cost again, including over the tokens the
-model already saw last round.
+The generic agent loop re-renders and re-prefills the *entire*
+conversation on every round:
 
-This is *expensive* and is why long agent-loop conversations get
-slow:
+* Round 0: prefill ~300 tokens.
+* Round 1: prefill 300 + (tool call + tool result + headers) ≈ 600 tokens.
+* Round 2: prefill 600 + (next call/result) ≈ 900 tokens.
+* And so on, up to `maxToolRounds`.
 
-* Round 0: prefill 1000 tokens.
-* Round 1: prefill 1000 + (tool call + tool result + headers) ≈ 1300 tokens.
-* Round 2: prefill 1000 + 300 + (next call/result) ≈ 1700 tokens.
-* And so on, up to `maxToolRounds = 5`.
+At ≈ 0.3 s per prompt token this is minutes per round on the 3B, and
+the value of the extra rounds on a 0.6B is low: a second round would
+only let Qwen paraphrase the acknowledgement string. Handing the
+structured commit list to a dedicated summariser is both faster and
+better than asking the tool model to write prose from a tool response.
 
-Each prefill is a fresh full-conversation pass. Tool calling buys you
-flexibility ("the model can ask for what it needs") at the cost of
-re-prefilling on every round.
-
-There's a known optimization (*prefix-shared KV caches* — keep state
-for the unchanged prefix and only prefill the new TOOL message
-suffix) that we don't implement and SKaiNET-transformers'
-`AgentLoop.run` doesn't either. It's an upstream improvement
-opportunity, not a configuration we can flip on.
+There's a known optimisation (*prefix-shared KV caches* — keep state
+for the unchanged prefix and only prefill the new TOOL message suffix)
+that neither this app nor SKaiNET-transformers' `AgentLoop` implements.
+It's an upstream improvement opportunity, not a configuration we can
+flip on — and with one round it is not needed.
 
 == 7. Final decode
 
-Identical to step 4. Generate tokens until EOS or `maxTokens`.
+The summariser's decode (step 4) *is* the final decode of the pipeline:
+tokens stream to stdout (Markdown without `--output`), then
+`[STAGE/COMPLETE]` and `[STAGE/FINAL ANSWER]` close the generation. With
+`--format json`, a strict-parse failure (`[STAGE/PARSE]`) re-runs steps
+1–4 for the summariser once more.
 
 == Performance implications
 
@@ -246,25 +343,35 @@ Identical to step 4. Generate tokens until EOS or `maxTokens`.
 |===
 |Observation |Why
 
-|Prompt length matters far more than output length on cold runs.
-|Prefill is quadratic in prompt length; decode is linear in *output*
-length. A 2000-in/200-out request and a 200-in/200-out request on the
-same model differ in wall time by an order of magnitude.
+|Prompt length matters as much as output length on this CPU path.
+|Prefill and decode cost about the same per token on the row-major
+kernel. A 400-in/250-out summary spends roughly half its wall time
+before the first token. `preprocess { firstMessageLine(120); limit(60) }`
+exists for this reason.
 
 |Streaming output starts only after prefill finishes.
 |There is no token to stream until step 4 begins. A long prefill looks
-identical to a hung process — `[STAGE/PREFILL DONE]` is the signal
-that decode has actually started.
+identical to a hung process — `[STAGE/PREFILL] n/total` and
+`[STAGE/PREFILL DONE]` are the signals that it is alive and that decode
+has started.
 
-|Tool calls multiply prefill cost.
-|The whole conversation re-prefills on every round. A 5-round agent
-loop with a long system prompt can spend more wall time prefilling
-than generating.
+|The tool stage is a fixed ~40 s overhead.
+|A 0.6B model on a ~300-token tool prompt. `--commits git` skips it
+entirely when you only need the summary.
+
+|A wrong sampler configuration can cost more than the model.
+|`topK = 0` with `topP < 1` makes sampling quadratic in the vocabulary
+(~10 s/token). Keep top-p paired with a finite top-k.
+
+|A `noexec` temp directory makes everything slow, not broken.
+|The native kernel library is extracted to `java.io.tmpdir` and loaded
+from there; when that fails the reference kernel runs instead. The Docker
+image sets `java.io.tmpdir=/app/tmp` on an exec-capable tmpfs for this
+reason.
 
 |KV cache size dictates max context.
-|`KvBufferCacheSettings(true)` enables overflow handling; a fixed-size
-allocation caps the conversation length. Tool-calling conversations
-that exceed the cap get truncated, not extended.
+|The window is `min(ctx, 4096)` tokens. Prompts beyond it are rejected,
+budgets beyond it are clamped (`[STAGE/WARN]`).
 |===
 
 == Diagnosing with `[STAGE/...]` logs
@@ -276,43 +383,51 @@ xref:reference/stage-logs.adoc[stage-log reference]:
 |===
 |Pipeline phase |Log lines you'll see
 
+|0. Model loading
+|`[MODEL] … resolving/cache hit/downloaded`, then the two
+`[MODEL LOAD]` lines. A gap between them is disk IO plus kernel-pack
+installation.
+
 |1. Context assembly
-|`[STAGE/SYSTEM PROMPT]`, `[STAGE/USER PROMPT]`,
-`[STAGE/RENDERED CHAT TEMPLATE]` (tool-calling path only)
+|`[STAGE/QWEN]` + `[STAGE/QWEN RENDERED PROMPT]` (tool stage);
+`[STAGE/PROMPT]`, `[STAGE/SYSTEM PROMPT]`, `[STAGE/USER PROMPT]`
+(summariser).
 
 |2. Tokenization
-|Not logged separately — happens inside `KLlamaSession.generate`.
-A long unexplained pause between
-`[STAGE/RENDERED CHAT TEMPLATE]` and `[STAGE/PREFILL DONE]` is
-prefill, not tokenization (tokenization is microseconds).
+|`[STAGE/INPUT] promptTokens=…` (summariser). Tokenization itself is
+microseconds; a long pause after it is prefill.
 
 |3. Prefill
-|Wall time between `generate()` invocation and `[STAGE/PREFILL DONE]`.
+|`[STAGE/PREFILL] done/total` every 512 tokens, then
+`[STAGE/PREFILL DONE]` / `[STAGE/QWEN PREFILL DONE]` with the TTFT.
 
 |4. Decode
-|Streaming token output to stdout. Throughput shown in
-`[STAGE/COMPLETE]` (e.g. `28.02 tok/s`).
+|Streaming token output to stdout (summariser). Throughput and
+`stoppedByEos` in `[STAGE/COMPLETE]`; the raw tool-stage answer in
+`[STAGE/QWEN RESPONSE]`.
 
 |5. Tool execution
-|`[GitTool] get_recent_commits(...)` lines from the tool's `execute`.
+|`[STAGE/TOOL CALLS]`, `[GitTool] get_recent_commits(...)`,
+`[GitTool] result: …`, `[STAGE/TOOL RESULT]`, or
+`[STAGE/TOOL VALIDATION FAILED]`; then `[STAGE/QWEN COMPLETE]`.
 
 |6. Second prefill
-|Currently invisible — `JavaAgentLoop` only exposes a token callback,
-not per-round events. xref:architecture:11-risks-technical-debt.adoc[TR-09]
-covers this.
+|Never happens (`maxToolRounds = 1`). `[STAGE/FALLBACK]` + `[STAGE/GIT]`
+appear instead when the round produced no usable call.
 
 |7. Final decode
-|Continued streaming + final `[STAGE/COMPLETE]` and `[STAGE/FINAL ANSWER]`.
+|Continued streaming + final `[STAGE/COMPLETE]` and `[STAGE/FINAL ANSWER]`;
+`[STAGE/PARSE]` if a JSON attempt was rejected.
 |===
 
 == See also
 
 * xref:explanation/agent-loop-internals.adoc[Agent-loop internals] —
-  the layer above this page (round loop driving multiple inference
-  calls).
+  the layer above this page (the one-round loop driving the tool stage).
 * xref:reference/chat-templates.adoc[Chat templates] — what step 1
   produces for each model family.
 * xref:reference/stage-logs.adoc[Stage logs] — runtime instrumentation
   per phase.
 * xref:explanation/negative-sample-2026-05-05.adoc[Negative sample
-  2026-05-05] — what a 14-minute prefill looks like in practice.
+  2026-05-05] — what a 14-minute prefill looked like on the retired
+  single-model path, before batched prefill and native kernels.

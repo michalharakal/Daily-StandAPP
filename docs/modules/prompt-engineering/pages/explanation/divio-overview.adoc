@@ -39,7 +39,7 @@ The user's *intent* dictates which one they want:
 
 |"I want to do X"
 |How-to guides
-|`add-a-new-tool`, `switch-chat-template`, `tune-prompts-for-1b`,
+|`add-a-new-tool`, `switch-chat-template`, `tune-prompts-for-small-models`,
 `debug-with-stage-logs`
 
 |"What's the value/format/signature of …?"

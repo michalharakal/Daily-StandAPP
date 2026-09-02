@@ -18,6 +18,10 @@ val standappJvmArgs = listOf(
     "--enable-preview",
     "--add-modules=jdk.incubator.vector",
     "--enable-native-access=ALL-UNNAMED",
+    // Commit messages and summaries are UTF-8 regardless of the shell locale.
+    "-Dfile.encoding=UTF-8",
+    "-Dstdout.encoding=UTF-8",
+    "-Dstderr.encoding=UTF-8",
 )
 
 application {

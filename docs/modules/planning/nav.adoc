@@ -2,6 +2,7 @@
 * xref:requirements.adoc[Requirements]
 * xref:design.adoc[Design]
 * xref:tasks.adoc[Tasks]
+* xref:verification-2026-09.adoc[Verification 2026-09]
 
 .Upstream program
 * xref:prd-skainet.adoc[PRD — SKaiNET core]

@@ -162,9 +162,9 @@ SKAINET-vs-Deliverance gap.
   rate move with model capacity.
 
 * Read `benchmark/src/jvmMain/deliverance/.../DeliveranceLLMService.kt`
-  — it's ~80 lines. Compare to `:llm/.../SKaiNetLLMService.kt`. The
-  shape is identical: load model, build prompt, call the engine's
-  `generate(...)`, return text. That's the engine-independence story
+  — it's ~80 lines. Compare to `:llm/.../LlamaChatLLMService.kt` plus the
+  `LlamaGenerateStage` it wraps. The shape is identical: load model, build
+  prompt, call the engine's `generate(...)`, return text. That's the engine-independence story
   in code.
 
 == When this tutorial breaks

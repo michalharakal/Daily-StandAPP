@@ -1,0 +1,83 @@
+= Verification log — September 2026 iteration
+:navtitle: Verification 2026-09
+
+End-to-end verification of the SKaiNET 0.53 two-model pipeline
+(xref:tasks.adoc[T-25]). Machine: Intel i7-9750H (6C/12T), 31 GB RAM, Linux
+6.8, JDK 25.0.4 (toolchain), Gradle 9.6.1. All runs through the fat JAR
+`StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar` with
+`--enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx12g`.
+
+== Ladder
+
+[cols="1,4,3", options="header"]
+|===
+| Step | Command / expectation | Result
+
+| 1 Resolve
+| `./gradlew :llm:dependencies --configuration jvmRuntimeClasspath`
+| All `sk.ainet*` artifacts at 0.53.0 incl. `skainet-data-source-jvm`,
+`skainet-transformers-inference-qwen-jvm`; no `runtime-kllama`; Kotlin 2.4.10, Ktor 3.5.2.
+
+| 2 Unit tests
+| `:data:jvmTest :standapp-ai-engine:allTests :llm:jvmTest :StandAPP-cli:test :benchmark:jvmTest :mcp-server:jvmJar :cloud-api:agent:build`
+| Green. `:llm:jvmTest` = 23 tests (`StandupFlowTest` 9, `ModelResolverTest` 6,
+`RecordingGitCommitsToolTest` 4+1, `LLMSummarizerStreamTest` 3), no network, no models.
+
+| 3 Fat JAR
+| `:StandAPP-cli:shadowJar`; inspect `META-INF/services/sk.ainet.backend.api.kernel.*`
+| 19.5 MB (was ~2 GB). `KernelProvider` lists Scalar, PanamaVector, Native;
+`ViewKernelPack` lists `FfmRowMajorKernelPackFactory`, `FfmTernaryKernelPackFactory`;
+`native/linux-x86_64/libskainet_kernels.so` bundled. `-Xlog:library` confirms the
+library is extracted and loaded at runtime.
+
+| 4 Tiny prompt
+| `STANDAPP_TINY_PROMPT=1 … --llama-model <local>`
+| Exit 0, reply `Hello, I'm ready`. Llama-3.2-3B Q4_K_M loads in 2.2 s
+(28 layers, window 4096, stop set `[128009, 128001]`).
+First measurement: 0.09 tok/s — root-caused with `jstack` to the upstream
+sampler (`sampleFromLogits(topK = 0, topP < 1)` is quadratic in the 128k
+vocabulary); after pairing top-p with top-k = 40: decode ≈ 3 tok/s.
+
+| 5 E2E default (30 days, `--score`)
+| `--repo <this repo> --days 30 --score` with both models local
+| Exit 0. `[PIPELINE] qwen-commits -> require-commits -> preprocess -> summarize[prompt -> llama -> parse x1]`.
+Qwen3-0.6B emitted `get_recent_commits({"days":30})` (source `QWEN_TOOL_CALL`), tool round 39 s.
+Llama prompt 233 tokens, prefill 71 s, 66 tokens generated, quality report 3/3 checks passed.
+Wall clock 2:20, peak RSS 4.2 GB (models loaded one at a time).
+
+| 6 REST backend
+| `--backend rest_api` against a local Ollama without the model
+| Exit 4 with the upstream error text; pipeline `git-commits -> … -> summarize[prompt -> rest-api -> parse x1]`.
+
+| 7 First-run download
+| default flow without `--qwen-model`, cold `~/.cache/standapp/models`
+| `hf://Qwen/Qwen3-0.6B-GGUF@main/Qwen3-0.6B-Q8_0.gguf` streamed with progress lines
+into `huggingface-a326b8cb-Qwen3-0.6B-Q8_0.gguf` (609 MB); tool call `days=1`,
+3 commits, Llama summary of the day's commits (397-token prompt, 124 tokens), exit 0.
+
+| 8 JSON + explicit window
+| `--since 2026-07-01 --format json -o standup.json --score`
+| _see below_
+
+| 9 Cache hit
+| default flow again, 60 days
+| _see below_
+|===
+
+== Measured speeds (this laptop)
+
+* Llama-3.2-3B-Instruct Q4_K_M: ≈ 0.3 s per token for both decode and prefill —
+  the row-major FFM kernel processes a batched prefill row by row, so prompt
+  length dominates: a 400-token prompt costs ≈ 2 min before the first token.
+* Qwen3-0.6B Q8_0 tool round (≈ 330-token rendered prompt, thinking off, one
+  round): ≈ 40 s.
+* Keep prompts short: the CLI applies `shortIds(7); firstMessageLine(120); limit(60)`.
+
+== Findings fed back into the code
+
+. Top-p must be paired with a finite top-k on this SKaiNET version (see step 4).
+. Qwen3-0.6B sometimes emits the same `<tool_call>` twice in one turn; the
+  tool reuses its recorded result for an identical repeat.
+. The `[SKaiNET] Using SIMD-accelerated …` banners are printed on stdout by the
+  library; the CLI diverts `System.out` for the whole run so stdout carries only
+  the summary.

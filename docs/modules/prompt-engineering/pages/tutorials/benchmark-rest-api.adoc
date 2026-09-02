@@ -7,7 +7,7 @@
 OpenAI-compatible inference server. **Time:** ~10–30 min depending on
 the model + hardware.
 
-This exercise gets you cross-checking SKAINET's embedded results
+This exercise gets you cross-checking SKAINET's in-process results
 against a different runtime — Ollama, LM Studio, llama.cpp's HTTP
 server, vLLM, or even OpenAI's hosted API. Same `LLMService`
 interface, very different runtime.
@@ -139,9 +139,10 @@ cat benchmark-results/benchmark-report.md | head -40
 A `REST_API (local)` row in the comparison table. Compared to SKAINET
 (if you ran that exercise first):
 
-* On a 3B model the **auto pass rate** typically rises to 0.85+ (vs
-  ~0.65 for the embedded 1B). Larger model, more capacity for
-  structured output.
+* With `llama3.2:3b` you are running the same model family and size as
+  the SKAINET summariser (Llama 3.2 3B Instruct), so the **auto pass rate**
+  should land in the same region (0.8+); differences come from quantisation
+  (Ollama's default Q4_K_M vs the same Q4_K_M GGUF in SKaiNET) and sampling.
 * **Latency p50** depends entirely on the server's hardware. A 3B model
   on CPU is typically 8–20 s per case; on a 3060+ GPU, 1–3 s.
 * **Determinism** drops if the server doesn't honour the same

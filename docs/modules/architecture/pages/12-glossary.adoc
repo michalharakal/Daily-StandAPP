@@ -115,8 +115,8 @@
 |*SKaiNET*
 |Kotlin-first AI/ML framework providing tensor operations and model inference capabilities.
 
-|*kllama*
-|SKaiNET's LLaMA model implementation for local inference in pure Kotlin.
+|*kllama (chat package)*
+|Historical name of SKaiNET's LLaMA runtime; today `sk.ainet.apps.kllama.chat` in SKaiNET-transformers hosts the chat templates, `Tool` interface and `AgentLoop` the tool stage uses.
 
 |*JGit*
 |Eclipse Foundation's pure Java implementation of Git.

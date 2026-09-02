@@ -3,8 +3,9 @@
 :toclevels: 2
 :icons: font
 
-Practitioner-facing handbook for working with the embedded LLM, tool calling,
-chat templates, and parsers. The architecture docs (`architecture` module)
+Practitioner-facing handbook for working with the two local models (Qwen3
+0.6B for the tool call, Llama 3.2 3B for the summary), the SKaiNET data
+pipeline that wires them together, chat templates, and parsers. The architecture docs (`architecture` module)
 explain *what* the system is; this module explains *how to use it well*.
 
 The pages are organised by the
@@ -24,7 +25,7 @@ flowchart LR
 
     HOWTO --> ANT[Add a new tool]
     HOWTO --> SCT[Switch chat template]
-    HOWTO --> TP[Tune prompts for 1B]
+    HOWTO --> TP[Tune prompts for small models]
     HOWTO --> DBG[Debug with stage logs]
 
     REF --> CT[Chat templates]
@@ -44,7 +45,7 @@ flowchart LR
 Newcomer:: xref:tutorials/getting-started.adoc[Tutorials → Getting started].
 Three commands and a paragraph; you'll have a standup summary in your terminal.
 
-Trying tool calling:: xref:tutorials/first-tool-call.adoc[Tutorials → Your first tool call] — and read xref:explanation/negative-sample-2026-05-05.adoc[the negative-sample post-mortem] before you do, because it doesn't yet work end-to-end on the embedded 1B.
+Reading the tool call:: xref:tutorials/first-tool-call.adoc[Tutorials → Your first tool call] — the default run already makes Qwen3 call `get_recent_commits`; this tutorial shows how to read the stage logs of that round and what the fallback looks like. xref:explanation/negative-sample-2026-05-05.adoc[The negative-sample post-mortem] is kept as history of the retired single-model path.
 
 Picking a model:: xref:reference/model-selection.adoc[Reference → Model selection].
 
@@ -78,13 +79,13 @@ Cross-references go both ways:
 |===
 |Topic |Architecture page
 
-|Why tool calling is opt-in
-|xref:architecture:09-architecture-decisions.adoc[ADR-011]
+|Why the tool call runs on Qwen3 and the summary on Llama 3.2 3B
+|xref:architecture:09-architecture-decisions.adoc[ADR-012]
 
-|Default vs tool-calling runtime paths
-|xref:architecture:06-runtime-view.adoc[§6.2 + §6.5]
+|Two-model runtime sequence and the first-run download
+|xref:architecture:06-runtime-view.adoc[§6.2 + §6.3]
 
-|Inference pipeline (token → prefill → decode → tool → decode)
+|Inference pipeline (token → prefill → decode per model)
 |xref:explanation/inference-stages.adoc[Inference stages] (this module)
 
 |Agent loop, chat-template internals
@@ -96,6 +97,6 @@ Cross-references go both ways:
 |Quantisation tradeoffs, performance numbers
 |xref:architecture:10-quality-requirements.adoc[§10]
 
-|Known risks (parser, listener, kernel)
+|Known risks (download, native kernel, sampler, tool fallback)
 |xref:architecture:11-risks-technical-debt.adoc[§11]
 |===

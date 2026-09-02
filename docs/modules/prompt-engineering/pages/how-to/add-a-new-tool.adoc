@@ -8,14 +8,17 @@ whatever. This page walks through adding a `Tool` end-to-end.
 
 == When this applies
 
-* You want to use the *opt-in tool-calling path*
-  (xref:tutorials/first-tool-call.adoc[STANDAPP_TOOL_CALLING=1]).
-* The default single-shot `SKaiNetLLMService` ignores tools entirely; this
-  guide doesn't apply there.
+* You are on the SKAINET backend with the default `--commits qwen` mode.
+  The tool stage is `QwenCommitsStage`, driven by Qwen3 0.6B through
+  SKaiNET's `AgentLoop`.
+* `--commits git`, an explicit `--since` window and the REST backend use
+  `GitCommitsStage` (direct JGit) and never render any tool; this guide
+  doesn't apply there.
 
 == The interface
 
-Implement `sk.ainet.apps.kllama.chat.Tool` from SKaiNET-transformers:
+Implement `sk.ainet.apps.kllama.chat.Tool` from SKaiNET-transformers — the
+interface has not changed across the 0.53 upgrade:
 
 [source,kotlin]
 ----
@@ -27,85 +30,120 @@ public interface Tool {
 
 `ToolDefinition` carries `name`, `description`, and a `parameters` JSON
 Schema as a `JsonObject`. The model never instantiates anything Kotlin-side —
-it only sees the schema as text in the rendered system message and produces
-JSON arguments back.
+it only sees the schema as text inside the `<tools>…</tools>` block of the
+rendered system message and produces JSON arguments back.
 
 == Reference implementation
 
 `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/GitTools.kt` —
-`GetRecentCommitsTool` — is the canonical example. Three things to copy:
+`RecordingGitCommitsTool` — is the canonical example. Four things to copy:
 
 . `definition` declares a JSON-Schema for `parameters`. Keep it tight: the
-  fewer optional fields, the easier for a small model.
+  fewer optional fields, the easier for a 0.6B model. `days` is the only
+  required field; `author` is optional.
 . `execute` parses each argument defensively — the model may send `days` as
-  string, integer, or double depending on the round.
-. `execute` returns a *short string*. The result becomes a `TOOL` message
-  appended to the conversation; long tool results blow up prefill cost on
-  the next round.
+  an integer or as a string, so the tool accepts both.
+. `execute` *records* its structured result in a property
+  (`recorded: List<GitInfo>?`) and returns only a short acknowledgement
+  string. This matters, see the next section.
+. A repeated identical call reuses the recorded result instead of hitting
+  git twice — small models sometimes emit the same `<tool_call>` twice in
+  one turn.
+
+== One round, no feedback: design your tool for side effects
+
+`QwenCommitsStage` configures `AgentConfig(maxToolRounds = 1)`. The loop
+generates once, parses and validates the `<tool_call>`, executes it and
+returns — there is *no* second generation in which the model could read the
+tool result. Consequences:
+
+* The string your `execute` returns is only ever seen in the
+  `[STAGE/TOOL RESULT]` log line. Keep it to one line.
+* Anything the pipeline should consume has to be captured by the tool itself
+  (a property, a callback, a file). `RecordingGitCommitsTool.recorded` is
+  what `QwenCommitsStage` turns into the `CommitBatch` for the summariser.
+* If your tool throws, `ToolRegistry` would swallow the exception into a
+  string; record the throwable (`failure`) so the stage can surface it, as
+  the git tool does.
+
+If you need a genuine multi-round agent (model reads the result and
+continues), write your own `PipelineStage` around `AgentLoop` with a higher
+`maxToolRounds` — the DSL accepts any `PipelineStage<StandupRequest, CommitBatch>`
+as `commits`.
 
 == Tool-registration flow
 
 [mermaid]
 ----
 flowchart TB
-    A[Implement Tool] --> B[Pass into ToolCallingLLMService.create]
-    B --> C[Service registers it in ToolRegistry]
-    C --> D[ChatTemplate.apply renders schema into system message]
-    D --> E[Model emits tool-call JSON in its output]
-    E --> F[ToolCallParser extracts ToolCall from raw text]
+    A[Implement Tool] --> B["commits = qwenToolCall(tools = listOf(MyTool()))"]
+    B --> C[QwenCommitsStage registers it in ToolRegistry next to get_recent_commits]
+    C --> D["QwenChatTemplate.apply renders the schemas into <tools>…</tools>"]
+    D --> E["Qwen emits <tool_call>{…}</tool_call>"]
+    E --> F[Hermes-style parser extracts ToolCall from raw text]
     F --> G[ToolCallValidator checks args against schema]
     G --> H[ToolRegistry.execute calls your Tool.execute]
-    H --> I[Result becomes TOOL message; loop re-renders + generates again]
+    H --> I[Round ends; the stage reads what the tool recorded]
 ----
 
-== Add it to the CLI
+== Register it in the flow
 
-The shortest path is to extend `LLMServiceFactory.createToolCallingForGit`
-or add a sibling factory method that takes a list of tools. For example:
+Extra tools are passed to the `qwenToolCall` stage factory in the
+`standupFlow` DSL. The built-in `get_recent_commits` tool is always
+registered first; yours are appended:
 
 [source,kotlin]
 ----
-// llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/LLMServiceFactory.kt
-fun createToolCallingForGitWithExtras(
-    repoDir: String,
-    extras: List<Tool>,
-): LLMService {
-    val modelPath = …  // existing extraction logic
-    val tools = listOf<Tool>(GetRecentCommitsTool(repoDir)) + extras
-    return ToolCallingLLMService.create(modelPath, tools, DEFAULT_SYSTEM_PROMPT)
+val flow = standupFlow(models) {
+    commits = qwenToolCall(tools = listOf(GetOpenIssuesTool(repoDir)))
+    preprocess { shortIds(7); firstMessageLine(120); limit(60) }
+    summarize(llama())
+    postprocess { parseSummary() }
 }
+println(flow.describe())   // qwen-commits -> require-commits -> preprocess -> summarize[…]
+val result = flow.execute(StandupRequest(repoDir = repoDir, days = 7))
 ----
 
-`ToolCallingLLMService.create` already accepts `tools: List<Tool>`, so no
-upstream change is needed for the service itself.
+`qwenToolCall` also takes `systemPrompt` (default
+`QwenCommitsStage.DEFAULT_SYSTEM_PROMPT`) and `maxTokens` (default 192). If
+you add a tool the model is supposed to *choose* over `get_recent_commits`,
+you almost certainly need to adjust the system prompt as well — the default
+one instructs the model to call `get_recent_commits` exactly once.
+
+The CLI's `Main.kt` builds its flow with the defaults; to ship an extra tool
+in the CLI, add it to that `qwenToolCall()` call.
 
 == Validate against a small tool first
 
 Once registered, exercise it with a *minimal* prompt that asks for exactly
-one tool call. Avoid composite tasks (`fetch X then summarise Y`) until the
-tool is proven to be reachable. Watch for:
+one tool call. Avoid composite tasks (`fetch X then summarise Y`) — with one
+round the model cannot chain calls anyway. Watch for:
 
-* `[STAGE/TOOL REGISTERED]` includes your tool's name.
-* `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` contains your `parameters`
-  schema verbatim.
-* `[GitTool]`-style log line from your tool prints when it executes — add
-  one in your `execute` if you want it visible.
+* `[STAGE/QWEN] tools=[get_recent_commits, my_tool] …` lists your tool's name.
+* `[STAGE/QWEN RENDERED PROMPT]` contains your `parameters` schema verbatim
+  inside `<tools>`.
+* `[STAGE/TOOL CALLS] my_tool({…})` shows the parsed, validated call.
+* A `[MyTool]`-style log line from your tool prints when it executes — add
+  one in your `execute` if you want it visible, as `[GitTool]` does.
+* `[STAGE/TOOL VALIDATION FAILED] my_tool: …` means the model called it with
+  arguments that don't match your schema.
 
-If the model emits a tool-call JSON in stdout but the tool never executes,
-the parser couldn't recognise the format — see
-xref:reference/tool-call-parsers.adoc[Tool-call parsers] for what's
+If `[STAGE/QWEN RESPONSE]` contains a tool-call JSON but no
+`[STAGE/TOOL CALLS]` line follows, the parser couldn't recognise the format
+— see xref:reference/tool-call-parsers.adoc[Tool-call parsers] for what's
 accepted.
 
 == Schema constraints to keep in mind
 
-* The 1B model is bad at JSON it has not seen. Stick with `string`,
+* A 0.6B model is bad at JSON it has not seen. Stick with `string`,
   `integer`, `boolean`, and `array` of those — avoid nested objects unless
   you're on a 7B+.
-* `required` fields are *strict* — the model often omits them. Provide
-  sensible defaults inside `execute` and document the field as required
-  anyway, so the schema doesn't lie.
+* `required` fields are *strict* — validation rejects a call that omits them
+  and the stage falls back to direct git. Provide sensible defaults inside
+  `execute` where you can and keep `required` minimal.
 * Description text on each property matters more than you'd think — the
-  model uses it to decide what value to put there.
+  model uses it to decide what value to put there. The git tool's `days`
+  description includes an example value (`e.g. 7`) for exactly this reason.
 
 == See also
 

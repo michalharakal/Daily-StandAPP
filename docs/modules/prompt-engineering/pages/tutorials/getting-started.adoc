@@ -3,11 +3,14 @@
 :icons: font
 
 Generate a daily standup summary from a git repository in three commands. No
-configuration, no API keys, no network — the model is embedded in the JAR.
+configuration, no API keys. The two models are downloaded once on the first
+run and cached locally; after that no network call is made.
 
 == Prerequisites
 
-* JDK 21+ (the build uses Gradle toolchain 25)
+* JDK 21+ to run Gradle (the build provisions a JDK 25 toolchain itself)
+* ~3 GB of disk for the model cache and network access for the first run
+* ~12 GB of RAM headroom — the CLI runs with `-Xmx12g`
 * A git repo to summarise (the Daily-StandAPP repo itself works fine)
 
 == Run it
@@ -19,9 +22,18 @@ cd Daily-StandAPP
 ./gradlew :StandAPP-cli:run --args="--repo /path/to/your/repo --days 2"
 ----
 
-That's it. On first run the embedded ~1.3 GB GGUF gets extracted to
-`~/.cache/standapp/models/` (5–15 s on local SSD, idempotent). After that
-extraction every subsequent run skips straight to inference.
+That's it. On first run the CLI downloads two GGUFs through SKaiNET's
+`hf://` data-source resolver into `~/.cache/standapp/models/`:
+
+* `Qwen3-0.6B-Q8_0.gguf` (~0.6 GB) — the tool-calling model
+* `Llama-3.2-3B-Instruct-Q4_K_M.gguf` (~2.0 GB) — the summariser
+
+Progress is reported on stderr as `[MODEL] downloading … MB` lines. Every
+subsequent run finds both files in the cache (`[MODEL] … cache hit`) and goes
+straight to inference. Set `STANDAPP_MODEL_CACHE_DIR` to move the cache,
+`STANDAPP_OFFLINE=1` to forbid network access, or point
+`STANDAPP_QWEN_MODEL_PATH` / `STANDAPP_LLAMA_MODEL_PATH` at GGUFs you already
+have.
 
 == What you'll see
 
@@ -29,22 +41,37 @@ extraction every subsequent run skips straight to inference.
 ----
 flowchart LR
     USR[You] --> CLI[StandAPP-cli]
-    CLI --> JGIT[JGit]
-    JGIT --> COMMITS[List of commits]
-    COMMITS --> PB[PromptBuilder]
-    PB --> SVC[SKaiNetLLMService]
-    SVC --> MODEL[Llama 3.2 1B Q8_0]
-    MODEL --> ANSWER[Markdown summary]
+    CLI --> QWEN[Qwen3 0.6B<br/>qwen-commits stage]
+    QWEN -->|"get_recent_commits(days=2)"| TOOL[RecordingGitCommitsTool]
+    TOOL --> JGIT[JGit]
+    JGIT --> COMMITS[Structured commit list]
+    COMMITS --> PRE[preprocess]
+    PRE --> PB[prompt: PromptBuilder]
+    PB --> LLAMA[Llama 3.2 3B Q4_K_M<br/>llama stage]
+    LLAMA --> PARSE[parse + score]
+    PARSE --> ANSWER[Markdown summary]
     ANSWER --> USR
 ----
 
-The CLI fetches commits with JGit, formats them into a Markdown prompt
-using `PromptBuilder`, and asks the embedded model to produce a three-section
-standup report (`## Yesterday`, `## Today`, `## Blockers`).
+The CLI builds a SKaiNET data pipeline (`standupFlow { … }`) and prints its
+stage chain first:
 
-This is the *default* path — the CLI does the data gathering, the model does
-the writing. No agent loop, no tool calls. Architecturally this is described
-in xref:architecture:06-runtime-view.adoc[Architecture §6.5].
+[source]
+----
+[PIPELINE] qwen-commits -> require-commits -> preprocess -> summarize[prompt -> llama -> parse x1]
+----
+
+. **Qwen3 0.6B** reads the request ("fetch the commits from the last 2 days")
+  and emits a `get_recent_commits` tool call. The tool runs JGit and records
+  the structured commit list; Qwen's prose is discarded. If Qwen does not
+  produce a valid call, the stage logs `[STAGE/FALLBACK]` and fetches the
+  commits directly — you still get a summary.
+. **Llama 3.2 3B** receives the commits formatted by `PromptBuilder` and
+  writes the three-section standup report (`## Yesterday`, `## Today`,
+  `## Blockers`), streamed token by token to stdout.
+
+Architecturally this is described in
+xref:architecture:06-runtime-view.adoc[Architecture §6.2].
 
 == Output format
 
@@ -62,20 +89,26 @@ The model is asked to produce:
 - Anything mentioned, or "None"
 ----
 
-If your repo had no commits in the period, the CLI prints
-`No commits found in the last N day(s).` and exits without invoking the model.
+If your repo had no commits in the period, the `require-commits` stage stops
+the pipeline with `No commits found in … for last N day(s)` and the CLI exits
+with code 3 without loading the summariser.
 
 == Speed
 
-On a recent x86_64 laptop with the native CPU kernels: ~5–15 s for ~10–20
-commits. The Panama Vector fallback (any JVM 21+ machine) runs ~2–3× slower.
+Measured on an i7-9750H (6 cores / 12 threads) with the native FFM kernels:
+
+* Qwen tool round: ~40 s (model load + prefill + a short tool call)
+* Llama 3B Q4_K_M: ~0.3 s per token for decode *and* for prefill, so a
+  20-commit prompt plus a 200-token answer is in the order of two to three
+  minutes
+
+By default each model is loaded, used and released in turn so peak memory
+stays at one model; pass `--keep-models` to keep both resident across a run.
 
 == Next steps
 
-* xref:tutorials/first-tool-call.adoc[Try tool calling] — let the model
-  drive a `get_recent_commits` tool itself instead of pre-feeding it the
-  data. (Caveat: not yet reliable on the embedded 1B; read the negative
-  sample first.)
+* xref:tutorials/first-tool-call.adoc[Read the tool call] — follow the Qwen
+  stage logs and see what the tool recorded.
 * xref:reference/prompt-templates.adoc[See the actual prompts] used here.
 * xref:reference/model-selection.adoc[Pick a different model] for higher
   quality or faster inference.

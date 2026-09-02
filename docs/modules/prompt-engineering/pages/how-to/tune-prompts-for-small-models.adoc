@@ -1,22 +1,46 @@
-= Tune Prompts for a 1B Model
+= Tune Prompts for Small Models
 :toc: left
 :icons: font
 
-The Llama 3.2 1B Q8_0 we ship embedded is small enough that prompt shape
-matters more than instruction wording. The same task that works on Claude
-or GPT-4 with a casual one-liner needs structural scaffolding here.
+The pipeline runs two small models: Qwen3 0.6B (Q8_0) for the tool call and
+Llama 3.2 3B Instruct (Q4_K_M) for the summary. Both are small enough that
+prompt *shape* matters more than instruction wording. The same task that
+works on Claude or GPT-4 with a casual one-liner needs structural
+scaffolding here — and the 0.6B tool model needs it even more than the 3B
+summariser.
 
 This page collects tactics that empirically work, with before/after
 examples drawn from this codebase.
 
+== Where the prompts live
+
+[cols="1,2,2"]
+|===
+|Stage |Prompt source |How to override
+
+|`qwen-commits` (0.6B)
+|`QwenCommitsStage.DEFAULT_SYSTEM_PROMPT` plus a user turn generated from
+the request (`Fetch the git commits from the last N day(s) … Pass days=N as
+a number.`). The tool schema is rendered by `QwenChatTemplate`.
+|`commits = qwenToolCall(systemPrompt = "…")` in `standupFlow`; the user
+turn is fixed by the stage.
+
+|`llama` (3B)
+|`DefaultPrompts.SYSTEM`, `DefaultPrompts.SUMMARY_USER`,
+`DefaultPrompts.JSON_USER` in `standapp-ai-engine`, rendered by
+`PromptBuilder` through the `PromptStage`.
+|`prompt { system = "…"; summaryTemplate = "…"; jsonTemplate = "…" }` in
+`standupFlow` (a `PromptSpec`).
+|===
+
 == Tactic 1: provide a structural skeleton
 
-A 1B model is much better at *filling in slots* than at *generating a
+A small model is much better at *filling in slots* than at *generating a
 structure from scratch*. Tell it the exact section headings and let it
 fill in the content.
 
 [source,markdown]
-.Before — open-ended (works on a 7B+, fragile on a 1B)
+.Before — open-ended (works on a 7B+, fragile on a 3B)
 ----
 Summarise the following git commits as a daily standup report.
 
@@ -51,21 +75,22 @@ invention.
 
 == Tactic 2: keep system prompts short
 
-Every token in the system message is processed on every prefill (or every
-re-render in the agent loop). The default `SKaiNetLLMService` system
-prompt is ~80 chars; the `ToolCallingLLMService` system prompt is ~240
-chars. Anything in the system that doesn't change *the model's behaviour*
-is wasted prefill cost.
+Every token in the system message is processed on every prefill. On the
+row-major kernel prefill costs about as much per token as decode (~0.3 s per
+token for the 3B on an i7-9750H), so 200 extra system tokens are a minute of
+wall time. The summariser's system prompt (`DefaultPrompts.SYSTEM`) is one
+sentence; the Qwen system prompt is three. Anything in the system that
+doesn't change *the model's behaviour* is wasted prefill cost.
 
 If you're tempted to write a long persona, instead write a *one-line*
-persona and put the constraints in the user message — they'll be processed
-once and discarded.
+persona and put the constraints in the user message.
 
 == Tactic 3: name a single output format
 
 Saying "respond with JSON or markdown" doubles the model's choice space.
 Pick one. The `DefaultPrompts.JSON_USER` template makes one choice — JSON
-only, with a worked schema.
+only, with a worked schema — and `--format json` switches the whole flow to
+it (`prompt { type = PromptType.JSON }`).
 
 == Tactic 4: lead with an instruction, not context
 
@@ -95,28 +120,58 @@ to be ignored or corrupted.
 "Decide whether the commits indicate progress or not" → bad.
 "Pick one of: progress / blocked / unclear. Justify in one sentence." → good.
 
-A 1B is much better at picking from an enumeration than at producing a
-free-form judgement.
+A small model is much better at picking from an enumeration than at
+producing a free-form judgement.
 
-== Tactic 6: temperature matters more than you think
+== Tactic 6: one job per model
 
-The codebase clamps temperature to ≥ 0.6 in both
-`SKaiNetLLMService.kt:34` and `ToolCallingLLMService.kt`, because at
-temperature 0.1 the raw-session path collapses into repetition
-("Goodbye. Goodbye. Goodbye."). The chat-template path is more tolerant of
-low temperatures because the turn tags steer sampling, but 0.6–0.7 is a
-safe default. For deterministic output (benchmark-style), drop to 0.1
-*only after* you've structurally constrained the prompt.
+The reason the pipeline uses two models is a prompt-engineering one. Asking
+a single small model to *call a tool and then summarise* mixes two tasks in
+one prompt, and the retired single-model path showed what happens: the
+model hallucinated a tool call inside markdown fences and then invented
+commits. Now each prompt asks for exactly one thing:
 
-== Tactic 7: verify with an empty case
+* Qwen's system prompt says *call `get_recent_commits` exactly once, never
+  answer from memory*; the user turn even spells out the argument
+  (`Pass days=7 as a number`). Thinking is disabled so the 192-token budget
+  goes to the call, and sampling is greedy (`temperature = 0`).
+* Llama's prompt contains the commits already and asks only for the report.
 
-If the commit list is empty, the CLI bypasses the model with a hard-coded
-"No commits found" message. Always sanity-check what your prompt does on
-empty/edge inputs before declaring it "good enough".
+If you change the Qwen system prompt, keep it imperative and keep the tool
+name in it. Watch `[STAGE/QWEN RESPONSE]` for `<tool_call>` and
+`[STAGE/FALLBACK]` for the failure reason.
 
-== Negative-sample anti-pattern
+== Tactic 7: sampling — low temperature is fine now
 
-The opt-in tool-calling system prompt currently reads:
+The CLI default is `--temperature 0.1`, passed through to Llama unchanged;
+there is no floor. The old `>= 0.6` clamp existed because the raw-session
+path collapsed into repetition at low temperatures, and the chat-template
+path does not have that problem. Nucleus sampling uses `topP = 0.9` paired
+with `topK = 40` (`LlamaGenerateStage.DEFAULT_TOP_K`) — the pairing is
+mandatory for speed, see xref:explanation/inference-stages.adoc[inference
+stages]. For determinism tests use `llama(seed = 42L)` in the DSL.
+
+Qwen is greedy (`temperature = 0`) regardless of the CLI flag.
+
+== Tactic 8: mind the window
+
+Both models run with a 4096-token KV cache window. `LlamaGenerateStage`
+refuses a prompt that does not fit and clamps `maxTokens` (default 512) to
+the remaining budget, logging `[STAGE/WARN] maxTokens clamped …`. The CLI's
+`preprocess { shortIds(7); firstMessageLine(120); limit(60) }` keeps a
+typical repo well inside; if you see the warning, tighten those numbers
+before touching the prompt.
+
+== Tactic 9: verify with an empty case
+
+If the commit list is empty, the `require-commits` stage stops the pipeline
+with a hard-coded message before the summariser is loaded. Always
+sanity-check what your prompt does on tiny inputs (one commit, one-word
+messages) before declaring it "good enough".
+
+== Historical anti-pattern
+
+The retired single-model tool-calling system prompt read:
 
 [source]
 ----
@@ -126,7 +181,7 @@ commits, call the `get_recent_commits` tool exactly once, then write a
 short standup summary.
 ----
 
-This is pleasant English but a structural mess for a 1B:
+Pleasant English, but a structural mess for a 1B:
 
 * Two tasks (call a tool *and* summarise) in one sentence.
 * "Exactly once" — a constraint the model can't reliably honour.
@@ -134,10 +189,8 @@ This is pleasant English but a structural mess for a 1B:
 * No exit condition (when does it know it has summarised "enough"?).
 
 xref:explanation/negative-sample-2026-05-05.adoc[The 2026-05-05 negative
-sample] documents what the model actually does with this — multi-line JSON
-inside markdown fences, then 512 tokens of hallucinated commits. A tighter
-version with a one-shot example would likely fare better; that's an open
-investigation.
+sample] documents what the model actually did with this. The two-model split
+(Tactic 6) is the fix that went in.
 
 == See also
 

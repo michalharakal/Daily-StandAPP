@@ -10,7 +10,7 @@
 * How-to guides
 ** xref:how-to/add-a-new-tool.adoc[Add a new tool]
 ** xref:how-to/switch-chat-template.adoc[Switch chat template]
-** xref:how-to/tune-prompts-for-1b.adoc[Tune prompts for a 1B model]
+** xref:how-to/tune-prompts-for-small-models.adoc[Tune prompts for small models]
 ** xref:how-to/debug-with-stage-logs.adoc[Debug with stage logs]
 * Reference
 ** xref:reference/chat-templates.adoc[Chat templates]

@@ -2,10 +2,11 @@
 :toc: left
 :icons: font
 
-**Engine:** SKaiNET kllama (Kotlin in-process, embedded GGUF) +
+**Engine:** SKaiNET 0.53 (Kotlin in-process, Llama 3.2 3B Q4_K_M GGUF from
+the local model cache) +
 {empty}**Goal:** run the 15-case benchmark suite against the production SKAINET
-backend with zero external setup. **Time:** ~10–20 min, mostly model
-warm-up and inference.
+backend with zero external setup. **Time:** ~20–40 min, mostly the
+first-run download, model warm-up and inference.
 
 NOTE: This is the easiest of the four engine tutorials — no third-party
 servers, no manual model downloads. Start here if you've never run the
@@ -18,12 +19,20 @@ benchmark before.
 |Need |Why
 
 |JDK 21 or newer
-|The benchmark needs Java's incubator Vector API (Panama) for SKaiNET's
-SIMD path. You can verify with `java -version`.
+|Gradle needs it to start; the build provisions a JDK 25 toolchain for
+compilation and for running. The runtime needs Java's incubator Vector API
+(Panama) and native access for SKaiNET's FFM kernels; the build passes
+those flags for you.
 
-|Disk space ~1.5 GB
-|First run extracts the embedded Llama 3.2 1B Q8_0 GGUF (~1.3 GB) to
+|Disk space ~2.5 GB
+|First run downloads `Llama-3.2-3B-Instruct-Q4_K_M.gguf` (~2.0 GB) into
 `~/.cache/standapp/models/`. Subsequent runs reuse the cached file.
+The benchmark only needs the summariser, so the Qwen tool model is not
+fetched here.
+
+|Network access, once
+|For the download. Afterwards set `STANDAPP_OFFLINE=1` if you want to be
+sure nothing leaves the machine.
 
 |*Not* required
 |Gradle, Kotlin, Maven, Docker. The repo uses the Gradle Wrapper —
@@ -63,14 +72,17 @@ BENCH_BACKENDS=SKAINET BENCH_RUNS=3 \
 ----
 
 `BENCH_BACKENDS=SKAINET` restricts the run to one backend so the
-exercise stays under 20 min (the default is "all available," which can
+exercise stays short (the default is "all available," which can
 take an hour with a cloud baseline). `BENCH_RUNS=3` lowers the
 runs-per-case from the default 5 to keep things quick. Drop both for a
 real benchmark.
 
-NOTE: First run extracts the embedded GGUF. You'll see
-`[EmbeddedModelLoader] Extracting … to ~/.cache/standapp/models/…` and
-a 5–15 s pause. Subsequent runs skip extraction.
+NOTE: First run downloads the GGUF. You'll see
+`[MODEL] llama-3.2-3b-instruct: resolving hf://bartowski/Llama-3.2-3B-Instruct-GGUF@main/…`
+followed by `[MODEL] downloading … MB` progress lines every 64 MB. Subsequent
+runs log `[MODEL] llama-3.2-3b-instruct: cache hit -> …` instead. The
+benchmark uses the caching model provider, so the model is loaded once per
+process and kept resident across all cases.
 
 === 3. Inspect the report
 
@@ -94,20 +106,24 @@ A Markdown report with a table like:
 
 | Backend | Faithfulness | Completeness | Structure | Auto pass% | Latency p50 | Latency p95 | Throughput | Determinism |
 |---------|--------------|--------------|-----------|------------|-------------|-------------|------------|-------------|
-| SKAINET | 0.00 | 0.00 | 0.00 | 0.66 | 4287 ms | 9420 ms | 14.2 c/s | 0.71 |
+| SKAINET | 0.00 | 0.00 | 0.00 | 0.80 | 61200 ms | 98400 ms | 9.8 c/s | 0.85 |
 ----
 
-The numbers will vary by hardware. Things to notice:
+The numbers above are illustrative and will vary by hardware. Things to notice:
 
 * **Auto pass rate** is heuristic ("did the output have the right
   Markdown headings? are commit IDs valid? no hallucinations?"). The
   human-scored columns (`Faithfulness`/`Completeness`/`Structure`) read
   `0.00` because they need manual annotation — this is a known
   benchmark limitation, not a quality drop.
-* **Latency p50 / p95** is wall-time per case in milliseconds.
+* **Latency p50 / p95** is wall-time per case in milliseconds. On an
+  i7-9750H the 3B Q4_K_M model decodes at roughly 0.3 s per token and
+  prefills at about the same rate, so a case with a 20-commit prompt and a
+  200-token answer lands in the minutes, not seconds.
 * **Determinism** is Jaccard similarity on word sets across runs (1.0 =
-  identical output, 0.0 = no overlap). At `temp=0.6` (the floor enforced
-  by SKAINET's raw-session path) you'll see 0.4–0.8 typically.
+  identical output, 0.0 = no overlap). The benchmark passes the CLI default
+  temperature of 0.1 straight through (there is no floor any more), so
+  expect fairly high determinism; top-p 0.9 is paired with top-k 40.
 
 == Stretch goals
 
@@ -115,24 +131,32 @@ The numbers will vary by hardware. Things to notice:
 * Filter to a single case: `BENCH_CASES=case-08` (the 32-commit stress test).
 * Add cold-start handling: `BENCH_WARMUP=1` discards the first run per
   case (JIT bias). Compare the latency p50 with and without.
-* Set a different model via `MCP_LLM_MODEL_PATH` to point at a 3B GGUF
-  you've downloaded yourself (any Llama-3 family; the Llama 3 turn-tag
-  format is hard-coded in `SKaiNetLLMService`).
+* Point the summariser at another GGUF via `MCP_LLM_MODEL_PATH` (legacy
+  alias) or `STANDAPP_LLAMA_MODEL_PATH`. Any Llama-3-family instruct model
+  works: `LocalModel` checks the GGUF architecture and renders through
+  `Llama3ChatTemplate`. An `hf://org/repo@rev/file.gguf` URI is accepted too
+  and goes through the same cache.
 
 == When this tutorial breaks
 
 * `Could not find or load main class` → JDK is < 21 or the wrapper
   picked the wrong toolchain. Confirm `java -version` and `./gradlew
   --version`.
-* `OutOfMemoryError` during inference → SKAINET's KV cache for the 1B
-  model needs ~6 GB heap. The build sets `-Xmx12g` for `:benchmark:jvmRun`
-  but if you're running on a memory-constrained machine, drop
-  `BENCH_RUNS=1` and `BENCH_CASES=case-03` (single-commit) to verify
-  the path before scaling up.
-* Incredibly slow first run (>5 min for `case-01`) → the native FFM
-  kernel didn't load and Panama Vector is doing all the math. Check
-  `:llm:build.gradle.kts` ensures `libs.skainet.backend.native.cpu` is
-  on the runtime classpath.
+* `Error resolving a model` / `DataSourceException` → the download failed
+  or `STANDAPP_OFFLINE=1` is set with a cold cache. Check network access, or
+  set `STANDAPP_LLAMA_MODEL_PATH` to a local GGUF. A truncated file shows up
+  as `[MODEL] WARNING: … may be truncated`; delete it from the cache and
+  rerun.
+* `OutOfMemoryError` during inference → weights are memory-mapped, but the
+  KV cache for the 4096-token window plus the packed weights still want
+  several GB of heap. The build sets `-Xmx12g` for `:benchmark:jvmRun`;
+  on a memory-constrained machine, drop to `BENCH_RUNS=1` and
+  `BENCH_CASES=case-03` (single-commit) to verify the path before scaling up.
+* Incredibly slow run (many minutes per token) → the native FFM kernel
+  library did not load and the packed Q4_K weights are going through the
+  decoding reference kernel. The library is extracted to `java.io.tmpdir`;
+  a `noexec` temp directory (common in containers) makes it silently fall
+  back. Point `-Djava.io.tmpdir` at an exec-capable directory.
 
 == Next exercise
 

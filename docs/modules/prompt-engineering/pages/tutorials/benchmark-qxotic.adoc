@@ -25,14 +25,14 @@ need it. Verify `java -version`.
 setup script invokes `mvn install` for you. Verify `mvn -v`.
 
 |A Llama 3.2 Q8_0 GGUF
-|qxotic's CLI takes a local GGUF path. Easiest source: run the
-SKAINET exercise once to extract the embedded GGUF to
-`~/.cache/standapp/models/Llama-3.2-1B-Instruct-Q8_0.gguf`. Reuse that
-file here.
+|qxotic's CLI (`Llama32CliQ8_0`) takes a local Q8_0 GGUF path. The SKAINET
+path no longer provides one — its summariser is a Q4_K_M file — so download
+one yourself, e.g. `Llama-3.2-1B-Instruct-Q8_0.gguf` or
+`Llama-3.2-3B-Instruct-Q8_0.gguf` from the `bartowski` Hugging Face repos,
+and keep it under `~/.cache/standapp/models/`.
 
 |~3 GB free disk
-|For the qxotic source clone, Maven cache, and the GGUF (already
-present if you ran the SKAINET exercise).
+|For the qxotic source clone, Maven cache, and the Q8_0 GGUF.
 
 |Internet access
 |For the initial git clone + `mvn install` of transitive deps.
@@ -102,9 +102,8 @@ java --enable-native-access=ALL-UNNAMED \
 ----
 
 If this prints something (even just timing diagnostics on stdout), the
-plumbing works. If it errors with `model file not found`, run the
-xref:tutorials/benchmark-skainet.adoc[SKAINET exercise] once first to
-extract the embedded GGUF.
+plumbing works. If it errors with `model file not found`, check the
+`--model` path — the SKAINET exercise does not create this file for you.
 
 === 3. Run the benchmark with qxotic enabled
 
@@ -125,13 +124,10 @@ Important caveats baked into the example above:
 * **`BENCH_CASES=case-01,case-03`** restricts to two short cases for a
   first run. Drop the filter once you know the pipeline works.
 
-You can also use the literal string `embedded` to default to the
-SKAINET-cached GGUF without typing the path:
-
-[source,bash]
-----
-BENCH_QXOTIC_MODEL=embedded ./gradlew :benchmark:jvmRun -Pqxotic.enabled=true
-----
+The literal string `embedded` is still accepted as a shorthand for
+`~/.cache/standapp/models/Llama-3.2-1B-Instruct-Q8_0.gguf`; it dates from
+the time the CLI shipped that file inside the JAR. It only works if you
+placed a GGUF at exactly that path yourself — prefer the explicit path.
 
 === 4. Inspect the report
 
@@ -167,7 +163,7 @@ BENCH_BACKENDS=SKAINET,REST_API,DELIVERANCE,QXOTIC \
 BENCH_LOCAL_URL=http://localhost:11434/v1 \
 BENCH_LOCAL_MODEL=llama3.2:3b \
 BENCH_DELIVERANCE_MODEL=TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
-BENCH_QXOTIC_MODEL=embedded \
+BENCH_QXOTIC_MODEL="$HOME/.cache/standapp/models/Llama-3.2-1B-Instruct-Q8_0.gguf" \
 BENCH_RUNS=3 \
 BENCH_CASES=case-01,case-03,case-08 \
     ./gradlew :benchmark:jvmRun \
@@ -210,7 +206,7 @@ BENCH_CASES=case-01,case-03,case-08 \
 You've now run the same 15-case benchmark against four genuinely
 different engine integrations:
 
-* SKAINET — Kotlin in-process, embedded GGUF (production)
+* SKAINET — Kotlin in-process, GGUF from the local model cache (production)
 * REST_API — HTTP client to an OpenAI-shaped server (production)
 * Deliverance — Java in-process, auto-downloaded HF model (benchmark only)
 * qxotic — subprocess around a CLI binary, local GGUF (benchmark only)

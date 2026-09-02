@@ -10,91 +10,148 @@ LLM behaviour. This page is a decision tree from "something is wrong" to
 
 [source,bash]
 ----
-STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
+./gradlew :StandAPP-cli:run \
   --args="--repo /path --days 2" 2>stages.log
 ----
 
-stdout = streamed model tokens + final answer. stderr = stage logs.
-Keep them separate: when the model goes wrong, the streamed tokens and the
-log lines tell different parts of the story.
+stdout = streamed summary tokens + final answer. stderr = everything else:
+the `[PIPELINE]` line, `[MODEL]` / `[MODEL LOAD]` lines, `[STAGE/...]` lines
+from every stage and `[GitTool]` lines from the tool. Keep them separate:
+when the model goes wrong, the streamed tokens and the log lines tell
+different parts of the story. With `--format json` or `-o FILE` the CLI
+redirects stdout to stderr for the whole generation, so `stages.log` then
+holds everything.
+
+The first useful line is the pipeline description:
+
+[source]
+----
+[PIPELINE] qwen-commits -> require-commits -> preprocess -> summarize[prompt -> llama -> parse x2]
+----
+
+It tells you which commit stage is active (`qwen-commits` or `git-commits`),
+which generation stage (`llama` or `rest-api`) and how many parse attempts
+the summariser may take. If it doesn't say what you expect, the bug is in
+flags or env, not in the model.
 
 == Symptom → likely cause
 
-=== Symptom: nothing happens for >60 s after `[STAGE/INPUT]`
+=== Symptom: the run stops before any `[STAGE/…]` line
 
-You see `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` then silence. Eventually
-either `[STAGE/PREFILL DONE]` lands (very late) or the process is killed.
+You see `[MODEL] … resolving hf://…` and then an error, or nothing.
 
-Likely cause:: The native CPU kernels didn't load. The Panama Vector
-fallback is much slower; on a 1.6 KB rendered prompt it should still be
-< 30 s, but on long prompts (60+ commits in the user message) it can be
-many minutes.
+Likely cause:: Model resolution failed — no network on a cold cache,
+`STANDAPP_OFFLINE=1` set, a wrong `--qwen-model` / `--llama-model` path, or
+a truncated download.
 
-Check:: stdout near the model-load banner. Look for
-`[SKaiNET] Using SIMD-accelerated CPU operations (Vector API)`. If you see
-*only* that and not a native-kernel log line, the native provider didn't
-register. See xref:architecture:11-risks-technical-debt.adoc[TR-08-adjacent].
+Check:: The last `[MODEL]` line. `downloading … MB` lines that stop → network.
+`WARNING: … may be truncated` → delete the file from
+`~/.cache/standapp/models` and rerun. `… points to '…' which is not a
+readable file` → the override path is wrong.
+
+Workaround:: Point `STANDAPP_QWEN_MODEL_PATH` / `STANDAPP_LLAMA_MODEL_PATH`
+at local GGUFs, or use `--backend rest_api` (no local models).
+
+=== Symptom: nothing happens for minutes after `[STAGE/QWEN RENDERED PROMPT]` or `[STAGE/INPUT]`
+
+You see the rendered prompt, then silence. Eventually
+`[STAGE/QWEN PREFILL DONE]` / `[STAGE/PREFILL DONE]` lands very late, or
+the process is killed.
+
+Likely cause:: The native FFM kernel library didn't load, so the packed
+Q8_0/Q4_K weights go through the decoding reference kernel. The library is
+extracted to `java.io.tmpdir`; on a `noexec` temp directory (containers,
+hardened hosts) it silently falls back.
+
+Check:: Compare against the expected numbers on an i7-9750H: Qwen's first
+token after ~10 s, Llama at ~0.3 s per token for prefill *and* decode
+(`[STAGE/PREFILL] done/total` ticks every 512 tokens). An order of magnitude
+slower means the reference kernel.
 
 Workaround::
-  - Switch to the default single-shot path (unset `STANDAPP_TOOL_CALLING`)
-  - Try the REST API backend against a faster external runtime
+  - Run with `-Djava.io.tmpdir=/some/exec/dir` (the Docker image uses
+    `/app/tmp` on an exec-capable tmpfs for this reason).
+  - Shorten the prompt: `preprocess { limit(20) }` or fewer `--days`.
+  - Try the REST API backend against a faster external runtime.
+
+=== Symptom: `[STAGE/FALLBACK]` — Qwen did not call the tool
+
+The run still produces a summary, but `[STAGE/COMMITS]` reports
+`via DIRECT_FALLBACK` instead of `via QWEN_TOOL_CALL`.
+
+Likely cause:: The 0.6B model answered in prose, called the tool with
+arguments that fail schema validation, or ran out of its 192-token budget.
+
+Check:: The reason inside the `[STAGE/FALLBACK]` line:
+  - `calls=[]` and a `lastResponse=` that reads like an answer → the model
+    skipped the call. Read `[STAGE/QWEN RESPONSE]`; if it contains a
+    `<tool_call>` block that was not picked up, the JSON inside is malformed.
+  - `validation=[get_recent_commits: …]` → the call was parsed but rejected,
+    typically `days` as a word instead of an integer. `[STAGE/TOOL
+    VALIDATION FAILED]` has the detail.
+  - `error=` → an exception; the message names it.
+
+Workaround:: Tighten `qwenToolCall(systemPrompt = …)`, raise
+`qwenToolCall(maxTokens = …)`, or try a larger Qwen3 via `--qwen-model`.
+`--commits git` skips the model entirely if the tool call is not what you
+are investigating.
 
 === Symptom: model output contains commit IDs that don't exist
 
-stdout has a confident-looking summary with hashes like `commit-fb1c2c3`,
-but those aren't real hashes from your repo.
+stdout has a confident-looking summary with hashes that aren't in your repo.
 
-Likely cause:: The tool-call parser missed the model's tool-call output, so
-the tool never executed and the model fell back to making things up.
+Likely cause:: The summariser invented them. Since the commit list is passed
+to Llama pre-formatted, this is a summariser-quality issue, not a tool
+issue — unless `[STAGE/COMMITS]` shows zero commits reaching the prompt.
 
 Check::
-  - Search `stages.log` for `[GitTool] get_recent_commits(`. *Absent* →
-    the tool was never executed.
-  - Search stdout for the JSON the model emitted. If it's wrapped in
-    markdown ` ``` ` fences or spans multiple lines, that's likely the
-    cause — the bare-JSON parser strategy is tested only on single-line
-    inputs.
+  - `[STAGE/COMMITS] N commit(s) via …` — N should match `git log` for the
+    window.
+  - `[STAGE/USER PROMPT]` — the commits Llama actually saw, after
+    `preprocess` (short ids, first message line, limit 60).
+  - `--score` — `QualityScorer` flags hallucinated ids and exits 5.
 
-Workaround::
-  - Try `templateName="qwen"` against a Qwen 3 model — Qwen's
-    `<tool_call>...</tool_call>` delimiters match the well-tested Hermes
-    parser strategy.
-  - Tighten the system prompt to repeat the format instruction multiple
-    times (small-model tactic).
+Workaround:: Lower `--temperature` (0.1 is the default), or a larger
+summariser via `--llama-model`.
 
 === Symptom: model output is repetitive ("Goodbye. Goodbye. Goodbye.")
 
-Likely cause:: Temperature too low for the path you're on.
+Likely cause:: A sampling problem on the REST path, or a broken prompt on
+the local path. There is no temperature floor any more; `[STAGE/INPUT]`
+reports the exact `temp=… topP=…` used.
 
-Check:: `[STAGE/INPUT]` reports `temp=…`. The raw-session path enforces
-`temp >= 0.6`; the agent-loop path inherits the same clamp. If you're on
-the REST path and explicitly set a low temperature, that's the culprit.
+Check:: `[STAGE/SYSTEM PROMPT]` and `[STAGE/USER PROMPT]` for an empty or
+duplicated block. On the REST path check the server honours `temperature`.
 
-Workaround:: Use `temp = 0.6` to `0.7` for production output; reserve
-`< 0.3` for benchmark/determinism testing on a model that can handle it.
+Workaround:: Raise `--temperature` to 0.3–0.6 and compare; if repetition
+persists at every temperature, the prompt is the problem.
 
-=== Symptom: `[STAGE/COMPLETE]` shows `tokensSeen=0`
+=== Symptom: `[STAGE/COMPLETE]` shows `0 tokens`
 
-Likely cause:: The model emitted the EOS token immediately, before
-producing any visible output. Usually a malformed prompt — for example,
-the chat template ended without an assistant prefix.
+Likely cause:: The model emitted a stop token immediately. Usually a
+malformed prompt; with the fixed `Llama3ChatTemplate` render this should
+not happen unless the system or user prompt is empty.
 
-Check:: `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` should end with
-`<|start_header_id|>assistant<|end_header_id|>\n\n`. If it ends with
-`<|eot_id|>`, the model has nothing to continue.
+Check:: `[STAGE/INPUT] … promptTokens=N` — N should be in the hundreds for
+a real commit list. `[STAGE/WARN] maxTokens clamped …` means the prompt
+nearly filled the 4096-token window and the budget went to zero.
 
-=== Symptom: the agent loop runs the full 5 rounds and returns truncated text
+=== Symptom: `[STAGE/PARSE] attempt 1 rejected: …` then a second generation
 
-Likely cause:: The model keeps emitting tool calls (or things that look
-like tool calls) and never produces a "final" assistant message.
+Not a bug. With `--format json` the summariser retries once when strict JSON
+parsing fails (`parse x2` in the `[PIPELINE]` line). The last attempt parses
+leniently; if it still has no sections the CLI prints a warning and exits 5.
 
-Check:: stdout should show 5 rounds of tool-call JSON. The default loop
-caps at `maxToolRounds = 5` and returns whatever the last assistant
-message was.
+Check:: `[STAGE/FINAL ANSWER]` of the rejected attempt for fences or prose
+around the JSON — a prompt-tightening candidate.
 
-Workaround:: System-prompt the model to stop calling tools once it has
-the data, e.g. "After one successful call, summarise without further
-calls."
+=== Symptom: the Qwen round runs but prints `[STAGE/TOOL CALLS]` twice
+
+Likely cause:: Small models sometimes emit the same `<tool_call>` twice in
+one turn.
+
+Check:: `[GitTool] … repeated; reusing N recorded commit(s)` — the tool
+detects the duplicate and does not hit git again. Harmless.
 
 == Stage tags by phase
 
@@ -102,27 +159,38 @@ calls."
 ----
 flowchart LR
     subgraph "Setup"
-      A[STAGE/MODEL LOAD] --> B[STAGE/INPUT]
-      B --> C[STAGE/SYSTEM PROMPT]
-      C --> D[STAGE/USER PROMPT]
-      D --> E[STAGE/TOOL REGISTERED]
+      P[PIPELINE] --> M[MODEL resolve / MODEL LOAD]
     end
-    subgraph "Generate"
-      E --> F[STAGE/RENDERED CHAT TEMPLATE]
-      F --> G[STAGE/PREFILL DONE]
-      G --> H[STAGE/COMPLETE]
+    subgraph "Tool stage (Qwen)"
+      M --> Q1[STAGE/QWEN]
+      Q1 --> Q2[STAGE/QWEN RENDERED PROMPT]
+      Q2 --> Q3[STAGE/QWEN PREFILL DONE]
+      Q3 --> Q4[STAGE/QWEN RESPONSE]
+      Q4 --> Q5[STAGE/TOOL CALLS → GitTool → STAGE/TOOL RESULT]
+      Q5 --> Q6[STAGE/QWEN COMPLETE]
+      Q4 -. no usable call .-> FB[STAGE/FALLBACK → STAGE/GIT]
     end
-    subgraph "Result"
-      H --> I[STAGE/FINAL ANSWER]
+    subgraph "Commits"
+      Q6 --> C[STAGE/COMMITS]
+      FB --> C
+    end
+    subgraph "Summary stage (Llama)"
+      C --> S1[STAGE/PROMPT]
+      S1 --> S2[STAGE/INPUT + SYSTEM PROMPT + USER PROMPT]
+      S2 --> S3[STAGE/PREFILL … PREFILL DONE]
+      S3 --> S4[STAGE/COMPLETE]
+      S4 --> S5[STAGE/FINAL ANSWER]
+      S5 -. invalid JSON .-> S6[STAGE/PARSE → retry]
     end
 ----
 
 If a stage is skipped, the issue is upstream of where the next stage would
-have appeared. Stage logs are *cheap*; add more in your tools' `execute`
-methods if you need finer visibility.
+have appeared. Stage logs are *cheap*; `StageLog.stage(...)` /
+`StageLog.block(...)` are a one-liner in your own tools and `transform`
+stages if you need finer visibility.
 
 == See also
 
 * xref:reference/stage-logs.adoc[Reference: every stage tag and meaning].
 * xref:explanation/negative-sample-2026-05-05.adoc[Negative sample: a real
-  failure walked through with stage logs].
+  failure of the retired single-model path walked through with stage logs].

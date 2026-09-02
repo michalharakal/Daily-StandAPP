@@ -2,32 +2,29 @@
 :toc: left
 :icons: font
 
-[WARNING]
-====
-The opt-in tool-calling path *does not yet produce reliable results on the
-embedded Llama 3.2 1B model* — see
-xref:explanation/negative-sample-2026-05-05.adoc[the 2026-05-05 negative
-sample] before assuming success. This tutorial is still useful: it shows you
-exactly what stage logs to read, and the diagnosis path when things go
-wrong.
-====
+The tool call is no longer opt-in: every default run starts with Qwen3 0.6B
+calling `get_recent_commits`. This tutorial shows you what that round looks
+like on the wire, which stage logs to read, and how to tell a real tool call
+from the direct-git fallback.
 
 == Goal
 
-Run the CLI through the `JavaAgentLoop`-driven path so the model fetches
-commits itself instead of receiving them pre-formatted in the prompt.
+Run the CLI once, capture the stage logs, and find the tool call that Qwen
+emitted, the arguments it chose, and what the tool recorded.
 
 == Run it
 
 [source,bash]
 ----
-STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
+./gradlew :StandAPP-cli:run \
   --args="--repo /path/to/repo --days 2" 2>stages.log
 ----
 
-`STANDAPP_TOOL_CALLING=1` flips the factory from `SKaiNetLLMService` to
-`ToolCallingLLMService`. The streamed answer goes to stdout; the
-`[STAGE/...]` stage logs go to stderr (captured here in `stages.log`).
+The streamed summary goes to stdout; every `[MODEL …]`, `[STAGE/...]` and
+`[GitTool]` line goes to stderr (captured here in `stages.log`).
+`--commits qwen` is the default; `--commits git` would skip the Qwen stage
+entirely, and an explicit `--since` window also takes the direct git path
+because the tool is day-based.
 
 == What happens
 
@@ -35,24 +32,34 @@ STANDAPP_TOOL_CALLING=1 ./gradlew :StandAPP-cli:run \
 ----
 sequenceDiagram
     participant CLI
-    participant Service as ToolCallingLLMService
-    participant Agent as JavaAgentLoop
-    participant Model as Llama 3.2 1B
-    participant Tool as GetRecentCommitsTool
+    participant Stage as QwenCommitsStage
+    participant Agent as AgentLoop (SKaiNET)
+    participant Model as Qwen3 0.6B
+    participant Tool as RecordingGitCommitsTool
 
-    CLI->>Service: generate("Summarise … call get_recent_commits …")
-    Note over Service: log [STAGE/INPUT], [STAGE/SYSTEM PROMPT],<br/>[STAGE/USER PROMPT], [STAGE/RENDERED CHAT TEMPLATE]
-    Service->>Agent: agent.chat(prompt, onToken)
-    Agent->>Model: render llama3 chat template + tool schema
-    Model-->>Agent: tokens incl. {"name":"get_recent_commits","parameters":{"days":2}}
+    CLI->>Stage: process(StandupRequest(days=2))
+    Note over Stage: log [STAGE/QWEN], [STAGE/QWEN RENDERED PROMPT]
+    Stage->>Agent: runWithEncoder(system + user, listener)
+    Agent->>Model: QwenChatTemplate render (tools in <tools>…</tools>)
+    Model-->>Agent: <tool_call>{"name":"get_recent_commits","arguments":{"days":2}}</tool_call>
+    Note over Agent: parse + validate against the JSON schema
     Agent->>Tool: execute({days:2})
-    Tool-->>Agent: "count=12\n- abc1234 …"
-    Agent->>Model: feed tool result, re-render, continue
-    Model-->>Agent: final markdown summary
-    Agent-->>Service: text
-    Note over Service: log [STAGE/COMPLETE], [STAGE/FINAL ANSWER]
-    Service-->>CLI: summary
+    Tool->>Tool: JGit fetch, record List<GitInfo>
+    Tool-->>Agent: "ok: 12 commit(s) found in the last 2 day(s)"
+    Note over Agent: maxToolRounds = 1 → return without a second generation
+    Agent-->>Stage: (prose discarded)
+    Stage-->>CLI: CommitBatch(source = QWEN_TOOL_CALL)
 ----
+
+Two things are different from a textbook agent loop:
+
+* The loop runs **one** tool round. The tool's string result is never fed
+  back to Qwen; the structured commit list the tool *recorded* is what the
+  rest of the pipeline consumes. Qwen's job is translation only: request in,
+  well-formed call out.
+* Thinking is disabled (`QwenChatTemplate(enableThinking = false)`), so the
+  0.6B model spends its 192-token budget on the call instead of a
+  `<think>` monologue. Sampling is greedy (`temperature = 0`).
 
 == Reading the stage logs
 
@@ -60,58 +67,97 @@ sequenceDiagram
 
 [source]
 ----
-[STAGE/MODEL LOAD] path=…/Llama-3.2-1B-Instruct-Q8_0.gguf template=llama3
-[STAGE/MODEL LOAD] done
-[STAGE/INPUT] system=241ch user=284ch tools=1 template=llama3 temp=0.6 maxTokens=512
-[STAGE/SYSTEM PROMPT] >>>
-You are a developer assistant. You can call tools …
-[STAGE/SYSTEM PROMPT] <<<
-[STAGE/USER PROMPT] >>>
-Summarise the work done in this git repository over the last 2 day(s) …
-[STAGE/USER PROMPT] <<<
-[STAGE/TOOL REGISTERED] get_recent_commits — List git commits …
-[STAGE/RENDERED CHAT TEMPLATE (round 0)] >>>
-<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+[PIPELINE] qwen-commits -> require-commits -> preprocess -> summarize[prompt -> llama -> parse x1]
+[MODEL] qwen3-0.6b: resolving hf://Qwen/Qwen3-0.6B-GGUF@main/Qwen3-0.6B-Q8_0.gguf (cache=/home/you/.cache/standapp/models, policy=Use)
+[MODEL] qwen3-0.6b: cache hit -> /home/you/.cache/standapp/models/…/Qwen3-0.6B-Q8_0.gguf (609 MB)
+[MODEL LOAD] qwen3-0.6b: arch=qwen3 family=qwen path=…
+[MODEL LOAD] qwen3-0.6b: done in 1834ms — layers=28 ctx=40960 (window 4096) vocab=151936 bos=… stop=[151645, 151643]
+[STAGE/QWEN] tools=[get_recent_commits] maxTokens=192 temp=0.0 thinking=off
+[STAGE/QWEN RENDERED PROMPT] >>>
+<|im_start|>system
+You are a git assistant. You must call the get_recent_commits tool to look up commits; …
+# Tools
 …
-You have access to the following functions:
-{"name":"get_recent_commits", …}
-…
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-…
-<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-[STAGE/RENDERED CHAT TEMPLATE (round 0)] <<<
-[STAGE/PREFILL DONE] first token after 12345ms
-[STAGE/COMPLETE] tokensSeen=… totalMs=… finalChars=…
-[STAGE/FINAL ANSWER] >>>
-…the model's text…
-[STAGE/FINAL ANSWER] <<<
+<tools>
+{"type":"function","function":{"name":"get_recent_commits","description":"List the git commits …","parameters":{…"required":["days"]}}}
+</tools>
+…<|im_end|>
+<|im_start|>user
+Fetch the git commits from the last 2 day(s) using get_recent_commits. Pass days=2 as a number.<|im_end|>
+<|im_start|>assistant
+<think>
+
+</think>
+
+[STAGE/QWEN RENDERED PROMPT] <<<
+[STAGE/QWEN PREFILL DONE] first token after 9210ms
+[STAGE/QWEN RESPONSE] >>>
+<tool_call>
+{"name": "get_recent_commits", "arguments": {"days": 2}}
+</tool_call>
+[STAGE/QWEN RESPONSE] <<<
+[STAGE/TOOL CALLS] get_recent_commits({"days":2})
+[GitTool] get_recent_commits(repo=/path/to/repo, days=2, author=*)
+[GitTool] result: 12 commit(s) recorded
+[STAGE/TOOL RESULT] get_recent_commits: ok: 12 commit(s) found in the last 2 day(s)
+[STAGE/QWEN COMPLETE] 38412ms
+[MODEL] qwen3-0.6b: released
+[STAGE/COMMITS] 12 commit(s) via QWEN_TOOL_CALL
 ----
 
-The single most useful block is `[STAGE/RENDERED CHAT TEMPLATE (round 0)]` —
-that is *literally what the tokenizer sees*. If something is wrong with the
-prompt (wrong delimiters, missing tool schema, malformed system message),
-this is where you see it.
+Read it top to bottom:
+
+`[STAGE/QWEN RENDERED PROMPT]`:: *Literally what the tokenizer sees*: the
+system prompt, the tool schema inside `<tools>…</tools>`, the user request,
+and the empty `<think></think>` prefill that switches thinking off. If
+something is wrong with the prompt (missing schema, wrong delimiters), this
+is where you see it.
+
+`[STAGE/QWEN RESPONSE]`:: The raw assistant text. A good round contains
+exactly one `<tool_call>` block with `days` as a number.
+
+`[STAGE/TOOL CALLS]`:: The parsed and schema-validated call(s) the agent loop
+is about to execute. If the model emitted something the Hermes-style parser
+could not read, this line is missing.
+
+`[GitTool] …` and `[STAGE/TOOL RESULT]`:: Proof that the tool actually ran and
+how many commits it recorded. The short acknowledgement string is all the
+loop ever sees; the commit list itself goes straight into the pipeline.
+
+`[STAGE/COMMITS] N commit(s) via QWEN_TOOL_CALL`:: The `require-commits`
+stage confirming the source. `QWEN_TOOL_CALL` means the model did its job.
 
 xref:reference/stage-logs.adoc[See the full reference] for what every tag
 means.
 
-== When it goes wrong
+== When Qwen does not call the tool
 
-If you see no `[STAGE/PREFILL DONE]` for >60 s, the model is stuck in
-prompt processing — usually a CPU-kernel-provider issue.
-xref:explanation/negative-sample-2026-05-05.adoc[The negative sample]
-documents one such failure (840 s prefill).
+The pipeline never fails because of the 0.6B model. If there is no call, the
+wrong tool, a schema violation, or the token budget runs out, you see:
 
-If `[STAGE/FINAL ANSWER]` contains commit IDs that don't exist in your
-repo, the tool was never called and the model hallucinated. Check stdout
-for whether the tool-call JSON appeared in the streamed tokens at all.
-`[GitTool] get_recent_commits(...)` is logged only when the tool *actually
-executed*; its absence proves the parser missed the call.
+[source]
+----
+[STAGE/TOOL VALIDATION FAILED] get_recent_commits: days: expected integer …
+[STAGE/FALLBACK] Qwen did not produce a usable get_recent_commits call (calls=[…] validation=[…] lastResponse=…); fetching commits directly
+[STAGE/GIT] repo=/path/to/repo author=* window=2026-08-31T… .. 2026-09-02T…
+[STAGE/COMMITS] 12 commit(s) via DIRECT_FALLBACK
+----
+
+The `reason` inside `[STAGE/FALLBACK]` tells you which of the three happened:
+`calls=[]` means no parsable call at all, `validation=[…]` lists schema
+failures, `error=` carries an exception. The summary that follows is
+identical either way, so a fallback is a prompt-engineering finding, not an
+outage.
+
+If you see `[STAGE/QWEN RENDERED PROMPT]` and then nothing for more than a
+minute or two, prefill is running on the reference kernel instead of the
+native FFM kernel. See
+xref:how-to/debug-with-stage-logs.adoc[Debug with stage logs].
 
 == Next steps
 
 * xref:how-to/debug-with-stage-logs.adoc[Debug with stage logs] — decision
   tree for common failure modes.
-* xref:how-to/tune-prompts-for-1b.adoc[Tune prompts for a 1B model].
+* xref:how-to/tune-prompts-for-small-models.adoc[Tune prompts for small models].
 * xref:how-to/add-a-new-tool.adoc[Add a new tool] to extend the surface
   beyond `get_recent_commits`.

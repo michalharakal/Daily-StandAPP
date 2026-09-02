@@ -74,7 +74,7 @@ graph LR
 
 |1
 |*Privacy (Critical)*
-|**Zero data leaves the machine.** Git commits contain sensitive information - code changes, project names, author details. All AI processing runs locally via SKaiNET kllama. No cloud APIs, no telemetry, no external services for core functionality.
+|**Zero data leaves the machine.** Git commits contain sensitive information - code changes, project names, author details. All AI processing runs locally via SKaiNET. No cloud APIs, no telemetry, no external services for core functionality.
 
 |2
 |*Offline Operation*
@@ -90,10 +90,10 @@ graph LR
 
 |5
 |*Extensibility*
-|Pluggable LLM architecture via `LLMService` interface. Production backends: SKaiNET kllama (in-process JVM, embedded GGUF) and REST API (OpenAI-compatible — Ollama, LM Studio, OpenAI). Benchmark-only alternative engines (Deliverance, qxotic) plug into the same interface for engine-independence comparisons.
+|Pluggable LLM architecture via `LLMService` interface. Production backends: SKaiNET (in-process JVM, two local GGUF models — Qwen3-0.6B for the tool call, Llama-3.2-3B-Instruct for the summary — downloaded to a local cache on first run) and REST API (OpenAI-compatible — Ollama, LM Studio, OpenAI). Benchmark-only alternative engines (Deliverance, qxotic) plug into the same interface for engine-independence comparisons.
 |===
 
-IMPORTANT: Privacy is non-negotiable. The embedded AI engine (SKaiNET kllama) exists specifically to ensure commit data never leaves the developer's machine. Cloud-based AI services are explicitly excluded from this architecture.
+IMPORTANT: Privacy is non-negotiable. The in-process AI engine (SKaiNET) exists specifically to ensure commit data never leaves the developer's machine. Cloud-based AI services are explicitly excluded from this architecture.
 
 == 1.3 Stakeholders
 

@@ -10,17 +10,17 @@
 |ID |Risk |Impact |Mitigation |Priority
 
 |TR-01
-|*JDK 21+ Requirement*
-Java Vector API is incubator module, may change
-|Breaking changes in future JDK versions
-|Abstract SIMD operations, monitor JDK roadmap
+|*JDK 25 Toolchain Requirement*
+The Vector API is still an incubator module and the native kernels need `--enable-preview` / `--enable-native-access`
+|Breaking changes in future JDK versions; hosts without the toolchain need the foojay resolver to provision it
+|Keep the JVM flags in one place (`standappJvmArgs`), monitor the JDK roadmap
 |Medium
 
 |TR-02
 |*Model Compatibility*
-GGUF format evolves, new quantization methods
-|Models may not load correctly
-|Pin tested model versions, version detection
+GGUF format evolves, new quantization methods; `ModelFamily` accepts only `qwen2/qwen3/qwen35` and `llama/mistral`
+|A user-supplied GGUF may be rejected or load slowly (non-packed path)
+|Pin the catalog files (`ModelCatalog`), check architecture from the GGUF metadata before loading, size sanity check after download
 |Medium
 
 |TR-03
@@ -32,57 +32,58 @@ MCP is relatively new, spec may evolve
 
 |TR-04
 |*Performance on Low-End Hardware*
-LLM inference is CPU-intensive
-|Unusable on older machines
-|Document requirements, provide lightweight mode
-|Low
+CPU-only inference of a 3B model: ~0.3 s/token decode on an i7-9750H, plus ~40 s for the Qwen tool round
+|A 300-token summary takes a couple of minutes; unusable on older machines
+|Document requirements (§7.8); `preprocess { limit(60); firstMessageLine(120) }` keeps prompts short; `--commits git` skips the Qwen round; `REST_API` offloads to a server
+|Medium
 
 |TR-05
-|*Large Model Downloads*
-Models are 4-8GB
-|Poor first-run experience
-|Provide download scripts, progress indicators
-|Low
+|*First-Run Download and Offline Use*
+Both GGUFs (~0.6 GB + ~2.0 GB) are fetched from Hugging Face on first run; nothing is bundled
+|Poor first-run experience on slow links; a cold cache fails outright behind a firewall or with `STANDAPP_OFFLINE=1` (exit code 4)
+|Progress every 64 MB, unbounded request timeout, persistent cache (`STANDAPP_MODEL_CACHE_DIR`), local overrides (`--qwen-model` / `--llama-model`, `STANDAPP_*_MODEL_PATH`, `hf://` or `https://` URIs), `HF_TOKEN`; Docker mounts the cache as a volume
+|Medium
 
 |TR-06
-|*Self-Contained JAR Size*
-Embedding Llama 3.2 1B Q8_0 makes the shadow JAR ~2.0 GB.
-|Slow CI uploads, exceeds some artefact-size limits, awkward in `git lfs`-free repos.
-|Keep the GGUF gitignored and only fetched at build time via `uv run scripts/download-model.py`. Document `MCP_LLM_MODEL_PATH` as an escape hatch. Consider a slim build profile in the future.
+|*Native Kernel Library Silently Unavailable*
+`skainet-backend-native-cpu` extracts `libskainet_kernels.so` to `java.io.tmpdir` and `dlopen`s it. On a `noexec` temp directory (hardened containers, some CI runners) or without `--enable-native-access` the runtime falls back to the Panama/Vector-API kernels *without an error*
+|Several-fold slower inference that looks like "the machine is slow"
+|Docker sets `-Djava.io.tmpdir=/app/tmp` on an exec-capable tmpfs; the JVM flags are part of the launcher. Check `[STAGE/COMPLETE] … tok/s` against the documented numbers; consider logging the active kernel pack at startup
 |Medium
 
 |TR-07
-|*Embedded-Model Cache Extraction*
-On first run, `EmbeddedModelLoader` copies ~1.3 GB out of the JAR to `~/.cache/standapp/models/`. JVM/JAR resource APIs cannot serve random-access reads, which `KLlamaJava.loadGGUF` requires.
-|First-run latency (~5-15 s on local SSD); fails on read-only home dirs or near-full disks.
-|Idempotency check (file size match) skips extraction on subsequent runs. Surface a clear log line. Consider honouring `STANDAPP_CACHE_DIR` for sandboxed environments.
-|Low
+|*Prefill as Slow as Decode*
+The row-major FFM kernel processes batched prefill (`PrefillStrategy.Batched(64)`) row by row, so prefill costs ~0.3 s per prompt token — the same as decode
+|A 1,000-token prompt (60 commits) spends ~5 minutes before the first token; retries on invalid JSON pay it again
+|Keep prompts short (`preprocess`), cap `maxTokens`, `--keep-models` avoids reloading between retries; a true batched matmul path upstream is the real fix
+|High
 
 |TR-08
-|*SKaiNET-transformers API Stability*
-Library pinned at 0.36.0 (unified core + transformers). The 0.21.x-era broken
-transformers BOM is fixed upstream — both `sk.ainet:skainet-bom` and
-`sk.ainet.transformers:skainet-transformers-bom` are imported as platforms and
-the former per-artifact pins are retired. `JavaAgentLoop`, `JavaTool`, and
-`ChatTemplate` survived the 0.23 -> 0.36 jump unchanged but remain pre-1.0.
-|Minor-version bumps may rename builder methods or template names.
-|BOM-pin both `skainet` and `skainet-transformers` versions. Verify each bump
-with the two inference smokes (raw session + tool-calling agent loop).
+|*SKaiNET / SKaiNET-transformers API Stability*
+Pinned at 0.53.0 through both BOMs; `AgentLoop`, `ChatTemplate`, `DecoderGgufWeightLoader`, `OptimizedLLMRuntime` and the `DataPipeline` DSL are pre-1.0. The 0.36 → 0.53 jump moved the decoder loader between artefacts and dropped kllama's Java facade
+|Minor-version bumps may rename loaders, template classes or stage APIs
+|BOM-pin both versions; verify each bump with the download smoke (`STANDAPP_TINY_PROMPT=1`) and a full two-model run; keep the composite build opt-in (`-PuseLocalTransformers=true`) for bisecting upstream changes
 |Medium
 
 |TR-09
-|*`AgentListener` not exposed via `JavaAgentLoop` public API*
-The Java facade only takes a `Consumer<String>` token callback. Structured
-`onToolCalls` / `onToolResult` / `onAssistantMessage` / `onThinking`
-transitions are emitted by the underlying `AgentLoop` but not surfaced to
-consumers — `KLlamaSession.runtime` and `.tokenizer` are `internal`, so we
-cannot construct `AgentLoop` directly either.
-|`ToolCallingLLMService` cannot log per-tool-call structured events. Tool-call
-JSON is visible in the streamed token output but not split out. Debugging
-multi-round behaviour relies on reading the inline tokens.
-|Adding `Builder.listener(AgentListener)` to `JavaAgentLoop` upstream is the
-clean fix (a few lines). Until then, render the round-0 chat template
-manually via the public `ChatTemplate` API and watch the streamed tokens.
+|*Upstream Sampler Quadratic Without Top-k*
+`sampleFromLogits(topK = 0, topP < 1)` sorts by insertion over the whole 128k Llama vocabulary — ~10 s per token measured
+|Any caller that requests nucleus sampling without a finite top-k stalls
+|`LlamaGenerateStage` always pairs `topP < 1` with `topK = 40` (llama.cpp default); temperature 0 / top-p 1 avoid the path. Report upstream
+|Low
+
+|TR-10
+|*Qwen Skips or Botches the Tool Call*
+A 0.6B model may answer in prose, call the tool with wrong arguments (validation failure) or emit the call twice
+|Silent quality regression: the `[STAGE/FALLBACK]` path still produces a summary, so users may not notice the model is not doing its job; the failed round still costs ~40 s
+|Thinking disabled, greedy sampling, explicit user prompt ("Pass days=7 as a number"), duplicate calls reuse the recorded result, `CommitBatch.source` records the path. Watch `[STAGE/FALLBACK]` in stderr; `--commits git` bypasses the stage; a larger Qwen via `--qwen-model` is a drop-in
+|Medium
+
+|TR-11
+|*Memory Footprint*
+The CLI runs with `-Xmx12g`; KV caches are capped at a 4096-token window and weights are memory-mapped, but `--keep-models` holds both models plus the FP32 activations
+|OOM or heavy swapping on 8 GB machines, especially with `--keep-models`
+|`ModelProvider.releasing()` (default) keeps peak memory at one model; document 16 GB for `--keep-models`; the Docker image uses `-Xmx6g` for the MCP server
 |Low
 |===
 
@@ -94,10 +95,11 @@ manually via the public `ChatTemplate` API and watch the streamed tokens.
 ----
 graph TB
     subgraph "High Priority"
-        TD1[CLI Not Implemented<br/>Stub only]
+        TD1[Summariser reloaded per retry<br/>releasing provider]
     end
 
     subgraph "Medium Priority"
+        TD2[Legacy MCP_LLM_MODEL_PATH alias<br/>and 'embedded' shorthand]
         TD3[No Summarization Tool<br/>MCP missing standup_summary]
         TD4[Platform Stubs<br/>Android, Wasm, Native]
     end
@@ -109,6 +111,7 @@ graph TB
     end
 
     style TD1 fill:#ffcdd2
+    style TD2 fill:#fff9c4
     style TD3 fill:#fff9c4
     style TD4 fill:#fff9c4
 ----
@@ -120,9 +123,14 @@ graph TB
 |ID |Debt Item |Current State |Remediation
 
 |TD-01
-|*CLI Implementation*
-|`Main.java` prints "Hello, World!"
-|Implement argument parsing, wire to GitClient and LLMSummarizer
+|*Summariser Reloaded per Retry*
+|With the default `ModelProvider.releasing()` every generation attempt (JSON retry) reloads the Llama model; `--keep-models` is a manual workaround
+|Keep the summariser resident for the duration of `RetryingSummarizeStage` while still releasing between the Qwen and Llama stages
+
+|TD-02
+|*Legacy `MCP_LLM_MODEL_PATH` Alias and `embedded` Shorthand*
+|`MCP_LLM_MODEL_PATH` still maps to the Llama summariser; the benchmark's `BENCH_QXOTIC_MODEL=embedded` shorthand points at a cache file the SKAINET path no longer creates
+|Migrate Docker/benchmark configs to `STANDAPP_LLAMA_MODEL_PATH`, retire the alias and the shorthand
 
 |TD-03
 |*MCP standup_summary Tool*
@@ -166,8 +174,11 @@ quadrantChart
     JDK Changes: [0.6, 0.3]
     Model Compat: [0.5, 0.4]
     MCP Changes: [0.4, 0.2]
-    Performance: [0.7, 0.3]
-    Downloads: [0.3, 0.6]
+    Prefill Speed: [0.7, 0.8]
+    First-Run Download: [0.4, 0.6]
+    Native Lib Fallback: [0.6, 0.4]
+    Qwen Tool Fallback: [0.4, 0.5]
+    Upstream API: [0.5, 0.5]
 ----
 
 == 11.4 Improvement Roadmap
@@ -181,15 +192,17 @@ quadrantChart
 
 === Medium Term
 
-* [ ] Complete CLI implementation
+* [ ] Keep the summariser resident across parse retries (TD-01)
 * [ ] Add integration tests
 * [ ] Unify configuration approach (env vars vs system properties)
+* [ ] Log the active kernel pack at startup so a silent native-library fallback is visible (TR-06)
 
 === Long Term
 
 * [ ] Native platform support (beyond stubs)
 * [ ] HTTP transport option for MCP
-* [ ] Model management tooling
+* [ ] Model management tooling (pre-warm / verify the cache, list downloaded models)
+* [ ] Batched prefill matmul upstream (removes TR-07)
 
 == 11.5 Dependencies Risk
 
@@ -197,33 +210,43 @@ quadrantChart
 |===
 |Dependency |Version |Risk Level |Notes
 
-|SKaiNET
-|0.13.0
+|SKaiNET core
+|0.53.0
 |Medium
-|Active development, API may change (migrated from 0.8.3)
+|Active development, pre-1.0 API; BOM-managed (`sk.ainet:skainet-bom`)
+
+|SKaiNET-transformers
+|0.53.0
+|Medium
+|Pre-1.0; supplies loaders, chat templates, `AgentLoop`, Qwen/Llama networks (`sk.ainet.transformers:skainet-transformers-bom`)
 
 |MCP Kotlin SDK
-|0.7.2
+|0.8.3
 |Medium
 |New library, expect updates
 
 |Eclipse JGit
-|7.1.0
+|7.7.0
 |Low
 |Mature, stable API
 
 |Kotlin
-|2.2.20
+|2.4.10
 |Low
-|Stable releases, good compatibility
+|Follows the SKaiNET upstream toolchain
 
 |Ktor
-|3.3.0
+|3.5.2
 |Low
-|Mature, stable API (used by cloud-api modules)
+|Mature, stable API (cloud-api modules, REST backend, model download client)
 
 |Koog Agents
-|0.6.1
+|1.0.0
 |Medium
-|Early-stage framework, API may change
+|Young framework, API may change
+
+|Hugging Face Hub (runtime)
+|n/a
+|Medium
+|First-run model download depends on the hosted repos `Qwen/Qwen3-0.6B-GGUF` and `bartowski/Llama-3.2-3B-Instruct-GGUF` staying available; mitigate with local files / a mirror URI
 |===

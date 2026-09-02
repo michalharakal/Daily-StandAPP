@@ -9,8 +9,8 @@
 |===
 |Constraint |Description
 
-|*TC-01: JDK 21+*
-|Required for Java Vector API (incubator module) which provides SIMD acceleration for tensor operations in the LLM engine.
+|*TC-01: JDK 25 toolchain*
+|Required for the Java Vector API (incubator module, `--enable-preview`) and FFM native access (`--enable-native-access=ALL-UNNAMED`) used by the SKaiNET kernels. Gradle provisions the toolchain via the foojay resolver; JDK 21+ is enough to run Gradle itself.
 
 |*TC-02: Kotlin Multiplatform*
 |The project uses Kotlin Multiplatform for cross-platform support. Platform-specific implementations use expect/actual pattern.
@@ -19,7 +19,7 @@
 |All LLM inference must happen locally. No cloud API calls for AI functionality.
 
 |*TC-04: GGUF Model Format*
-|SKaiNET kllama requires models in GGUF format with quantization (Q4, Q5, Q8, K-quants).
+|SKaiNET-transformers loads models in GGUF format with quantization (Q4, Q5, Q8, K-quants).
 
 |*TC-05: Git Repository Access*
 |Only supports local git repositories accessible via file system.

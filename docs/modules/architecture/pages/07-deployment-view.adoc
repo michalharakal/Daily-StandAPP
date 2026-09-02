@@ -5,14 +5,20 @@
 
 == 7.1 Infrastructure Overview
 
-The CLI is now a *self-contained* fat JAR: the Llama 3.2 1B Instruct (Q8_0, ~1.3 GB) GGUF is embedded as a JAR resource, so end-users do not need to manage external model files. On first run, `EmbeddedModelLoader` extracts the GGUF to `~/.cache/standapp/models/` (idempotent — extraction is skipped when the cached file size matches the resource).
+The CLI ships as a ~20 MB shadow JAR that contains all code but *no model*.
+The two GGUF files — `Qwen3-0.6B-Q8_0.gguf` (~0.6 GB) and
+`Llama-3.2-3B-Instruct-Q4_K_M.gguf` (~2.0 GB) — are resolved on first run
+through SKaiNET's `hf://` data-source resolver into a local model cache
+(`STANDAPP_MODEL_CACHE_DIR`, default `~/.cache/standapp/models`) and reused
+afterwards. After that download no network access is needed
+(xref:06-runtime-view.adoc[§6.3]).
 
 [mermaid]
 ----
 graph TB
     subgraph "Developer Machine"
-        subgraph "JVM Runtime (JDK 21+, Panama Vector enabled)"
-            CLI_JAR[standapp-1.0-SNAPSHOT-all.jar<br/>~2.0 GB self-contained]
+        subgraph "JVM Runtime (JDK 25, --enable-preview, Vector API, native access)"
+            CLI_JAR[standapp-1.0-SNAPSHOT-all.jar<br/>~20 MB, no model inside]
             MCP[mcp-server-jvm.jar]
             BENCH[benchmark]
             CLOUDAPI[cloud-api:server<br/>port 8080]
@@ -20,7 +26,8 @@ graph TB
 
         subgraph "File System"
             REPOS[(Git Repositories)]
-            CACHE[(~/.cache/standapp/models/<br/>extracted GGUF, ~1.3 GB)]
+            CACHE[(~/.cache/standapp/models/<br/>Qwen3-0.6B-Q8_0.gguf ~0.6 GB<br/>Llama-3.2-3B-Instruct-Q4_K_M.gguf ~2.0 GB)]
+            TMP[(java.io.tmpdir<br/>libskainet_kernels.so)]
         end
 
         subgraph "AI Assistant"
@@ -28,11 +35,16 @@ graph TB
         end
     end
 
+    HF[(huggingface.co<br/>hf:// resolver)]
+
     CLAUDE -->|"stdio"| MCP
     MCP --> REPOS
     CLI_JAR --> REPOS
-    CLI_JAR -->|"first run only"| CACHE
+    CLI_JAR --> CACHE
+    CLI_JAR -->|"extract native kernels"| TMP
     BENCH --> CACHE
+    MCP --> CACHE
+    CACHE -.->|"first run only"| HF
 
     style CLI_JAR fill:#c8e6c9
     style MCP fill:#bbdefb
@@ -40,6 +52,8 @@ graph TB
     style CLOUDAPI fill:#e3f2fd
     style REPOS fill:#fff9c4
     style CACHE fill:#fce4ec
+    style TMP fill:#fce4ec
+    style HF fill:#eeeeee
 ----
 
 == 7.2 Deployment Artifacts
@@ -53,9 +67,9 @@ graph TB
 |`./gradlew :mcp-server:jvmJar`
 |`mcp-server/build/libs/mcp-server-jvm.jar`
 
-|CLI (self-contained)
-|Shadow fat JAR (~2.0 GB, embeds Llama 3.2 1B Q8_0)
-|`uv run scripts/download-model.py && ./gradlew :StandAPP-cli:shadowJar`
+|CLI
+|Shadow fat JAR (~20 MB; models come from the cache at runtime)
+|`./gradlew :StandAPP-cli:shadowJar`
 |`StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar`
 
 |Benchmark
@@ -81,8 +95,28 @@ graph TB
 |Docker Image
 |Container
 |`docker compose build`
-|MCP server in container with JDK 21
+|MCP server in a JDK 25 (`eclipse-temurin:25-jre-jammy`) container
 |===
+
+The shadow JAR merges service files and additionally re-merges the two
+`META-INF/services/sk.ainet.backend.api.kernel.*` entries
+(`KernelProvider`, `ViewKernelPack`) — the same workaround `skainet-cli`
+applies — so the native kernel provider stays discoverable.
+
+=== Running the CLI JAR
+
+[source,bash]
+----
+java --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx12g \
+  -jar StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar --repo /path/to/repo --days 7 --score
+----
+
+`./gradlew :StandAPP-cli:run` applies the same flags through
+`applicationDefaultJvmArgs` (`-Xms1g -Xmx12g`). The heap holds mostly KV caches
+(capped at a 4096-token window) and FP32 activations; the GGUF weights stay
+packed and memory-mapped. By default the models are loaded one after the other
+(`ModelProvider.releasing()`), so peak memory is one model; `--keep-models`
+keeps both resident.
 
 == 7.3 MCP Server Deployment
 
@@ -97,11 +131,15 @@ Add to Claude Desktop's MCP configuration (`claude_desktop_config.json`):
     "standapp-git": {
       "command": "java",
       "args": [
+        "--enable-preview",
         "--add-modules", "jdk.incubator.vector",
-        "-Dllm.model=/path/to/model.gguf",
+        "--enable-native-access=ALL-UNNAMED",
         "-jar",
         "/path/to/mcp-server-jvm.jar"
-      ]
+      ],
+      "env": {
+        "STANDAPP_MODEL_CACHE_DIR": "/path/to/model-cache"
+      }
     }
   }
 }
@@ -113,23 +151,35 @@ Add to Claude Desktop's MCP configuration (`claude_desktop_config.json`):
 ----
 graph LR
     subgraph "JVM Configuration"
-        JDK[JDK 21+]
-        VECTOR[--add-modules<br/>jdk.incubator.vector]
+        JDK[JDK 25 toolchain<br/>foojay auto-provisioned]
         PREVIEW[--enable-preview]
+        VECTOR[--add-modules<br/>jdk.incubator.vector]
+        NATIVE[--enable-native-access=ALL-UNNAMED]
+        HEAP[-Xmx12g]
     end
 
-    subgraph "System Properties"
-        MODEL[-Dllm.model=...]
-        SEQLEN[-Dllm.max.seq.len=2048]
-        TEMP[-Dllm.temperature=0.8]
+    subgraph "Environment"
+        CACHE[STANDAPP_MODEL_CACHE_DIR]
+        PATHS[STANDAPP_QWEN_MODEL_PATH<br/>STANDAPP_LLAMA_MODEL_PATH]
+        OFFLINE[STANDAPP_OFFLINE=1]
+        TMPDIR[java.io.tmpdir must allow exec]
     end
 
-    JDK --> VECTOR
-    VECTOR --> PREVIEW
+    JDK --> PREVIEW
+    PREVIEW --> VECTOR
+    VECTOR --> NATIVE
+    NATIVE --> HEAP
 
     style JDK fill:#e8f5e9
     style VECTOR fill:#fff3e0
+    style NATIVE fill:#fff3e0
 ----
+
+`--enable-native-access` and an exec-capable `java.io.tmpdir` are required for
+the native FFM kernels (`skainet-backend-native-cpu`): the bundled
+`libskainet_kernels.so` is extracted to the temp directory and `dlopen`ed.
+Without it the runtime *silently* falls back to the slower Panama/Vector-API
+kernels (see xref:11-risks-technical-debt.adoc[§11]).
 
 == 7.4 Docker Deployment
 
@@ -142,11 +192,18 @@ docker compose build
 docker compose up
 ----
 
-The Docker image uses a multi-stage build with JDK 21 and packages the MCP server fat JAR.
+The image is a multi-stage build on `eclipse-temurin:25` and packages the MCP
+server fat JAR. Container specifics for the local models:
+
+* `JAVA_OPTS` carries `--enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Djava.io.tmpdir=/app/tmp`.
+* `/app/tmp` is an exec-capable tmpfs (`/tmp` itself stays `noexec`) so the native kernel library can load.
+* `STANDAPP_MODEL_CACHE_DIR=/app/models`; `/app/models` is a writable volume (`./models:/app/models` in compose) that receives the first-run download and persists it across container restarts. Pre-provisioned files can be pointed at with `STANDAPP_QWEN_MODEL_PATH` / `STANDAPP_LLAMA_MODEL_PATH`.
 
 == 7.5 Environment Variable Configuration
 
-End users do not need any environment variables — `SKAINET` is the default backend and the model is embedded. Variables exist only as overrides.
+End users need no environment variables — `SKAINET` is the default backend
+and both models are downloaded into the cache on first use. Variables exist
+as overrides; CLI flags win over them.
 
 [cols="1,2,2"]
 |===
@@ -154,11 +211,35 @@ End users do not need any environment variables — `SKAINET` is the default bac
 
 |`MCP_LLM_BACKEND`
 |`SKAINET`
-|Backend selection: `SKAINET` (embedded Llama 3.2 1B) or `REST_API`.
+|Backend selection: `SKAINET` (local two-model pipeline) or `REST_API`. CLI: `--backend skainet\|rest_api`.
+
+|`STANDAPP_QWEN_MODEL_PATH`
+|_(unset → download `hf://Qwen/Qwen3-0.6B-GGUF@main/Qwen3-0.6B-Q8_0.gguf`)_
+|Local GGUF (or `hf://` / `https://` URI) for the tool-calling stage. CLI: `--qwen-model`.
+
+|`STANDAPP_LLAMA_MODEL_PATH`
+|_(unset → download `hf://bartowski/Llama-3.2-3B-Instruct-GGUF@main/Llama-3.2-3B-Instruct-Q4_K_M.gguf`)_
+|Local GGUF (or URI) for the summariser. CLI: `--llama-model` (alias `-m` / `--model`).
 
 |`MCP_LLM_MODEL_PATH`
-|_(unset → use embedded resource)_
-|Optional override. Set to an absolute GGUF path to use a different model on the SKAINET backend. The embedded model wins when this is unset.
+|_(unset)_
+|Legacy alias for `STANDAPP_LLAMA_MODEL_PATH` (summariser only); keeps existing Docker/benchmark setups that point it at "the GGUF" working.
+
+|`STANDAPP_MODEL_CACHE_DIR`
+|`~/.cache/standapp/models`
+|Download cache for the `hf://` resolver.
+
+|`STANDAPP_OFFLINE`
+|_(unset)_
+|`1` → never touch the network; fail fast (exit code 4) when the cache is cold.
+
+|`HF_TOKEN`
+|_(optional)_
+|Hugging Face token passed by the resolver on download.
+
+|`STANDAPP_TINY_PROMPT`
+|_(unset)_
+|`1` → skip the pipeline and send a one-line prompt to the summariser (download + inference smoke test).
 
 |`MCP_LLM_REST_BASE_URL`
 |`http://localhost:11434`
@@ -170,38 +251,41 @@ End users do not need any environment variables — `SKAINET` is the default bac
 
 |`MCP_LLM_REST_API_KEY`
 |_(optional)_
-|Bearer token for authenticated REST API endpoints
+|Bearer token for authenticated REST API endpoints (falls back to `OPENAI_API_KEY`)
 |===
 
-== 7.6 Embedded Model
+== 7.6 Model Cache
 
-The repo ships a build-time hook that downloads the GGUF *into the source tree* before the JAR is assembled.
-
-* Source: `bartowski/Llama-3.2-1B-Instruct-GGUF` on Hugging Face (filename `Llama-3.2-1B-Instruct-Q8_0.gguf`).
-* Build script: `scripts/download-model.py` (PEP 723 inline-deps; runs as `uv run scripts/download-model.py`).
-* Drop location: `llm/src/jvmMain/resources/models/Llama-3.2-1B-Instruct-Q8_0.gguf` (gitignored).
-* Gradle wiring: a `prepareModel` `Exec` task in `llm/build.gradle.kts` invokes the uv script and is a dependency of `jvmProcessResources`. `onlyIf { !modelFile.exists() }` keeps reruns cheap.
-* Runtime: `EmbeddedModelLoader.extract()` copies the resource to `~/.cache/standapp/models/` (random-access on disk is required by `KLlamaJava.loadGGUF`).
+Nothing is downloaded at build time and nothing lives in the source tree. At
+runtime `ModelResolver` resolves each `ModelSpec` in this order: CLI flag →
+`STANDAPP_*_MODEL_PATH` → `MCP_LLM_MODEL_PATH` (Llama only) → `hf://` download
+through `sk.ainet.data.source.JvmDataSourceResolver` (Ktor CIO client with an
+unbounded request timeout, progress logged every 64 MB, size sanity check
+against the catalog).
 
 [cols="1,2,3"]
 |===
 |Aspect |Requirement |Notes
 
 |Format
-|GGUF
-|Q8_0 chosen for size/quality trade-off (~1.3 GB).
+|GGUF, packed quantisations
+|Qwen3-0.6B Q8_0 (~0.6 GB) for the tool call; Llama-3.2-3B-Instruct Q4_K_M (~2.0 GB) for the summary. Both stay packed on the native kernel path.
 
 |Architecture
-|Llama 3.2
-|Auto-detected by SKaiNET-transformers; chat template is `llama3`.
+|`qwen2`/`qwen3`/`qwen35` for the tool stage, `llama`/`mistral` for the summariser
+|Checked from the GGUF metadata before loading; chat templates (`QwenChatTemplate`, `Llama3ChatTemplate`) follow the family automatically.
 
-|First-run extraction
-|`~/.cache/standapp/models/`
-|~5-15 s on local disk; idempotent on subsequent runs.
+|First run
+|~2.7 GB download into `STANDAPP_MODEL_CACHE_DIR`
+|Once per machine; subsequent runs are cache hits. `STANDAPP_OFFLINE=1` forbids the download.
+
+|Load time
+|Memory-mapped, streaming GGUF load
+|Reported as `[MODEL LOAD] … done in <ms>`; native kernels installed once per process.
 
 |Override
-|`MCP_LLM_MODEL_PATH=/path/to/other.gguf`
-|Lets power users swap in a larger model without rebuilding the JAR.
+|`--qwen-model` / `--llama-model` or the `STANDAPP_*_MODEL_PATH` variables
+|Swap in another GGUF of the same family (e.g. a larger Qwen for the tool call) without rebuilding the JAR.
 |===
 
 == 7.7 Deployment Diagram
@@ -210,19 +294,23 @@ The repo ships a build-time hook that downloads the GGUF *into the source tree* 
 ----
 graph TB
     subgraph WORKSTATION["Developer Workstation"]
-        subgraph JVM["JVM 21+"]
+        subgraph JVM["JVM 25 (preview + Vector API + native access)"]
             MCP_JAR[mcp-server-jvm.jar]
+            CLI_JAR[standapp-*-all.jar]
         end
         CLAUDE[Claude Desktop]
         GIT[(Git Repos)]
-        MODELS[(GGUF Models)]
+        MODELS[(Model cache<br/>~/.cache/standapp/models)]
     end
 
     CLAUDE -->|stdio| MCP_JAR
     MCP_JAR -->|JGit| GIT
+    CLI_JAR -->|JGit| GIT
     MCP_JAR -->|SKaiNET| MODELS
+    CLI_JAR -->|SKaiNET| MODELS
 
     style MCP_JAR fill:#c8e6c9
+    style CLI_JAR fill:#c8e6c9
     style CLAUDE fill:#e3f2fd
     style GIT fill:#fff9c4
     style MODELS fill:#fce4ec
@@ -235,17 +323,20 @@ graph TB
 |Resource |Minimum Requirement
 
 |*JDK*
-|JDK 21 or later (for Vector API)
+|JDK 25 toolchain (auto-provisioned by the foojay resolver; JDK 21+ suffices to run Gradle)
 
 |*RAM*
-|8GB minimum, 16GB recommended for 7B models
+|8 GB minimum; the CLI runs with `-Xmx12g`, 16 GB recommended when using `--keep-models`
 
 |*Disk*
-|4-8GB for model files
+|~3 GB for the model cache (~0.6 GB Qwen + ~2.0 GB Llama)
 
 |*CPU*
-|Modern CPU with AVX2/AVX-512 for SIMD acceleration
+|Modern x86-64 with AVX2 (native FFM kernels + Vector API). Measured on an i7-9750H: ~0.3 s/token for the 3B summariser, ~40 s for the Qwen tool round
+
+|*Network*
+|Once, for the first-run download (or pre-provisioned GGUF files + `STANDAPP_OFFLINE=1`)
 
 |*OS*
-|macOS, Linux, Windows (JVM supported platforms)
+|Linux, macOS, Windows (JVM supported platforms; native kernel library bundled per platform)
 |===

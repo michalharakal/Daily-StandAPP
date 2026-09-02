@@ -3,9 +3,16 @@
 :icons: font
 
 What `template.parseToolCalls(rawText)` actually recognises. Three
-strategies fire in order; the first one that returns non-empty results
-wins. Source:
-`SKaiNET-transformers/llm-agent/src/commonMain/kotlin/sk/ainet/apps/kllama/chat/ToolCallParser.kt:25-29`.
+built-in strategies fire in order (runtime-registered strategies, if any,
+go first); the first one that returns non-empty results wins. Source:
+`SKaiNET-transformers/llm-agent/src/commonMain/kotlin/sk/ainet/apps/kllama/chat/ToolCallParser.kt`
+(0.53.0).
+
+In the default pipeline the tool stage renders through `QwenChatTemplate`,
+which inherits the default `ChatTemplate.parseToolCalls` — so Qwen3's
+`<tool_call>` output is handled by *strategy 1*, the Hermes parser. The
+summariser never calls a parser: `LlamaGenerateStage` renders without
+tools and treats the output as plain text.
 
 [mermaid]
 ----
@@ -19,9 +26,9 @@ flowchart TB
     S3 -- no match --> EMPTY[Empty list — treated as final answer]
 ----
 
-== Strategy 1: Hermes / ChatML
+== Strategy 1: Hermes / ChatML / Qwen — used by the default flow
 
-Source: `ToolCallParser.kt:94-115`.
+Source: `HermesToolCallParserStrategy` in `ToolCallParser.kt`.
 
 Regex-driven; matches `<tool_call>` blocks:
 
@@ -40,12 +47,27 @@ Accepted forms (all from `ToolCallParserTest.kt`):
 ----
 
 Multiple calls in the same response are supported. Tolerates whitespace
-inside the tags. Used by `qwen`, `chatml`, and any model that emits the
-Hermes-style wrapper.
+inside the tags, and multi-line JSON — the open/close tags anchor the
+match. Used by `QwenChatTemplate`, `ChatMLTemplate`, and any model that
+emits the Hermes-style wrapper.
+
+What Qwen3-0.6B emits in a good run of this app:
+
+[source]
+----
+<tool_call>
+{"name": "get_recent_commits", "arguments": {"days": 7}}
+</tool_call>
+----
+
+…which surfaces as `[STAGE/TOOL CALLS] get_recent_commits({"days":7})`.
+A small model occasionally emits the same block twice in one turn; both
+calls parse, and `RecordingGitCommitsTool` reuses the recorded result for
+the repeat (`[GitTool] … repeated`).
 
 == Strategy 2: Llama 3.1 FUNCTION_TAG
 
-Source: `ToolCallParser.kt:193-213`.
+Source: `Llama3FunctionTagParserStrategy` in `ToolCallParser.kt`.
 
 Regex:
 
@@ -66,14 +88,14 @@ are parsed as JSON from the body.
 
 == Strategy 3: Llama 3.1/3.2 bare JSON
 
-Source: `ToolCallParser.kt:130-183`.
+Source: `Llama31ToolCallParserStrategy` in `ToolCallParser.kt`.
 
 Brace-balancer (not regex). Looks for a `{...}` block whose top level
 contains a `"name"` key. Optionally strips a leading `<|python_tag|>`
 marker. Tolerates prose before and after the JSON.
 
 Both `arguments` and `parameters` are accepted as the args-object key
-(`ToolCallParser.kt:72-74`):
+(`ToolCallParser.parseJsonToolCall`):
 
 [source,kotlin]
 ----
@@ -109,41 +131,47 @@ That should give you the result.
 [IMPORTANT]
 ====
 **The bare-JSON strategy's test suite covers only single-line inputs.**
-See `ToolCallParserTest.kt:122-150`.
+See `ToolCallParserTest.kt` upstream.
 
 In particular: a *multi-line* JSON object wrapped in markdown ` ``` `
-fences (which is what 1B Llama models tend to produce when given a
+fences (which is what small Llama models tend to produce when given a
 "single JSON object on one line" instruction they can't follow) is **not**
 in the test suite, and is empirically not parsed —
 xref:explanation/negative-sample-2026-05-05.adoc[the 2026-05-05 negative
-sample] documents one such failure.
+sample] documents one such failure on the retired Llama-1B tool path.
 
-If you observe this failure mode, two workarounds exist:
-
-. Switch to a model and template that uses an XML wrapper
-  (`qwen`/`chatml`) — the Hermes regex tolerates multi-line JSON because
-  the open/close tags anchor the match.
-. Strip code-fence markers before passing the raw text to
-  `parseToolCalls`. This would need a wrapper around the agent loop.
+This is the practical reason the current pipeline puts the tool call on
+Qwen3 with the `<tool_call>` XML wrapper: the Hermes regex tolerates
+multi-line JSON because the open/close tags anchor the match. What can
+still go wrong with Qwen is a *truncated* block (the 192-token budget
+ran out before `</tool_call>`) or a call with the wrong argument shape;
+both end in `[STAGE/FALLBACK]`, not in a crash.
 ====
 
 == Validation after parsing
 
 Once `parseToolCalls` returns a non-empty list, the agent loop calls
 `ToolCallValidator.validate(call, def)` against the registered
-`ToolDefinition`. On failure the loop:
+`ToolDefinition`'s JSON-schema `parameters` (for `get_recent_commits`:
+`days` integer, required; `author` string, optional). On failure the
+loop:
 
-* Calls `listener?.onToolCallValidationFailed(call, reason)`
+* Calls `listener?.onToolCallValidationFailed(call, reason)` — logged by
+  `QwenCommitsStage` as `[STAGE/TOOL VALIDATION FAILED] <tool>: <reason>`
 * Returns `"validation error: <reason>"` as the tool result
 * Does *not* invoke the tool's `execute`
 
-The model sees the validation error on the next round and can retry with
-correct arguments. Useful when the model omits a required field or sends
-the wrong type.
+In a multi-round loop the model would see the validation error on the
+next round and could retry. This app runs `maxToolRounds = 1`, so a
+validation failure means no commits were recorded and the stage falls
+back to direct git access (`[STAGE/FALLBACK]`). The tool itself adds a
+second, softer check inside `execute` (`days` must be a positive integer,
+strings that parse as integers are accepted) and answers `error: …`
+instead of throwing.
 
 == See also
 
-* `ToolCallParserTest.kt` — the canonical test suite (~190 lines) at
+* `ToolCallParserTest.kt` — the canonical test suite at
   `SKaiNET-transformers/llm-agent/src/commonTest/kotlin/sk/ainet/apps/kllama/chat/ToolCallParserTest.kt`. Read this if you suspect parser behaviour you're unsure about.
 * xref:reference/chat-templates.adoc[Chat templates] — which template
   produces output for which parser strategy.

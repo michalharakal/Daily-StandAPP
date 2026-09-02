@@ -8,7 +8,7 @@
 
 This documentation describes the architecture of *DailyStandApp*, a **privacy-first** Kotlin Multiplatform application that helps developers prepare for daily standup meetings by analyzing git commits and generating AI-powered summaries.
 
-IMPORTANT: *Privacy is the core principle.* All AI processing runs locally using SKaiNET kllama. Git commits contain sensitive information - no data ever leaves the developer's machine.
+IMPORTANT: *Privacy is the core principle.* All AI processing runs locally using SKaiNET (two local GGUF models). Git commits contain sensitive information - no data ever leaves the developer's machine.
 
 The documentation follows the https://arc42.org[arc42] template for software architecture documentation.
 
@@ -89,8 +89,8 @@ benchmark suite against four different LLM engines (SKAINET, Ollama/LM
 Studio, Deliverance, qxotic) to demonstrate engine-independence.
 
 |xref:prompt-engineering:how-to/add-a-new-tool.adoc[How-to guides]
-|Add a new tool to the agent loop, switch chat templates, tune prompts
-for a 1B model, debug with stage logs.
+|Add a new tool to the Qwen tool stage, chat templates per model family, tune prompts
+for small models (0.6B tool stage, 3B summary stage), debug with stage logs.
 
 |xref:prompt-engineering:reference/chat-templates.adoc[Reference]
 |Chat-template formats per family, tool-call parser strategies, stage
@@ -118,7 +118,7 @@ graph TB
 
     subgraph "External Systems"
         GIT[(Git Repositories)]
-        MODELS[(GGUF Models)]
+        MODELS[(GGUF Models<br/>hf:// download cache)]
         MCPCLIENT[MCP Clients<br/>Claude, etc.]
     end
 
@@ -141,9 +141,9 @@ graph TB
 
 == Technology Stack
 
-* *Language*: Kotlin 2.2+ with Multiplatform
-* *Runtime*: JDK 21+ (required for Vector API)
+* *Language*: Kotlin 2.4 with Multiplatform
+* *Runtime*: JDK 25 toolchain (auto-provisioned; Vector API + FFM native kernels)
 * *Build System*: Gradle with Kotlin DSL
-* *AI Engine*: SKaiNET kllama
+* *AI Engine*: SKaiNET 0.53 + SKaiNET-transformers (Qwen3-0.6B tool stage, Llama-3.2-3B summary stage, downloaded on first run)
 * *Git Integration*: Eclipse JGit
 * *Protocol*: Model Context Protocol (MCP) SDK

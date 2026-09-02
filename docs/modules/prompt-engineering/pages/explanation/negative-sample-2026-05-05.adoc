@@ -2,6 +2,8 @@
 :toc: left
 :icons: font
 
+NOTE: Historical. This page documents the retired single-model path (embedded Llama-3.2-1B-Instruct Q8_0, opt-in `STANDAPP_TOOL_CALLING=1` agent loop, SKaiNET 0.36); the current two-model pipeline is described in xref:explanation/agent-loop-internals.adoc[] and xref:reference/model-selection.adoc[].
+
 A worked post-mortem of an end-to-end run of the opt-in tool-calling
 path against the embedded Llama 3.2 1B Q8_0 model. The run failed in
 two distinct ways, each instructive. Documenting the failure honestly

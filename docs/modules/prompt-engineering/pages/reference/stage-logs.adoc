@@ -2,16 +2,22 @@
 :toc: left
 :icons: font
 
-Every `[STAGE/...]` and `[GitTool]` line emitted by the LLM and tool
-layers, what it means, and which code path emits it.
+Every `[PIPELINE]`, `[MODEL]`, `[STAGE/...]` and `[GitTool]` line emitted
+by the model layer and the pipeline stages, what it means, and which code
+path emits it.
 
-All stage logs go to *stderr*, not stdout. Streamed model tokens go to
-stdout. Capture them separately:
+All stage logs go to *stderr*, not stdout. Streamed summariser tokens go
+to stdout (Markdown output without `--output` only). Capture them
+separately:
 
 [source,bash]
 ----
-./gradlew :StandAPP-cli:run --args="…" >stdout.log 2>stderr.log
+./gradlew :StandAPP-cli:run --args="…" >stdout.log 2>stages.log
 ----
+
+The lines appear in pipeline order — the order of the sections below is
+the order you will see them in a default run
+(`qwen-commits -> require-commits -> preprocess -> summarize[prompt -> llama -> parse xN]`).
 
 == Where they're emitted
 
@@ -19,76 +25,270 @@ stdout. Capture them separately:
 |===
 |Tag |Source
 
-|`[STAGE/MODEL LOAD]`
-|`ToolCallingLLMService.kt` (companion `create`) and `SKaiNetLLMService.kt`
-(companion `create`)
+|`[PIPELINE]`
+|`Main.kt` — `flow.describe()` of the built `DataPipeline`, printed once
+before execution
 
-|`[STAGE/INPUT]`
-|`SKaiNetLLMService.kt:generate` and `ToolCallingLLMService.kt:generate`
-(start of the call)
+|`[MODEL]`
+|`model/ModelResolver.kt` (resolve / download / cache hit) and
+`model/ModelProvider.kt` (release)
 
-|`[STAGE/SYSTEM PROMPT]`
-|Both services, after `[STAGE/INPUT]`
+|`[MODEL LOAD]`
+|`model/LocalModel.kt:load` — two lines bracketing the GGUF load
 
-|`[STAGE/USER PROMPT]`
-|Both services, after `[STAGE/SYSTEM PROMPT]`
-
-|`[STAGE/TOOL REGISTERED]`
-|`ToolCallingLLMService.kt` only — one line per registered tool
-
-|`[STAGE/RENDERED CHAT TEMPLATE (round 0)]`
-|`ToolCallingLLMService.kt` only — the full string going into the
-tokenizer for round 0
-
-|`[STAGE/WRAPPED PROMPT (Llama 3 turn tags)]`
-|`SKaiNetLLMService.kt` only — equivalent of the rendered template for
-the raw single-shot path
-
-|`[STAGE/PREFILL DONE]`
-|Both services — emitted on first generated token, with TTFT in ms
-
-|`[STAGE/COMPLETE]`
-|Both services — emitted at end with totals (tokens, ms, tok/s, final
-char count)
-
-|`[STAGE/FINAL ANSWER]`
-|Both services — full answer text on stderr (the same text is also
-returned to the caller)
+|`[STAGE/QWEN]`, `[STAGE/QWEN RENDERED PROMPT]`, `[STAGE/QWEN PREFILL DONE]`,
+`[STAGE/QWEN RESPONSE]`, `[STAGE/TOOL CALLS]`, `[STAGE/TOOL RESULT]`,
+`[STAGE/TOOL VALIDATION FAILED]`, `[STAGE/QWEN COMPLETE]`, `[STAGE/FALLBACK]`
+|`pipeline/QwenCommitsStage.kt` — the tool-calling stage and its
+`AgentListener`
 
 |`[GitTool]`
-|`GitTools.kt` only — emitted when `GetRecentCommitsTool.execute` is
-called. Contains arguments and result size.
+|`GitTools.kt` — `RecordingGitCommitsTool.execute`
+
+|`[STAGE/GIT]`
+|`pipeline/Stages.kt:GitCommitsStage` — direct JGit path (`--since`,
+`--commits git`, REST backend, or the Qwen fallback)
+
+|`[STAGE/COMMITS]`
+|`pipeline/Stages.kt:RequireCommitsStage`
+
+|`[STAGE/PROMPT]`
+|`pipeline/Stages.kt:PromptStage`
+
+|`[STAGE/INPUT]`, `[STAGE/SYSTEM PROMPT]`, `[STAGE/USER PROMPT]`,
+`[STAGE/WARN]`, `[STAGE/PREFILL]`, `[STAGE/PREFILL DONE]`,
+`[STAGE/COMPLETE]`, `[STAGE/FINAL ANSWER]`
+|`pipeline/LlamaGenerateStage.kt` — the summariser
+
+|`[STAGE/PARSE]`
+|`pipeline/RetryingSummarizeStage.kt` — strict-parse rejections
+
+|`[LLMServiceFactory]`
+|`LLMServiceFactory.kt` — only for callers that go through the plain
+`LLMService` factory (benchmark, MCP server), not the CLI pipeline
 |===
+
+Every `[STAGE/...]` line is produced by `pipeline/StageLog.kt`: `stage()`
+prints a one-liner, `block()` prints a multi-line body bracketed by
+`[STAGE/<label>] >>>` and `[STAGE/<label>] <<<`.
 
 == Per-tag detail
 
-=== `[STAGE/MODEL LOAD]`
+=== `[PIPELINE]`
 
 [source]
 ----
-[STAGE/MODEL LOAD] path=/home/.../Llama-3.2-1B-Instruct-Q8_0.gguf template=llama3
-[STAGE/MODEL LOAD] done
+[PIPELINE] qwen-commits -> require-commits -> preprocess -> summarize[prompt -> llama -> parse x2]
 ----
 
-Two lines bracket model loading. The first prints the GGUF path and chat
-template; the second prints when `KLlamaJava.loadGGUF` returns. Long gaps
-between them indicate disk-IO or initial JIT cost.
+The stage chain of the built pipeline. `x2` appears when
+`retryOnInvalid(maxAttempts = 2)` is on (JSON output); `x1` otherwise.
+With `--commits git`, `--since`, or the REST backend the first stage
+reads `git-commits`, and `rest-api` replaces `llama`.
+
+=== `[MODEL]`
+
+[source]
+----
+[MODEL] qwen3-0.6b: resolving hf://Qwen/Qwen3-0.6B-GGUF@main/Qwen3-0.6B-Q8_0.gguf (cache=/home/me/.cache/standapp/models, policy=Use)
+[MODEL] downloading Qwen3-0.6B-Q8_0.gguf: 64/609 MB
+[MODEL] qwen3-0.6b: downloaded -> /home/me/.cache/standapp/models/…/Qwen3-0.6B-Q8_0.gguf (609 MB)
+[MODEL] llama-3.2-3b-instruct: using local file from STANDAPP_LLAMA_MODEL_PATH -> /models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
+[MODEL] llama-3.2-3b-instruct: cache hit -> … (1925 MB)
+[MODEL] qwen3-0.6b: released
+----
+
+Model resolution and lifetime. `resolving` names the URI, cache directory
+and `CachePolicy` (`Use`, or `Offline` under `STANDAPP_OFFLINE=1`).
+Download progress is reported every 64 MB. `using local file from
+<origin>` shows which override won (`flag`, `STANDAPP_*_MODEL_PATH`, or
+`MCP_LLM_MODEL_PATH`); an override that is itself an `hf://` or `https://`
+URI logs `<origin> -> <uri>` and then downloads. A `WARNING: … may be
+truncated` line follows when a downloaded catalog file is more than 10 %
+smaller than expected. `released` is printed by the default
+`ModelProvider.releasing()` after each stage; with `--keep-models` it never
+appears.
+
+=== `[MODEL LOAD]`
+
+[source]
+----
+[MODEL LOAD] qwen3-0.6b: arch=qwen3 family=qwen path=/home/me/.cache/standapp/models/…/Qwen3-0.6B-Q8_0.gguf
+[MODEL LOAD] qwen3-0.6b: done in 2143ms — layers=28 ctx=40960 (window 4096) vocab=151936 bos=151643 stop=[151645, 151643]
+----
+
+Two lines bracket `LocalModel.load`: GGUF metadata was read and the
+architecture accepted (`qwen2`/`qwen3`/`qwen35` for the tool stage,
+`llama`/`mistral` for the summariser); then weights are memory-mapped,
+the network built and the runtime created. `window` is
+`min(ctx, 4096)` — the longest prompt + generation the KV cache holds.
+`stop` lists every token id that ends a turn. A long gap between the two
+lines is disk IO plus native kernel-pack installation on the first load.
+
+=== `[STAGE/QWEN]`
+
+[source]
+----
+[STAGE/QWEN] tools=[get_recent_commits] maxTokens=192 temp=0.0 thinking=off
+----
+
+Start of the tool-calling round: registered tool names (plus any extra
+tools passed to `qwenToolCall(tools = …)`), the per-round token budget,
+greedy sampling, and thinking disabled.
+
+=== `[STAGE/QWEN RENDERED PROMPT]`
+
+The single most useful debugging artefact for the tool stage: the full
+string the tokenizer sees, as rendered by
+`QwenChatTemplate(enableThinking = false)` — the system turn with the
+`<tools>` block, the user turn, and the assistant prefix with the empty
+`<think></think>` prefill. Bracketed by `>>>` / `<<<`. Only one round is
+ever rendered (`maxToolRounds = 1`), so this is the whole conversation.
+
+=== `[STAGE/QWEN PREFILL DONE]`
+
+[source]
+----
+[STAGE/QWEN PREFILL DONE] first token after 18234ms
+----
+
+Time-to-first-token of the tool round, measured from the start of
+`runWithEncoder`.
+
+=== `[STAGE/QWEN RESPONSE]`
+
+The raw text Qwen produced for the round (bracketed). Normally a
+`<tool_call>{…}</tool_call>` block; if you see prose or a truncated block
+here, the fallback will follow.
+
+=== `[STAGE/TOOL CALLS]`
+
+[source]
+----
+[STAGE/TOOL CALLS] get_recent_commits({"days":7})
+----
+
+Tool calls parsed from the response, name and JSON arguments. Absence of
+this line after a `[STAGE/QWEN RESPONSE]` that visibly contains a
+`<tool_call>` block is the signature of a parser miss (see
+xref:reference/tool-call-parsers.adoc[]).
+
+=== `[GitTool]`
+
+[source]
+----
+[GitTool] get_recent_commits(repo=/path/to/repo, days=7, author=*)
+[GitTool] result: 12 commit(s) recorded
+----
+
+Emitted from inside the tool's `execute`. A third form,
+`… repeated; reusing N recorded commit(s)`, appears when the model emitted
+the same call twice in one turn.
+
+=== `[STAGE/TOOL RESULT]`
+
+[source]
+----
+[STAGE/TOOL RESULT] get_recent_commits: ok: 12 commit(s) found in the last 7 day(s)
+----
+
+The string the tool returned. In this pipeline it is only an
+acknowledgement — the structured commit list is recorded on the tool
+object and never fed back to the model. A result starting with `error:`
+means the arguments were unusable (`days` missing, non-positive, …) or
+git failed.
+
+=== `[STAGE/TOOL VALIDATION FAILED]`
+
+[source]
+----
+[STAGE/TOOL VALIDATION FAILED] get_recent_commits: missing required property 'days'
+----
+
+`ToolCallValidator` rejected the call against the tool's JSON-schema
+parameters; the tool was *not* executed. Followed by `[STAGE/FALLBACK]`.
+
+=== `[STAGE/QWEN COMPLETE]`
+
+[source]
+----
+[STAGE/QWEN COMPLETE] 41207ms
+----
+
+Wall time of the whole agent round (prefill, decode, tool execution).
+
+=== `[STAGE/FALLBACK]`
+
+[source]
+----
+[STAGE/FALLBACK] Qwen did not produce a usable get_recent_commits call (calls=[] validation=[] lastResponse=…); fetching commits directly
+----
+
+The tool stage gave up on the model and fetched the commits through JGit
+instead. The parenthesised reason lists the calls heard, validation
+failures, any exception, and the last 200 characters of the model's
+response. A `[STAGE/GIT]` line follows, and `[STAGE/COMMITS]` reports
+`via DIRECT_FALLBACK`.
+
+=== `[STAGE/GIT]`
+
+[source]
+----
+[STAGE/GIT] repo=/path/to/repo author=* window=2026-08-26T09:00:00Z .. 2026-09-02T09:00:00Z
+----
+
+Direct JGit fetch with the resolved time window. Printed by
+`GitCommitsStage` — on the fallback, with `--commits git`, with
+`--since/--until`, or with the REST backend.
+
+=== `[STAGE/COMMITS]`
+
+[source]
+----
+[STAGE/COMMITS] 12 commit(s) via QWEN_TOOL_CALL
+----
+
+The commit count that enters the summariser and how it was obtained:
+`QWEN_TOOL_CALL`, `DIRECT`, or `DIRECT_FALLBACK`. An empty window does
+not print this line; it raises `NoCommitsException` (exit 3) instead.
+
+=== `[STAGE/PROMPT]`
+
+[source]
+----
+[STAGE/PROMPT] type=SUMMARY system=91ch user=1412ch
+----
+
+Rendered prompt sizes in *characters*, after `preprocess { }` has trimmed
+the commit list.
 
 === `[STAGE/INPUT]`
 
 [source]
 ----
-[STAGE/INPUT] system=241ch user=284ch tools=1 template=llama3 temp=0.6 maxTokens=512
+[STAGE/INPUT] model=llama-3.2-3b-instruct promptTokens=436 maxTokens=512 temp=0.1 topP=0.9 attempt=1
 ----
 
-Sizes in *characters*, not tokens. `tools=0` for the default single-shot
-path (which has no tools).
+Start of one summariser generation: prompt length in *tokens*, the
+effective generation budget, sampling parameters, and the attempt number
+(`2` on a JSON retry).
+
+=== `[STAGE/WARN]`
+
+[source]
+----
+[STAGE/WARN] maxTokens clamped 512 -> 300 to fit the 4096-token window
+----
+
+Only when prompt + `--max-tokens` would exceed the inference window. A
+prompt that alone exceeds the window fails with an `IllegalArgumentException`
+asking you to shorten it.
 
 === `[STAGE/SYSTEM PROMPT]` and `[STAGE/USER PROMPT]`
 
-The full text of the system and user prompts, before the chat template
-renders them. Bracketed by `>>>` and `<<<` lines so you can grep them out
-if needed:
+The full text of the system and user prompts before `Llama3ChatTemplate`
+wraps them in turn tags. Bracketed by `>>>` and `<<<` lines so you can
+grep them out if needed:
 
 [source]
 ----
@@ -97,96 +297,77 @@ if needed:
 [STAGE/SYSTEM PROMPT] <<<
 ----
 
-=== `[STAGE/TOOL REGISTERED]`
+=== `[STAGE/PREFILL]`
 
 [source]
 ----
-[STAGE/TOOL REGISTERED] get_recent_commits — List git commits …
+[STAGE/PREFILL] 436/436
 ----
 
-Only emitted on the tool-calling path. One line per tool. The
-description shown is the same one rendered into the system message — if
-this is wrong, the model sees something wrong.
-
-=== `[STAGE/RENDERED CHAT TEMPLATE (round 0)]`
-
-The single most useful debugging artefact. This is the full string the
-tokenizer sees for round 0 of the agent loop, including:
-
-* Llama 3 turn tags (or the equivalent for whichever template you're using)
-* Tool schema rendered into the system message
-* Any user-supplied system prompt merged in
-* The user message
-* The trailing `<|start_header_id|>assistant<|end_header_id|>` that prompts
-  the model to start generating
-
-The agent loop re-renders on every round (with all prior tool messages
-appended), but only round 0 is logged. If you need later rounds, add
-extra logging to `ToolCallingLLMService` or wait for upstream to expose
-`AgentListener` (xref:architecture:11-risks-technical-debt.adoc[TR-09]).
-
-=== `[STAGE/WRAPPED PROMPT (Llama 3 turn tags)]`
-
-The single-shot equivalent of the rendered chat template. Unlike the
-agent-loop path, this is built by hand in `formatLlama3Turn` rather than
-delegated to SKaiNET-transformers. Useful when comparing what the
-default path sends vs the agent-loop path.
+Prefill progress, printed every 512 tokens and at the end. Prefill runs in
+batches of 64 tokens; on the row-major CPU kernel it costs about as much
+per token as decode, so a long prompt sits here for a while.
 
 === `[STAGE/PREFILL DONE]`
 
 [source]
 ----
-[STAGE/PREFILL DONE] first token after 12345ms
+[STAGE/PREFILL DONE] first token after 131502ms
 ----
 
-Time-to-first-token (TTFT) in milliseconds. On a fast x86_64 with native
-CPU kernels, expect sub-second TTFT for short prompts. TTFT > 60 s on a
-short prompt usually means the native kernels didn't load (Panama Vector
-fallback only).
+Time-to-first-token (TTFT) of the summariser, in milliseconds. On an
+i7-9750H the 3B Q4_K_M model needs roughly 0.3 s per prompt token, so a
+400-token prompt gives a TTFT around two minutes. Many times slower than
+that on a short prompt usually means the native kernel library could not
+be loaded (for example a `noexec` temp directory).
 
 === `[STAGE/COMPLETE]`
 
-Default path:
-
 [source]
 ----
-[STAGE/COMPLETE] 245 tokens in 8743ms (28.02 tok/s)
+[STAGE/COMPLETE] 245 tokens in 213743ms (1.15 tok/s) stoppedByEos=true
 ----
 
-Tool-calling path:
-
-[source]
-----
-[STAGE/COMPLETE] tokensSeen=245 totalMs=8743 (28.02 tok/s) finalChars=1024
-----
-
-`tokensSeen` is the total tokens *streamed across all rounds*, not just
-the final round. `totalMs` is wall time including all prefills and tool
-executions.
+Totals for one generation: tokens produced, wall time *including prefill*,
+throughput over that wall time, and whether a stop token (`<|eot_id|>` /
+`<|end_of_text|>`) ended the answer. `stoppedByEos=false` means the
+budget ran out — expect a truncated summary.
 
 === `[STAGE/FINAL ANSWER]`
 
-The full final answer text, bracketed by `>>>` / `<<<`. The same text is
-also what the CLI prints to stdout, so this can feel redundant — but
-having it on stderr lets you save the answer for diff/regression checks
-without scraping stdout.
+The full raw answer text, bracketed by `>>>` / `<<<`. The same text is also
+what the CLI renders to stdout, so this can feel redundant — but having
+it on stderr lets you save the answer for diff/regression checks without
+scraping stdout.
 
-=== `[GitTool]`
+=== `[STAGE/PARSE]`
 
 [source]
 ----
-[GitTool] get_recent_commits(repo=/path/to/repo, days=2, author=*)
-[GitTool] result: 12 commits, 856 chars
+[STAGE/PARSE] attempt 1 rejected: Unexpected JSON token at offset 0
 ----
 
-Two lines per tool invocation: the parsed arguments, then the result
-size. *Absence of this line in your stage log when the model emits a
-tool-call JSON in stdout is the signature of a parser miss* — see
-xref:how-to/debug-with-stage-logs.adoc[the debug guide].
+`SummaryParser` rejected the output in strict mode; the summariser runs
+again while attempts remain. The last attempt parses leniently and never
+throws.
+
+=== `[LLMServiceFactory]`
+
+[source]
+----
+[LLMServiceFactory] Selected backend: SKAINET
+----
+
+Backend selection for callers of the plain `LLMService` interface. The
+CLI pipeline does not go through the factory, so you will not see this
+line in a normal `standapp` run.
 
 == See also
 
 * xref:how-to/debug-with-stage-logs.adoc[How-to: debug with stage logs] —
   symptom-driven decision tree.
+* xref:tutorials/first-tool-call.adoc[Tutorial: your first tool call] —
+  reading the Qwen lines of a default run.
 * xref:explanation/negative-sample-2026-05-05.adoc[Negative sample] — a
-  real failure walked through with these logs.
+  real failure on the retired single-model path, walked through with the
+  stage logs of that time.

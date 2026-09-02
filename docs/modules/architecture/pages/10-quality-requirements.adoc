@@ -92,7 +92,7 @@ graph TB
 |Same JAR works on all platforms
 
 |QS-PORT2
-|Use with different JDK 21+ distributions
+|Use with different JDK 25 distributions (toolchain auto-provisioned)
 |Application runs correctly
 |Tested on OpenJDK, Temurin, GraalVM
 |===
@@ -132,7 +132,7 @@ graph TB
 
 |*Portability*
 |2
-|Works on JDK 21+ any OS
+|Works on the JDK 25 toolchain on any OS
 |CI builds on multiple platforms
 
 |*Reliability*

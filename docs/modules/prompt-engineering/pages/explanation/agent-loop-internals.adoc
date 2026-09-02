@@ -2,8 +2,9 @@
 :toc: left
 :icons: font
 
-What `JavaAgentLoop.chat(...)` does between "you call it" and "it returns".
-This page is the conceptual companion to
+What `AgentLoop.runWithEncoder(...)` does between "the Qwen stage calls
+it" and "it returns" — and why this app deliberately lets it run a single
+round. This page is the conceptual companion to
 xref:architecture:08-crosscutting-concepts.adoc[Architecture §8.7] —
 that section is structural ("the loop has these components"); this page
 is dynamic ("the loop runs through these steps").
@@ -14,8 +15,71 @@ that — what the model actually does between "tokens go in" and "tokens
 come out" (tokenization, prefill, decode, KV cache) — is documented in
 xref:explanation/inference-stages.adoc[Inference stages]. Read that one
 first if you've never thought about the inference pipeline; it's the
-prerequisite for understanding why the agent loop's per-round costs are
-shaped the way they are.
+prerequisite for understanding why the loop's per-round costs are shaped
+the way they are.
+
+== How the app constructs the loop
+
+Source: `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/pipeline/QwenCommitsStage.kt`,
+`runAgent`. The loop is the upstream
+`sk.ainet.apps.kllama.chat.AgentLoop` (SKaiNET-transformers 0.53.0),
+built once per pipeline run:
+
+[source,kotlin]
+----
+val registry = ToolRegistry().apply {
+    register(tool)                 // RecordingGitCommitsTool
+    extraTools.forEach(::register) // qwenToolCall(tools = …)
+}
+val template = QwenChatTemplate(enableThinking = false)
+val agent = AgentLoop(
+    runtime = model.runtime,       // OptimizedLLMRuntime, DIRECT mode
+    template = template,
+    toolRegistry = registry,
+    eosTokenId = model.primaryEosTokenId,   // <|im_end|>
+    config = AgentConfig(
+        maxToolRounds = 1,
+        maxTokensPerRound = 192,
+        temperature = 0.0f,
+        prefillStrategy = PrefillStrategy.Batched(64),
+    ),
+    decode = { model.tokenizer.decode(it) },
+)
+val messages = mutableListOf(
+    ChatMessage(ChatRole.SYSTEM, systemPrompt),
+    ChatMessage(ChatRole.USER, userPrompt(input)),
+)
+val result = agent.runWithEncoder(messages, encode = { model.tokenizer.encode(it) }, listener = listener)
+----
+
+`runWithEncoder` is the variant that takes the real tokenizer's `encode`;
+the plain `run` has no encoder and throws. Every configuration value
+above is deliberate:
+
+[cols="1,3"]
+|===
+|Setting |Why
+
+|`maxToolRounds = 1`
+|One generation, one tool execution, return. The tool records the
+structured commit list; there is nothing for the model to say afterwards.
+
+|`maxTokensPerRound = 192`
+|A `<tool_call>` block with two arguments is ~30 tokens. The budget
+leaves room for a stray sentence but caps the damage when the model
+rambles instead of calling.
+
+|`temperature = 0`
+|Greedy decoding — there is exactly one correct answer.
+
+|`PrefillStrategy.Batched(64)`
+|The rendered tool prompt is ~300 tokens; batched prefill cuts the
+per-call overhead compared with the default autoregressive prefill.
+
+|`QwenChatTemplate(enableThinking = false)`
+|Pre-fills an empty `<think></think>` block so a 0.6B model does not
+spend its 192 tokens reasoning before it reaches the call.
+|===
 
 == One round of the loop
 
@@ -27,9 +91,9 @@ stateDiagram-v2
     Reset --> Render
     Render: template.apply(messages, tools, addGenerationPrompt=true)
     Render --> Encode
-    Encode: tokenizer.encode(rendered)
+    Encode: encode(rendered)  (tokenizer)
     Encode --> Generate
-    Generate: runtime.generateUntilStop()<br/>(stream tokens until EOS or maxTokens)
+    Generate: runtime.generateUntilStop()<br/>(stream tokens until EOS or maxTokensPerRound)
     Generate --> ParseThinking
     ParseThinking: template.parseThinkingBlocks(rawText)
     ParseThinking --> Strip
@@ -47,81 +111,74 @@ stateDiagram-v2
     Execute: ToolRegistry.execute(call)<br/>(invokes Tool.execute)
     Execute --> AppendToolMsg
     AppendToolMsg: messages.add(ChatMessage(TOOL, result, callId))
-    AppendToolMsg --> Reset: next round
+    AppendToolMsg --> [*]: maxToolRounds reached (this app)
+    AppendToolMsg --> Reset: next round (generic loop)
 ----
 
-Each transition can be observed in stage logs and in the streamed token
-output.
+Each transition can be observed through the `AgentListener` and shows up
+in the stage logs.
 
 == The five-step lifecycle in detail
 
 === 1. Reset
 
-`runtime.reset()` drops the KV cache from any prior round. This is why
-re-rendering the full conversation is necessary: the cache from round N-1
-is gone, so round N starts the prefill from scratch.
-
-Why drop the cache? Because the rendered prompt for round N includes new
-TOOL messages that weren't in round N-1's prompt. Reusing cache across
-different prompts gives wrong results. The choice is between:
-
-* Drop cache, re-render fully (current approach — simple, correct, slow).
-* Maintain prefix-shared cache and only prefill the new tokens (faster
-  but requires careful prompt design and per-round invariants).
-
-SKaiNET-transformers picks the simple option. This is fine for short
-conversations; it's the dominant cost for long ones (see
-xref:explanation/why-prompts-matter-on-small-models.adoc[the prefill
-math]).
+`runtime.reset()` drops the KV cache from any prior round. In the generic
+loop this is why re-rendering the full conversation is necessary: the
+cache from round N-1 is gone, so round N starts the prefill from
+scratch. With a single round it simply guarantees a clean cache — the
+Qwen model was just loaded (or, with `--keep-models`, may have served an
+earlier request).
 
 === 2. Render and encode
 
-`ChatTemplate.apply(messages, tools, addGenerationPrompt=true)` produces
-the full string for the tokenizer. Three parts merge:
+`QwenChatTemplate.apply(messages, tools, addGenerationPrompt = true)`
+produces the full string for the tokenizer:
 
-* The base system message (often a hardcoded family-specific intro,
-  e.g. "You are Qwen, created by Alibaba Cloud.").
-* The tool schema, rendered into the system message in the family's
-  format (`<tools>`-wrapped JSON for Qwen, bare JSON for Llama 3, etc.).
-* The user-supplied system prompt (merged in by `mergeToolSystem` —
-  the user's text is appended *after* the family prefix and tool schema).
-* The conversation: user turns, assistant turns (including any prior tool
-  calls), tool turns.
-* The trailing assistant prefix (`<|start_header_id|>assistant…` for
-  Llama 3) that prompts the model to start generating.
+* The system turn: the caller's system prompt
+  (`QwenCommitsStage.DEFAULT_SYSTEM_PROMPT`), then the `# Tools` section
+  with every registered tool as one JSON object per line inside
+  `<tools></tools>` and the `<tool_call>` format instruction. No
+  "You are Qwen" persona is injected.
+* The user turn: `Fetch the git commits from the last 7 day(s) using
+  get_recent_commits. Pass days=7 as a number.`
+* The assistant prefix `<|im_start|>assistant\n` followed by the empty
+  think block.
 
-`tokenizer.encode(rendered)` produces the `IntArray` of token IDs. This
-is the input to the next step.
+The stage logs exactly this string as `[STAGE/QWEN RENDERED PROMPT]`.
+`encode(rendered)` — the closure passed to `runWithEncoder` — produces
+the `IntArray` of token IDs.
 
 === 3. Generate
 
-`runtime.generateUntilStop` runs the model autoregressively. For each
-position:
+`runtime.generateUntilStop` runs the model autoregressively with the
+config's temperature and prefill strategy. For each position:
 
-. Sample a token ID from the model's output distribution (with the
-  configured `temperature`).
-. If it equals `eosTokenId`, stop.
+. Sample a token ID from the model's output distribution (greedy at
+  temperature 0).
+. If it equals `eosTokenId` (`<|im_end|>`), stop.
 . If we've produced `maxTokensPerRound` tokens, stop.
 . Otherwise, feed back as the next input token and continue.
 
-The `onToken` callback is invoked per token, decoded to a string fragment.
-This is what `ToolCallingLLMService` uses to stream to stdout.
+`listener.onToken` fires per decoded fragment — the stage uses the first
+call to log `[STAGE/QWEN PREFILL DONE]`. `listener.onPrefillProgress`
+exists upstream but the stage does not log it. When generation ends,
+`listener.onAssistantMessage(rawText)` delivers the whole response
+(`[STAGE/QWEN RESPONSE]`).
 
 === 4. Parse
 
-The raw text output goes through three parsers in sequence (most strict
-first):
+The raw text output goes through three parsers in sequence:
 
-. `template.parseThinkingBlocks(rawText)` — extracts any reasoning
-  blocks (Gemma 4's `<|think>...<think|>`, etc.). These are emitted to
-  the listener but *stripped from the conversation* — the next round
-  doesn't see them. This keeps reasoning private and prevents the model
-  from chaining its own thinking across rounds.
+. `template.parseThinkingBlocks(rawText)` — extracts `<think>…</think>`
+  blocks and reports each through `listener.onThinking`. With thinking
+  disabled this list is normally empty; a model that "thinks anyway"
+  still gets its reasoning stripped from what is persisted.
 . `template.stripThinking(rawText)` — produces the visible response
-  (raw text minus thinking blocks). This is what gets persisted to the
-  conversation if no tool calls are found.
-. `template.parseToolCalls(rawText)` — extracts structured `ToolCall`
-  objects. The strategies are documented in
+  (raw text minus thinking blocks, and minus an *unterminated* block
+  when the budget ran out mid-thought).
+. `template.parseToolCalls(rawText)` — `QwenChatTemplate` inherits the
+  default, which runs `ToolCallParser.parse`: the Hermes `<tool_call>`
+  strategy matches Qwen's output. The strategies are documented in
   xref:reference/tool-call-parsers.adoc[the parser reference].
 
 The parser runs against the *raw* text, not the stripped one. This lets
@@ -130,58 +187,87 @@ a model emit a thinking block and a tool call in the same response.
 === 5. Decision: tool calls or final answer?
 
 If `parseToolCalls` returns an empty list, the assistant message is
-treated as the final answer. The visible (thinking-stripped) text is
-appended to the conversation as an `ASSISTANT` message; `onComplete` is
-called; the loop exits and returns.
+treated as the final answer: it is appended to `messages`,
+`listener.onComplete` is called, and `runWithEncoder` returns the visible
+text. For this app that is a *failure* — no commits were recorded — and
+`QwenCommitsStage` answers with `[STAGE/FALLBACK]`.
 
 If there are tool calls:
 
+. `listener.onToolCalls(calls)` — `[STAGE/TOOL CALLS]`.
+. The assistant message is appended with its structured `toolCalls`.
 . Each call is validated against its registered `ToolDefinition`'s JSON
-  schema by `ToolCallValidator`. Invalid calls return their error as
-  the tool result *without* invoking the actual `Tool.execute`. The
-  model sees the error on the next round and can retry.
+  schema by `ToolCallValidator`. An invalid call reports
+  `listener.onToolCallValidationFailed(call, reason)`
+  (`[STAGE/TOOL VALIDATION FAILED]`) and yields the string
+  `validation error: <reason>` as its result *without* invoking
+  `Tool.execute`.
 . Valid calls are dispatched via `ToolRegistry.execute`, which calls the
-  registered `Tool.execute(arguments: JsonObject)`. The string result
-  becomes a `TOOL` message appended to the conversation.
-. The loop iterates.
+  registered `Tool.execute(arguments: JsonObject)`.
+  `RecordingGitCommitsTool` fetches the commits through JGit, stores
+  them in `recorded`, and returns a one-line acknowledgement.
+. `listener.onToolResult(call, result)` — `[STAGE/TOOL RESULT]` — and
+  the result is appended as a `TOOL` message.
+. The loop would now iterate; with `maxToolRounds = 1` it exits the
+  `for` loop instead, calls `listener.onComplete(lastVisibleResponse)`
+  and returns.
 
-== Bounds: why `maxToolRounds=5`
+`QwenCommitsStage` then ignores the returned string entirely. It checks
+`tool.failure` (a git exception becomes exit code 3), then
+`tool.recorded`: a non-null list becomes a `CommitBatch` tagged
+`QWEN_TOOL_CALL`; otherwise the stage builds a reason string from
+everything the listener heard and falls back to `GitCommitsStage`
+(`DIRECT_FALLBACK`). Either way the pipeline continues — the CLI always
+delivers a summary.
 
-The default `AgentConfig` caps at 5 rounds. After that, the loop returns
-the last visible assistant message regardless. This is a safety net for
-runaway models that keep emitting tool calls.
+== Bounds: why `maxToolRounds = 1` here, and 5 upstream
 
-In practice:
+The upstream default `AgentConfig` caps at 5 rounds. After that, the
+loop returns the last visible assistant message regardless. In a
+chat-style agent the happy path is two rounds — round 0 emits the call,
+round 1 turns the tool result into an answer — and the cap is a safety
+net for runaway models.
 
-* Round 0: generate first response, often a tool call.
-* Round 1: tool result fed back, generate the answer.
-* That's the happy path — *two* rounds, not five.
+This pipeline does not want round 1. The tool result the model would
+see is `ok: 12 commit(s) found in the last 7 day(s)`; letting a 0.6B
+paraphrase that costs another full prefill (the whole conversation is
+re-rendered and re-prefilled every round — see
+xref:explanation/inference-stages.adoc[]) and produces nothing the
+summariser can use. The structured list goes straight from the tool to
+the next `PipelineStage`, and Llama 3.2 3B writes the prose.
 
-If a model is hitting round 5, something is wrong: it's stuck in a
-"think then call" loop, the model wasn't trained for tool calling, or
-the prompt is incompatible with the model. The cap stops it; you should
-diagnose with stage logs.
+If you raise `maxToolRounds` for an experiment, remember that Qwen's
+tool results are rendered as *user* turns with `<tool_response>` blocks,
+that the stage's system prompt says "call the tool exactly once", and
+that `RecordingGitCommitsTool` reuses its recorded result when the same
+call is repeated.
 
 == What the loop does *not* do
 
+* **Feed results back to the model** — not in this app (one round).
 * **Streaming output across tool calls.** The token callback fires
-  during generation, but tool execution is synchronous and blocks the
-  stream. The user sees the model's tokens streamed, then a pause for
-  tool execution, then the next round's tokens.
+  during generation, but tool execution is synchronous. The stage does
+  not stream Qwen's tokens to stdout at all; only the summariser's
+  tokens are streamed.
 * **Parallel tool execution.** Tool calls within a round are executed
   sequentially in iteration order.
-* **Memory across `chat(...)` invocations.** Each `JavaAgentLoop.chat`
-  starts with the system prompt only (in the
-  `JavaAgentLoop.reset()` sense). For multi-turn conversation, you'd
-  need to manage the message list yourself or extend the facade.
+* **Memory across invocations.** `QwenCommitsStage.process` builds a
+  fresh `messages` list and a fresh `RecordingGitCommitsTool` per
+  request.
+* **Multi-tool planning.** Extra tools passed through
+  `qwenToolCall(tools = …)` are rendered into `<tools>` and can be
+  called in the same single round, but only `get_recent_commits`
+  feeds the pipeline; other tools must record their own side effects.
 
 == See also
 
-* `AgentLoop.kt:102-167` upstream — the actual implementation; ~70 lines
-  and worth reading for confirmation.
+* `AgentLoop.kt` upstream — `runWithEncoder` is ~70 lines and worth
+  reading for confirmation.
 * xref:reference/stage-logs.adoc[Stage logs] — what each transition above
   emits in the logs.
 * xref:reference/tool-call-parsers.adoc[Tool-call parsers] — what
   `parseToolCalls` accepts.
+* xref:how-to/add-a-new-tool.adoc[How-to: add a new tool] — registering
+  extra tools for the round.
 * xref:architecture:08-crosscutting-concepts.adoc[Architecture §8.7] —
   the structural view of the same machinery.

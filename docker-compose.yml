@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mcp-server:
     build:
@@ -155,12 +153,12 @@ services:
   #   depends_on:
   #     - prometheus
 
-volumes:
-  # Uncomment if using Prometheus/Grafana
-  # prometheus-data:
-  #   driver: local
-  # grafana-data:
-  #   driver: local
+# Named volumes — uncomment together with the Prometheus/Grafana services above.
+# volumes:
+#   prometheus-data:
+#     driver: local
+#   grafana-data:
+#     driver: local
 
 networks:
   default:

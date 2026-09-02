@@ -3,15 +3,12 @@
 :toclevels: 3
 :icons: font
 
-[IMPORTANT]
+[NOTE]
 ====
-**Doc status (2026-05-05):** the SKAINET backend now has two paths.
-The default (§6.5) is the single-shot one: CLI pre-fetches commits and hands the
-model a fully-formed prompt via `SKaiNetLLMService` — no agent loop, no tool
-parsing. Setting `STANDAPP_TOOL_CALLING=1` opts into the agent-loop path (§6.2):
-`ToolCallingLLMService` builds a `JavaAgentLoop` with a single `get_recent_commits`
-tool and lets the model drive the fetch. The 1B reliability problem from 2026-04-30
-is unsolved — opt-in is the compromise. See ADR-011.
+**Doc status (2026-09):** the SKAINET backend is the two-model pipeline of
+xref:09-architecture-decisions.adoc#adr-012[ADR-012]: §6.2 shows the default
+run (Qwen3-0.6B tool call → Llama-3.2-3B summary), §6.3 the first-run model
+download and load. The former single-shot and opt-in agent-loop paths are gone.
 ====
 
 == 6.1 MCP Tool Call: Get Commits by Author
@@ -51,131 +48,147 @@ sequenceDiagram
     Transport-->>Client: tool result
 ----
 
-== 6.2 LLM Standup Summary via Agent Loop (SKAINET, opt-in)
+== 6.2 LLM Standup Summary — Two-Model Pipeline (SKAINET, default)
 
-Opt-in via `STANDAPP_TOOL_CALLING=1`. The CLI does not pre-fetch commits — it hands
-the model a short task prompt, and the agent loop drives a single `get_recent_commits`
-tool call before producing the summary. See §8 (Crosscutting Concepts) for the chat
-template + tool-call processing details.
-
-[mermaid]
-----
-sequenceDiagram
-    participant User
-    participant CLI as StandAPP-cli
-    participant Factory as LLMServiceFactory
-    participant EML as EmbeddedModelLoader
-    participant Service as ToolCallingLLMService
-    participant Agent as JavaAgentLoop
-    participant Model as KLlamaSession<br/>(Llama 3.2 1B Q8_0)
-    participant Tool as GetRecentCommitsTool
-    participant Git as JGit (data module)
-
-    User->>CLI: STANDAPP_TOOL_CALLING=1<br/>standapp --repo R --days 7
-    CLI->>Factory: createToolCallingForGit(repoDir=R)
-    Factory->>EML: extract()
-    EML-->>Factory: ~/.cache/standapp/models/...gguf
-    Factory->>Service: ToolCallingLLMService.create(path, [GetRecentCommitsTool(R)])
-    Note over Service: log [STAGE/MODEL LOAD]
-
-    CLI->>Service: generate("Summarise the work … call get_recent_commits …")
-    Note over Service: log [STAGE/INPUT], [STAGE/SYSTEM PROMPT],<br/>[STAGE/USER PROMPT], [STAGE/RENDERED CHAT TEMPLATE]
-    Service->>Agent: agent.chat(prompt, tokenConsumer)
-
-    Agent->>Model: render llama3 chat template + tool schema
-    Model-->>Agent: streamed tokens incl. <tool_call>{name:get_recent_commits, args:{days:7}}
-    Agent->>Tool: execute({days:7})
-    Tool->>Git: getAllCommitsInPeriod(R, start, now)
-    Git-->>Tool: List<GitInfo>
-    Tool-->>Agent: "count=12\n- abc1234 … - …"<br/>(log [GitTool] result)
-
-    Agent->>Model: feed tool result, re-render, continue
-    Model-->>Agent: streamed tokens (final markdown summary)
-    Agent-->>Service: final text
-    Note over Service: log [STAGE/COMPLETE], [STAGE/FINAL ANSWER]
-    Service-->>CLI: summary
-    CLI-->>User: prints summary
-----
-
-NOTE: `JavaAgentLoop` exposes only a streaming-token callback in its public API.
-Mid-stream tool-call markers are visible via the tokens themselves but discrete
-`onToolCalls` / `onToolResult` events are not surfaced to this layer. See TR-09.
-
-NOTE: The `REST_API` backend always uses the legacy single-shot path: the CLI
-pre-fetches commits with JGit, builds a prompt via `PromptBuilder`, and calls
-`service.generate(prompt)` once.
-
-== 6.3 SKaiNET Initialisation (Embedded Model Extraction)
-
-Shows the cold-start path the very first time the self-contained JAR runs.
-
-[mermaid]
-----
-sequenceDiagram
-    participant Factory as LLMServiceFactory.create()
-    participant EML as EmbeddedModelLoader
-    participant CL as ClassLoader
-    participant FS as ~/.cache/standapp/models/
-    participant KLlama as KLlamaJava.loadGGUF
-    participant Builder as JavaAgentLoop.builder
-
-    Factory->>EML: extract()
-    EML->>CL: getResource("models/Llama-3.2-1B-Instruct-Q8_0.gguf")
-    CL-->>EML: jar:.../standapp-all.jar!/models/...gguf
-
-    alt cached file exists with matching size
-        EML->>FS: stat target
-        FS-->>EML: size matches resource length
-        EML-->>Factory: target Path (no extraction)
-    else first run
-        EML->>FS: copy(input, target, REPLACE_EXISTING)
-        Note over EML,FS: ~1.3 GB — takes 5–15s on local disk
-        EML-->>Factory: target Path
-    end
-
-    Factory->>KLlama: loadGGUF(target, systemPrompt=null)
-    KLlama-->>Factory: KLlamaSession
-
-    alt STANDAPP_TOOL_CALLING=1
-        Factory->>Builder: session().tool(GetRecentCommitsTool).template("llama3").build()
-        Builder-->>Factory: JavaAgentLoop
-        Factory-->>Factory: ToolCallingLLMService instance
-    else default
-        Factory-->>Factory: SKaiNetLLMService instance<br/>(raw KLlamaSession.generate path)
-    end
-----
-
-== 6.5 LLM Standup Summary — Default SKAINET Path (Single-Shot)
-
-This is the default flow when `STANDAPP_TOOL_CALLING` is unset. The CLI fetches
-commits with JGit, formats them via `PromptBuilder`, and `SKaiNetLLMService` wraps
-the prompt in Llama 3 turn tags before a single `KLlamaSession.generate(...)` call.
-No agent loop, no tool parsing.
+The default CLI flow. `standupFlow { }` builds a SKaiNET `DataPipeline`
+(`[PIPELINE] qwen-commits -> require-commits -> preprocess -> summarize[prompt -> llama -> parse xN]`);
+the CLI does not pre-fetch commits — Qwen3-0.6B turns the request into one
+`get_recent_commits` tool call, the tool records the structured commit list,
+and Llama-3.2-3B-Instruct writes the summary from the engine's prompt
+templates. See §8 (Crosscutting Concepts) for chat templates, tool-call
+processing and the stage-log vocabulary.
 
 [mermaid]
 ----
 sequenceDiagram
     participant User
     participant CLI as StandAPP-cli
-    participant PB as PromptBuilder
-    participant Service as SKaiNetLLMService
-    participant Model as KLlamaSession<br/>(Llama 3.2 1B Q8_0)
+    participant Flow as DataPipeline<br/>(standupFlow)
+    participant Provider as ModelProvider<br/>(releasing)
+    participant QStage as QwenCommitsStage
+    participant Agent as AgentLoop<br/>(QwenChatTemplate, 1 round)
+    participant Qwen as Qwen3-0.6B Q8_0
+    participant Tool as RecordingGitCommitsTool
     participant Git as JGit (data module)
+    participant Sum as RetryingSummarizeStage
+    participant LStage as LlamaGenerateStage
+    participant Llama as Llama-3.2-3B Q4_K_M
 
     User->>CLI: standapp --repo R --days 7
-    CLI->>Git: getAllCommitsInPeriod(R, start, now)
-    Git-->>CLI: List<GitInfo>
-    CLI->>PB: buildUserPrompt(commits, SUMMARY)
-    PB-->>CLI: "Given the following Git commits …\n{{commits}} → expanded"
+    CLI->>Flow: execute(StandupRequest(R, days=7))
+    Flow->>QStage: process(request)
+    QStage->>Provider: withModel(QWEN3_0_6B)
+    Note over Provider: resolve path (cache / download),<br/>log [MODEL] + [MODEL LOAD]
+    QStage->>Agent: runWithEncoder(system + user, listener)
+    Note over QStage: log [STAGE/QWEN], [STAGE/QWEN RENDERED PROMPT]
+    Agent->>Qwen: prefill (batched 64) + greedy decode, ≤192 tokens
+    Qwen-->>Agent: <tool_call>{"name":"get_recent_commits","arguments":{"days":7}}</tool_call>
+    Note over Agent: log [STAGE/QWEN PREFILL DONE], [STAGE/QWEN RESPONSE],<br/>[STAGE/TOOL CALLS]
+    Agent->>Tool: execute({days:7})
+    Tool->>Git: getAllCommitsInPeriod(R, now-7d, now)
+    Git-->>Tool: List<GitInfo>
+    Note over Tool: recorded = commits<br/>log [GitTool] result: n commit(s) recorded
+    Tool-->>Agent: "ok: n commit(s) found in the last 7 day(s)"
+    Note over Agent: maxToolRounds = 1 → return,<br/>no second generation
+    Agent-->>QStage: (log [STAGE/TOOL RESULT], [STAGE/QWEN COMPLETE])
+    Provider-->>QStage: close Qwen (log [MODEL] released)
+    QStage-->>Flow: CommitBatch(source = QWEN_TOOL_CALL)
 
-    CLI->>Service: generate(prompt, temperature, topP)
-    Note over Service: log [STAGE/SYSTEM PROMPT],<br/>[STAGE/USER PROMPT],<br/>[STAGE/WRAPPED PROMPT (Llama 3 turn tags)]
-    Service->>Model: generate(wrappedPrompt, GenerationConfig)
-    Model-->>Service: streamed tokens
-    Note over Service: log [STAGE/PREFILL DONE] on first token,<br/>[STAGE/COMPLETE], [STAGE/FINAL ANSWER]
-    Service-->>CLI: summary
-    CLI-->>User: prints summary
+    Flow->>Flow: require-commits (log [STAGE/COMMITS])<br/>preprocess: shortIds(7), firstMessageLine(120), limit(60)
+
+    Flow->>Sum: process(CommitBatch)
+    Sum->>Sum: PromptStage → system + user prompt (log [STAGE/PROMPT])
+    loop until parse succeeds or attempts exhausted
+        Sum->>LStage: process(PromptedBatch)
+        LStage->>Provider: withModel(LLAMA_3_2_3B)
+        Note over Provider: log [MODEL] + [MODEL LOAD]
+        LStage->>Llama: Llama3ChatTemplate render → generateUntilStop<br/>(stop {<|eot_id|>, <|end_of_text|>}, temp 0.1, top-p 0.9 / top-k 40)
+        Note over LStage: log [STAGE/INPUT], [STAGE/SYSTEM PROMPT], [STAGE/USER PROMPT],<br/>[STAGE/PREFILL …], [STAGE/PREFILL DONE]
+        Llama-->>LStage: streamed tokens → onToken (stdout for --format md)
+        Note over LStage: log [STAGE/COMPLETE], [STAGE/FINAL ANSWER]
+        Provider-->>LStage: close Llama (log [MODEL] released)
+        Sum->>Sum: SummaryParser.parse (log [STAGE/PARSE] on rejection)
+    end
+    Sum->>Sum: QualityScorer.score (with --score)
+    Sum-->>Flow: PipelineResult
+    Flow-->>CLI: result
+    CLI-->>User: rendered summary (md | json | text), score report on stderr
 ----
+
+[NOTE]
+====
+*Fallback.* If Qwen produces no usable call — no `<tool_call>`, a call that
+fails JSON-schema validation (`[STAGE/TOOL VALIDATION FAILED]`), an exhausted
+token budget or an exception — `QwenCommitsStage` logs
+`[STAGE/FALLBACK] Qwen did not produce a usable get_recent_commits call (…); fetching commits directly`
+and delegates to `GitCommitsStage`; the batch is tagged `DIRECT_FALLBACK` and
+the summary is still produced. A git failure inside the tool is re-raised as
+`GitAccessException` (exit code 3).
+====
+
+[NOTE]
+====
+*Direct git path.* `--since/--until` (the tool is day-based), `--commits git`
+and the `REST_API` backend skip Qwen: `GitCommitsStage` fetches the window
+through JGit (`[STAGE/GIT]`) and the rest of the pipeline is unchanged. With
+`REST_API` the summariser is `LLMServiceGenerateStage(RestApiLLMService)`.
+====
+
+== 6.3 First Run — Model Resolution and Loading
+
+No model is bundled in the JAR. Each stage asks the `ModelProvider` for its
+model; `ModelResolver` turns the `ModelSpec` into a local file, downloading
+through SKaiNET's `hf://` data-source resolver on a cold cache
+(~0.6 GB + ~2.0 GB, once per machine).
+
+[mermaid]
+----
+sequenceDiagram
+    participant Stage as Qwen / Llama stage
+    participant Provider as ModelProvider
+    participant Resolver as ModelResolver
+    participant DS as JvmDataSourceResolver<br/>(skainet-data-source, Ktor CIO)
+    participant HF as huggingface.co
+    participant Cache as $STANDAPP_MODEL_CACHE_DIR<br/>(~/.cache/standapp/models)
+    participant Local as LocalModel.load
+
+    Stage->>Provider: withModel(spec)
+    Provider->>Resolver: resolve(spec, explicitPath?)
+
+    alt --qwen-model / --llama-model flag
+        Resolver-->>Provider: local file (or hf://|https:// URI → download branch)
+    else STANDAPP_QWEN_MODEL_PATH / STANDAPP_LLAMA_MODEL_PATH<br/>(or legacy MCP_LLM_MODEL_PATH, Llama only)
+        Resolver-->>Provider: local file
+    else catalog hf:// URI
+        Resolver->>DS: resolve(DataSourceRequest(uri, CachePolicy.Use | Offline))
+        alt cache hit
+            DS-->>Resolver: localPath (log [MODEL] cache hit)
+        else STANDAPP_OFFLINE=1
+            DS-->>Resolver: DataSourceException → CLI exit 4
+        else first run
+            DS->>HF: GET GGUF (HF_TOKEN if set)
+            HF-->>DS: bytes (log [MODEL] downloading … every 64 MB)
+            DS->>Cache: store
+            DS-->>Resolver: localPath (log [MODEL] downloaded, size sanity check)
+        end
+    end
+
+    Provider->>Local: load(spec, path)
+    Note over Local: KernelSetup.ensureInstalled()<br/>KernelPacks.install() + FfmRowMajorKernelPack.install()<br/>(libskainet_kernels.so extracted to java.io.tmpdir)
+    Local->>Local: StreamingGGUFReader → ModelMetadata, TokenizerFactory
+    Local->>Local: check architecture ∈ family (qwen2/qwen3/qwen35 | llama/mistral)
+    Local->>Local: DecoderGgufWeightLoader.loadToMapStreaming<br/>(packed Q8_0 / Q4_K weights, memory-mapped)
+    Local->>Local: QwenNetworkLoader | LlamaNetworkLoader.fromWeights
+    Local->>Local: OptimizedLLMRuntime(DIRECT), stop-token set
+    Local-->>Provider: LocalModel (log [MODEL LOAD] … done in ms)
+    Provider-->>Stage: model
+
+    Note over Provider: releasing(): close after the stage<br/>caching() / --keep-models: keep resident
+----
+
+NOTE: The `STANDAPP_TINY_PROMPT=1` smoke path bypasses the pipeline and sends a
+one-line prompt to the summariser through `LlamaChatLLMService` — a quick way
+to verify download + inference without a repository.
 
 == 6.4 MCP Server Startup
 

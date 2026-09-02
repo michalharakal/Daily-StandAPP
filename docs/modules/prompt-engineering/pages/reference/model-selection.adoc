@@ -2,90 +2,263 @@
 :toc: left
 :icons: font
 
-Decision matrix for picking a model + backend + chat template + prompt
-style. Extends — does not replace — the
-"Model Selection Best Practices" section in the repo `README.md`.
+Which models the pipeline ships with, how a GGUF is resolved at runtime,
+and when to swap a stage for something else. Extends — does not
+replace — the "Standapp CLI" section in the repo `README.md`.
+
+== The two catalog models
+
+Source: `llm/src/jvmMain/kotlin/de/jug_da/standapp/llm/model/ModelSpec.kt`
+(`ModelCatalog`).
+
+[cols="1,2,2,1,1"]
+|===
+|Stage |Model |Source (`hfUri`) |Size |Role
+
+|`qwen-commits`
+|Qwen3-0.6B, Q8_0 (`Qwen3-0.6B-Q8_0.gguf`)
+|`hf://Qwen/Qwen3-0.6B-GGUF@main/Qwen3-0.6B-Q8_0.gguf`
+|~0.6 GB
+|Turns the request into one `get_recent_commits` call. Its prose is
+discarded; only the recorded commit list matters.
+
+|`llama`
+|Llama-3.2-3B-Instruct, Q4_K_M (`Llama-3.2-3B-Instruct-Q4_K_M.gguf`)
+|`hf://bartowski/Llama-3.2-3B-Instruct-GGUF@main/Llama-3.2-3B-Instruct-Q4_K_M.gguf`
+|~2.0 GB
+|Writes the standup summary (Markdown, JSON or text) from the engine's
+prompt templates.
+|===
+
+Why this split: a 0.6B model is fast enough to run a tool round on a
+laptop CPU (~40 s) and Qwen3 was trained on the exact `<tool_call>`
+contract the parser expects; a 3B instruct model writes noticeably better
+prose than 1B without leaving the 12 GB heap. Q8_0 on the small model
+because it is cheap; Q4_K_M on the 3B because it stays packed on the
+native kernel path in SKaiNET 0.53 and halves the download.
+
+Both `ModelSpec`s carry a `family` that decides the loader
+(`QwenNetworkLoader` / `LlamaNetworkLoader`), the chat template and the
+stop-token set. Accepted GGUF architectures:
+
+[cols="1,2"]
+|===
+|`ModelFamily` |Accepted `general.architecture`
+
+|`QWEN`
+|`qwen2`, `qwen3`, `qwen35`
+
+|`LLAMA`
+|`llama`, `mistral`
+|===
+
+A file with any other architecture is rejected at load time with a clear
+message, so you cannot accidentally hand the summariser slot a Qwen file
+or vice versa.
+
+== Nothing is bundled: first-run download
+
+The fat JAR is ~20 MB and contains no model. On first use each stage
+resolves its GGUF through SKaiNET's `JvmDataSourceResolver` (the `hf://`
+data-source resolver from `skainet-data-source`) into the model cache and
+reuses it afterwards. Progress is logged as `[MODEL] downloading … MB`
+every 64 MB; a truncated file (more than 10 % smaller than expected)
+triggers a `[MODEL] WARNING`.
+
+[cols="2,3"]
+|===
+|Setting |Effect
+
+|`STANDAPP_MODEL_CACHE_DIR`
+|Cache directory. Default `~/.cache/standapp/models` (falls back to
+`java.io.tmpdir` when `user.home` is unset).
+
+|`STANDAPP_OFFLINE=1`
+|`CachePolicy.Offline`: never touch the network; fail fast (exit 4) when
+the cache is cold.
+
+|`HF_TOKEN`
+|Optional Hugging Face token, picked up by the resolver
+(`useEnvironmentHuggingFaceToken = true`) for gated or rate-limited
+repositories.
+|===
+
+The download uses a Ktor CIO client with no request timeout (a 2 GB file
+on a slow line must not be cut off), a 60 s connect timeout and a 300 s
+socket timeout to catch stalls. After the download no network call is
+made — the privacy guarantee of
+xref:architecture:09-architecture-decisions.adoc[ADR-001] holds.
+
+== Resolution precedence
+
+Source: `model/ModelResolver.kt`. For each `ModelSpec`, the first hit
+wins:
+
+. **CLI flag** — `--qwen-model <gguf>` for the tool stage,
+  `--llama-model <gguf>` (aliases `-m`, `--model`) for the summariser.
+. **Stage env override** — `STANDAPP_QWEN_MODEL_PATH` /
+  `STANDAPP_LLAMA_MODEL_PATH`.
+. **Legacy alias** — `MCP_LLM_MODEL_PATH`, honoured for the *summariser
+  only*, so Docker and benchmark setups that pointed it at "the GGUF" keep
+  working. It never affects the Qwen stage.
+. **Catalog download** — the spec's `hf://` URI into the cache.
+
+Any override may itself be an `hf://`, `hf+https://`, `https://` or
+`http://` URI; it is then resolved through the same cache. A local path
+that is not a readable regular file fails immediately (exit 4). The
+winning source is logged as `[MODEL] <id>: using local file from <origin>`
+or `[MODEL] <id>: resolving <uri>`.
+
+== Loading and lifetime
+
+`LocalModel.load` reads the GGUF metadata, builds the tokenizer from the
+file, then streams the weights with `DecoderGgufWeightLoader`
+(`loadToMapStreaming`) so they stay packed (Q8_0 / Q4_K / Q6_K) and
+memory-mapped, and wraps the family network in an `OptimizedLLMRuntime`
+in `DIRECT` mode. Native kernel packs (`KernelPacks.install()` and
+`FfmRowMajorKernelPack.install()`) are installed once per process before
+the first load. The KV cache is capped at a 4096-token window
+(`LocalModel.MAX_INFERENCE_LEN`), which is why the CLI runs with `-Xmx12g`
+and why a very long commit list is trimmed by `preprocess { limit(60) }`.
+
+`ModelProvider` owns the lifetime:
+
+[cols="1,2,2"]
+|===
+|Provider |When |Behaviour
+
+|`ModelProvider.releasing()`
+|CLI default
+|Loads a model for one `withModel { }` block and closes it afterwards
+(`[MODEL] <id>: released`). Qwen and Llama run one after the other, so
+peak memory is one model.
+
+|`ModelProvider.caching()`
+|`--keep-models`, benchmark, tests, `LlamaChatLLMService.create`
+|Keeps loaded models resident across calls. Use when you run several
+summaries in one process.
+|===
+
+Both memoise the resolved path, so a download happens at most once per
+process.
+
+== Choosing the commit source
+
+[cols="1,1,3"]
+|===
+|Flag |Stage |Use when
+
+|`--commits qwen` (default)
+|`qwen-commits`
+|You want the tool-calling demo: Qwen decides the arguments, the tool
+records the commits, and a bad call falls back to direct git with a
+`[STAGE/FALLBACK]` line.
+
+|`--commits git`
+|`git-commits`
+|You only care about the summary, or the machine is too slow for the
+extra ~40 s. Also forced automatically by `--since/--until` (the tool is
+day-based) and by `--backend rest_api` (no local models at all).
+|===
 
 == Decision matrix
 
-[cols="2,1,2,2,3"]
+[cols="2,1,2,3"]
 |===
-|Scenario |Backend |Model |Template |Notes
+|Scenario |Backend |Models |Notes
 
-|Demo / privacy-first / offline
+|Demo / privacy-first / offline after first run
 |`SKAINET` (default)
-|Embedded Llama 3.2 1B Q8_0
-|`llama3`
-|Self-contained JAR; ~2 GB. CLI pre-fetches commits via JGit. Uses the
-single-shot path. Quality: rough but workable on small-to-medium commit
-windows. Default for the repo.
+|Qwen3-0.6B Q8_0 + Llama-3.2-3B Q4_K_M
+|Default for the repo. ~2.7 GB download once; then fully local.
+Interactive on a laptop: a tool round plus a summary takes a few minutes
+on an i7-9750H.
 
-|Demo / privacy-first + tool calling experiment
-|`SKAINET`, `STANDAPP_TOOL_CALLING=1`
-|Embedded Llama 3.2 1B Q8_0
-|`llama3`
-|Opt-in path that exercises the agent loop. *Currently unreliable on the
-1B* — see xref:explanation/negative-sample-2026-05-05.adoc[the negative
-sample]. Worth running for instrumentation but don't trust the output.
+|Faster local run, no tool demo
+|`SKAINET`, `--commits git`
+|Llama-3.2-3B Q4_K_M only
+|Skips the Qwen load and round. The summary path is unchanged.
 
-|Local high-quality / offline
-|`REST_API` against local Ollama or llama.cpp
-|Llama 3.2 3B Instruct or Qwen 3 7B Instruct
-|`llama3` for Llama, `qwen` for Qwen
-|3B is the sweet spot for standup quality on a CPU laptop. 7B if you
-have an RTX 3060+. Qwen is more reliable for tool calling; Llama is
-better for free-form prose.
-
-|Tool calling that actually works
-|`REST_API` against Ollama, LM Studio, or vLLM
-|Qwen 3 7B+ or any Hermes-trained checkpoint
-|`qwen` or `chatml`
-|The `<tool_call>...</tool_call>` XML wrapper is parsed by the
-well-tested Hermes strategy. Most reliable open-weights tool calling we
-can get without rolling our own parser.
+|Local high-quality / GPU
+|`REST_API` against local Ollama, LM Studio, llama.cpp server or vLLM
+|Llama 3.2 3B+, Qwen 3 7B+, whatever the server has loaded
+|`MCP_LLM_REST_MODEL` names the model; commits always come from direct
+git. Best option when you have a GPU — the CLI just hits an
+OpenAI-compatible endpoint.
 
 |Cloud baseline / quality benchmark
 |`REST_API` against OpenAI/Anthropic
 |GPT-4o-mini, GPT-4o, Claude Sonnet 4.6
-|n/a (the remote service handles formatting)
 |For baselining the local stack against. Not for production — the
-privacy guarantee in xref:architecture:09-architecture-decisions.adoc[ADR-001] forbids cloud
-processing of commit data in practice.
+privacy guarantee in xref:architecture:09-architecture-decisions.adoc[ADR-001]
+forbids cloud processing of commit data in practice.
 
 |Pure-Java integration test
 |`REST_API` against any local server
 |Whatever's loaded
-|n/a
-|Useful when running headless from a Java service that doesn't want to
-embed a 1.3 GB GGUF.
+|Useful when running headless from a Java service that doesn't want a
+model cache.
 |===
+
+== Swapping a model in a stage
+
+The catalog is data, not a hard-coded path. A different GGUF of the same
+family only needs a path or URI:
+
+[source,bash]
+----
+# A different Llama-family summariser from the Hugging Face hub
+./gradlew :StandAPP-cli:run --args="--repo . --days 7 \
+  --llama-model hf://bartowski/Llama-3.2-3B-Instruct-GGUF@main/Llama-3.2-3B-Instruct-Q6_K.gguf"
+
+# A local Qwen3-1.7B for the tool stage
+STANDAPP_QWEN_MODEL_PATH=/models/Qwen3-1.7B-Q8_0.gguf ./gradlew :StandAPP-cli:run --args="--repo ."
+----
+
+From Kotlin, pass a `ModelSpec` to the stage factory:
+
+[source,kotlin]
+----
+val bigger = ModelCatalog.LLAMA_3_2_3B.copy(
+    id = "llama-3.1-8b-instruct",
+    hfUri = "hf://bartowski/Meta-Llama-3.1-8B-Instruct-GGUF@main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    fileName = "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+    approxBytes = 4_900_000_000L,
+)
+val flow = standupFlow(models) { summarize(llama(spec = bigger)) }
+----
+
+Mind the `-Xmx12g` heap and the 4096-token window: an 8B Q4_K_M still
+fits, but decode on the CPU path is proportionally slower. A model from
+another family (Gemma, Mistral-architecture aside) needs a new
+`ModelFamily` entry, a loader, a template and a stage — see
+xref:how-to/switch-chat-template.adoc[].
 
 == Quantisation tradeoffs
 
 [cols="1,1,1,2"]
 |===
-|Quant |Disk size for 7B |Throughput (CPU) |Quality vs FP16
+|Quant |Disk size |Where used |Quality vs FP16
 
 |Q4_K_M
-|~4 GB
-|10–20 tok/s
-|~95% of FP16 on benchmark scores
+|~2.0 GB for the 3B (~4 GB for a 7B)
+|Summariser default
+|~95 % of FP16 on benchmark scores; packed weights stay on the native
+kernel path.
 
-|Q5_K_M
-|~5 GB
-|8–15 tok/s
-|~98% of FP16
+|Q5_K_M / Q6_K
+|~2.3–2.6 GB for the 3B
+|Optional summariser override
+|~98 % of FP16; longer download, slightly slower matmuls.
 
 |Q8_0
-|~7 GB (1.3 GB for our 1B)
-|6–12 tok/s
-|~99.5% of FP16
+|~0.6 GB for the 0.6B (~3.4 GB for a 3B)
+|Tool stage default
+|~99.5 % of FP16 — worth it on a 0.6B where every bit of capacity goes
+into producing one well-formed call.
 |===
 
-For the embedded model we picked Q8_0 specifically because the *1B model
-is small enough to spend the bandwidth on quality*. On a 7B+, Q4_K_M is
-usually the right default. For numbers and reasoning behind these
-quantisation levels, see
+For numbers and reasoning behind these quantisation levels, see
 xref:architecture:10-quality-requirements.adoc[Architecture §10].
 
 == Model-family choice for tool calling
@@ -94,17 +267,18 @@ xref:architecture:10-quality-requirements.adoc[Architecture §10].
 |===
 |Family |Tool-call reliability |Why
 
-|Qwen 3
+|Qwen 3 (0.6B and up)
 |High
-|Trained heavily on the `<tool_call>` XML format; matches the
-well-tested Hermes parser strategy.
+|Trained on the `<tool_call>` XML format; matches the well-tested Hermes
+parser strategy. Even the 0.6B produces a valid `get_recent_commits`
+call most of the time with thinking disabled and temperature 0.
 
 |Hermes / OpenHermes / NousHermes
 |High
 |Fine-tunes specifically targeting the same `<tool_call>` format Qwen
 uses.
 
-|Llama 3.2/3.3 8B+
+|Llama 3.1/3.3 8B+
 |Medium
 |Native tool-call training, but Meta's format is
 single-line-JSON-or-`<\|python_tag\|>` which the parser handles less
@@ -112,9 +286,10 @@ robustly than XML wrappers.
 
 |Llama 3.2 1B / 3B
 |Low
-|Capacity-constrained — emits malformed JSON, ignores
-single-line constraint, hallucinates calls. Not recommended for
-production tool calling.
+|Capacity-constrained — emits malformed JSON, ignores the single-line
+constraint, hallucinates calls. This is why the 3B only writes prose in
+this pipeline and the retired 1B tool path was dropped
+(xref:explanation/negative-sample-2026-05-05.adoc[]).
 
 |Gemma 2 / 3
 |Low–medium
@@ -132,13 +307,21 @@ parser strategy has thinner test coverage.
 
 == When CPU-only is the constraint
 
-* 1B Q8 → 5–15 s per standup summary on a recent x86_64 with native
-  kernels; 30+ s on Panama Vector only.
-* 3B Q4 → 30–60 s per summary, depending on commit count.
-* 7B Q4 → likely 2–5 minutes; usable for batch but not interactive.
+Measured on an i7-9750H (6C/12T) with the native FFM row-major kernels:
 
-For interactive feel, prefer 1B–3B. For higher-quality offline reports,
-batch a 7B overnight.
+* Qwen3-0.6B Q8_0 tool round → ~40 s including prefill of the rendered
+  tool prompt.
+* Llama-3.2-3B Q4_K_M → ~0.3 s per token for *both* prefill and decode
+  (the row-major kernel processes batched prefill row by row). A
+  400-token prompt plus a 250-token summary is roughly three to four
+  minutes.
+* Larger models scale roughly with parameter count; a 7B Q4 is batch
+  territory on this CPU.
+
+Shorten the prompt before reaching for a smaller model:
+`preprocess { firstMessageLine(120); limit(60) }` is already the CLI
+default. The download plus a first inference can be smoke-tested without
+a repository via `STANDAPP_TINY_PROMPT=1`.
 
 == When you have a GPU
 
@@ -149,21 +332,18 @@ OpenAI-compatible HTTP endpoint. Set:
 [source,bash]
 ----
 MCP_LLM_BACKEND=REST_API \
-MCP_LLM_REST_BASE_URL=http://localhost:11434/v1 \
+MCP_LLM_REST_BASE_URL=http://localhost:11434 \
 MCP_LLM_REST_MODEL=qwen2.5:7b-instruct \
 ./gradlew :StandAPP-cli:run --args="…"
 ----
 
-Tool calling on the REST path currently uses the legacy single-shot
-prompt — the agent loop is SKAINET-only.
-xref:architecture:09-architecture-decisions.adoc[ADR-011] notes this as a
-deferred follow-up.
+The REST backend always uses direct git access for the commits; the Qwen
+tool stage is SKAINET-only.
 
 == See also
 
-* `README.md` "Model Selection Best Practices" — quality/latency
-  thresholds and the cloud-baseline comparison rubric.
-* xref:reference/chat-templates.adoc[Chat templates] — what each
-  template name accepts.
+* `README.md` "Standapp CLI" — flags, environment variables, exit codes.
+* xref:reference/chat-templates.adoc[Chat templates] — what each family
+  renders.
 * xref:architecture:10-quality-requirements.adoc[Architecture §10] —
   empirical quantisation/throughput tables.
