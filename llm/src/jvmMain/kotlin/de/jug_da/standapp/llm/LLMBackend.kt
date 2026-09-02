@@ -11,8 +11,8 @@ enum class LLMBackendType {
     REST_API;
 
     companion object {
-        // SKAINET is the default — the Llama 3.2 1B Instruct model is embedded as a
-        // JAR resource so the app runs self-contained with no env vars set.
+        // SKAINET is the default — the Qwen3 0.6B / Llama 3.2 3B GGUFs are downloaded
+        // into the model cache on first run, so the app works with no env vars set.
         fun fromEnv(): LLMBackendType = parse(System.getenv("MCP_LLM_BACKEND"))
 
         /** Shared by `MCP_LLM_BACKEND` and the CLI's `--backend` flag. */

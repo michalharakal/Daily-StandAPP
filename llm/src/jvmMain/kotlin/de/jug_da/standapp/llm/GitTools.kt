@@ -1,8 +1,8 @@
 package de.jug_da.standapp.llm
 
+import de.jug_da.data.git.GitInfo
 import de.jug_da.data.git.commitsByAuthorAndPeriod
 import de.jug_da.data.git.getAllCommitsInPeriod
-import kotlin.time.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -10,24 +10,62 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import sk.ainet.apps.kllama.chat.Tool
 import sk.ainet.apps.kllama.chat.ToolDefinition
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
- * `get_recent_commits` tool exposed to the LLM agent loop.
- *
- * Wraps the JGit-backed [getAllCommitsInPeriod] / [commitsByAuthorAndPeriod]
- * helpers from `:data` so the model can pull commits on demand instead of
- * receiving the full list pre-baked into the user prompt.
- *
- * Why: with a 1B model the whole-prompt summarisation path tends to truncate
- * or drift on long inputs. Tool-calling lets the model ask only for what it
- * needs, and the prompt the model sees stays small.
+ * Commit lookup behind a tiny interface so pipeline stages and tests can
+ * swap the JGit implementation from `:data` for a fake.
  */
-class GetRecentCommitsTool(private val repoDir: String) : Tool {
+fun interface GitCommitSource {
+    fun fetch(repoDir: String, author: String?, start: Instant, end: Instant): List<GitInfo>
+
+    companion object {
+        /** JGit-backed source from the `:data` module. */
+        fun jgit(): GitCommitSource = GitCommitSource { repoDir, author, start, end ->
+            if (author != null) commitsByAuthorAndPeriod(repoDir, author, start, end)
+            else getAllCommitsInPeriod(repoDir, start, end)
+        }
+    }
+}
+
+/**
+ * `get_recent_commits` tool exposed to the Qwen tool-calling stage.
+ *
+ * The model's job is only to translate the user's request into a well-formed
+ * call (`days` as a number, optional `author`). The tool records the
+ * structured commit list in [recorded] — that list, not the model's prose,
+ * is what the pipeline consumes downstream. The returned string is a short
+ * acknowledgement because the agent loop runs a single tool round and never
+ * feeds the result back to the model.
+ */
+class RecordingGitCommitsTool(
+    private val repoDir: String,
+    private val source: GitCommitSource = GitCommitSource.jgit(),
+    private val clock: () -> Instant = { Clock.System.now() },
+    private val log: (String) -> Unit = System.err::println,
+) : Tool {
+
+    @Volatile
+    var recorded: List<GitInfo>? = null
+        private set
+
+    @Volatile
+    var recordedDays: Int? = null
+        private set
+
+    @Volatile
+    var recordedAuthor: String? = null
+        private set
+
+    @Volatile
+    var failure: Throwable? = null
+        private set
 
     override val definition: ToolDefinition = ToolDefinition(
-        name = "get_recent_commits",
-        description = "List git commits in the configured repository within the last N days. " +
-            "Returns a compact text summary with id, author, date, and message for each commit.",
+        name = TOOL_NAME,
+        description = "List the git commits of the repository from the last N days. " +
+            "Returns the number of commits found; the commit details are handed to the summariser.",
         parameters = Json.parseToJsonElement(
             """
             {
@@ -39,7 +77,7 @@ class GetRecentCommitsTool(private val repoDir: String) : Tool {
                 },
                 "author": {
                   "type": "string",
-                  "description": "Optional. Author name filter; omit or pass empty string for all authors."
+                  "description": "Optional author name filter. Omit for all authors."
                 }
               },
               "required": ["days"]
@@ -54,33 +92,26 @@ class GetRecentCommitsTool(private val repoDir: String) : Tool {
         if (days <= 0) return "error: 'days' must be positive"
         val author = (arguments["author"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
-        System.err.println("[GitTool] get_recent_commits(repo=$repoDir, days=$days, author=${author ?: "*"})")
-
-        val nowMs = System.currentTimeMillis()
-        val now = Instant.fromEpochMilliseconds(nowMs)
-        val start = Instant.fromEpochMilliseconds(nowMs - days * 86_400_000L)
-
-        val commits = if (author != null) {
-            commitsByAuthorAndPeriod(repoDir, author, start, now)
-        } else {
-            getAllCommitsInPeriod(repoDir, start, now)
+        log("[GitTool] $TOOL_NAME(repo=$repoDir, days=$days, author=${author ?: "*"})")
+        return try {
+            val now = clock()
+            val start = Instant.fromEpochMilliseconds(now.toEpochMilliseconds() - days * 86_400_000L)
+            val commits = source.fetch(repoDir, author, start, now)
+            recorded = commits
+            recordedDays = days
+            recordedAuthor = author
+            log("[GitTool] result: ${commits.size} commit(s) recorded")
+            "ok: ${commits.size} commit(s) found in the last $days day(s)" +
+                (author?.let { " by $it" } ?: "")
+        } catch (t: Throwable) {
+            // ToolRegistry.execute would swallow this into a string; keep the
+            // cause so the stage can surface it as a git error.
+            failure = t
+            "error: ${t.message}"
         }
-        if (commits.isEmpty()) {
-            System.err.println("[GitTool] result: 0 commits")
-            return "no commits found in the last $days day(s)" +
-                if (author != null) " for author $author" else ""
-        }
-        // Cap at 50 commits — keeps the tool result well within the model's
-        // context budget on a 1B; the model can re-invoke with a smaller
-        // window if it needs more recent ones.
-        val capped = commits.take(50)
-        val text = buildString {
-            appendLine("count=${capped.size}${if (commits.size > capped.size) " (truncated from ${commits.size})" else ""}")
-            capped.forEach { c ->
-                appendLine("- ${c.id.take(7)} ${c.whenDate} ${c.authorName}: ${c.message.lineSequence().first().take(120)}")
-            }
-        }.trimEnd()
-        System.err.println("[GitTool] result: ${capped.size} commits, ${text.length} chars")
-        return text
+    }
+
+    companion object {
+        const val TOOL_NAME = "get_recent_commits"
     }
 }

@@ -4,7 +4,7 @@ package de.jug_da.standapp.llm
  * Programmatic configuration for creating [LLMService] instances
  * without relying on environment variables.
  *
- * @param modelPath              Path to GGUF model file (SKAINET)
+ * @param modelPath              Local GGUF for the SKAINET summariser (Llama 3.2 3B); blank = resolve/download
  * @param deliveranceModelOwner  HuggingFace model owner (DELIVERANCE)
  * @param deliveranceModelName   HuggingFace model name (DELIVERANCE)
  * @param baseUrl                REST endpoint URL (REST_API backend)

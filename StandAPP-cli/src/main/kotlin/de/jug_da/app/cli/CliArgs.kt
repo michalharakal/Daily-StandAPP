@@ -6,6 +6,9 @@ import kotlinx.datetime.LocalDate
 
 enum class OutputFormat { MD, JSON, TEXT }
 
+/** How the commit list is obtained. */
+enum class CommitsMode { QWEN, GIT }
+
 /** Bad command line — message goes to stderr, process exits with code 2. */
 class CliUsageException(message: String) : Exception(message)
 
@@ -20,16 +23,20 @@ data class CliArgs(
     val format: OutputFormat = OutputFormat.MD,
     /** Overrides MCP_LLM_BACKEND when set. */
     val backend: LLMBackendType? = null,
-    /** Overrides MCP_LLM_MODEL_PATH when set (SKAINET only). */
-    val modelPath: String? = null,
+    /** Local GGUF for the Qwen3 tool-calling stage (overrides STANDAPP_QWEN_MODEL_PATH). */
+    val qwenModelPath: String? = null,
+    /** Local GGUF for the Llama 3.2 summariser (overrides STANDAPP_LLAMA_MODEL_PATH / MCP_LLM_MODEL_PATH). */
+    val llamaModelPath: String? = null,
+    /** Qwen tool call (default) or direct git access for the commit list. */
+    val commits: CommitsMode = CommitsMode.QWEN,
+    /** Keep both models resident instead of releasing each after its stage. */
+    val keepModels: Boolean = false,
     /** Write the rendered summary to this file instead of stdout. */
     val output: String? = null,
     /** Print a quality report to stderr; failed checks exit with code 5. */
     val score: Boolean = false,
     val maxTokens: Int = LLMService.DEFAULT_MAX_TOKENS,
     val temperature: Float = LLMService.DEFAULT_TEMPERATURE,
-    /** Drive the model through the tool-calling agent loop (SKAINET only). */
-    val toolCalling: Boolean = false,
     val help: Boolean = false,
 ) {
     companion object {
@@ -80,7 +87,15 @@ data class CliArgs(
                         }
                         result = result.copy(backend = backend)
                     }
-                    "--model", "-m" -> result = result.copy(modelPath = value(arg))
+                    "--model", "-m", "--llama-model" -> result = result.copy(llamaModelPath = value(arg))
+                    "--qwen-model" -> result = result.copy(qwenModelPath = value(arg))
+                    "--commits" -> {
+                        val raw = value(arg)
+                        val mode = CommitsMode.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+                            ?: throw CliUsageException("--commits expects qwen|git, got '$raw'")
+                        result = result.copy(commits = mode)
+                    }
+                    "--keep-models" -> result = result.copy(keepModels = true)
                     "--output", "-o" -> result = result.copy(output = value(arg))
                     "--score" -> result = result.copy(score = true)
                     "--max-tokens" -> result = result.copy(maxTokens = intValue(arg))
@@ -90,7 +105,6 @@ data class CliArgs(
                             ?: throw CliUsageException("--temperature expects a non-negative number, got '$raw'")
                         result = result.copy(temperature = temp)
                     }
-                    "--tool-calling" -> result = result.copy(toolCalling = true)
                     "--help", "-h" -> result = result.copy(help = true)
                     else -> {
                         if (arg.startsWith("-")) throw CliUsageException("unknown option '$arg'")

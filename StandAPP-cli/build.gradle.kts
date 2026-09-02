@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.zip.ZipFile
 
 plugins {
     kotlin("jvm")
@@ -9,24 +10,22 @@ plugins {
 group = "de.jug_da.standapp.cli"
 version = "1.0-SNAPSHOT"
 
+// Both models keep their GGUF weights memory-mapped and packed (Q8_0 / Q4_K_M),
+// so the heap holds mostly the KV caches (capped at a 4096-token window) and
+// FP32 activations. 12 GB is generous headroom; models are loaded one at a
+// time unless --keep-models is passed.
+val standappJvmArgs = listOf(
+    "--enable-preview",
+    "--add-modules=jdk.incubator.vector",
+    "--enable-native-access=ALL-UNNAMED",
+)
+
 application {
     mainClass.set("de.jug_da.app.cli.MainKt")
-    applicationDefaultJvmArgs = listOf(
-        "--enable-preview",
-        "--add-modules=jdk.incubator.vector",
-        "--enable-native-access=ALL-UNNAMED",
-        // Empirical: shadow JAR run from /tmp OOMed at -Xmx12g (HeapKvCache.<init>);
-        // 24 GB lets it allocate Llama 3.2 1B's 128K KV cache plus FP32 weights plus
-        // GC headroom. Lower if you constrain context length.
-        "-Xms2g",
-        "-Xmx24g",
-    )
+    applicationDefaultJvmArgs = standappJvmArgs + listOf("-Xms1g", "-Xmx12g")
 }
 
-// Self-contained fat JAR: bundles the embedded Llama 3.2 1B Q8_0 GGUF resource
-// (~1.3 GB) plus all skainet kernel-provider service files. mergeServiceFiles is
-// essential because skainet 0.21.0's CPU backend discovers kernels via
-// META-INF/services/sk.ainet.backend.api.kernel.KernelProvider.
+// Self-contained fat JAR (tens of MB — models are downloaded at first run, not bundled).
 tasks.shadowJar {
     archiveBaseName.set("standapp")
     archiveClassifier.set("all")
@@ -39,6 +38,42 @@ tasks.shadowJar {
     }
     // Sign-related entries break when shadow concatenates JARs; strip them.
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+
+    // Workaround (same as upstream skainet-cli): shadow's mergeServiceFiles()
+    // can drop one of two co-located META-INF/services entries when both
+    // skainet-backend-cpu and skainet-backend-native-cpu are on the classpath,
+    // leaving the fat JAR without the native kernel provider / view kernel
+    // pack. Re-merge both service files from the runtime classpath.
+    val runtimeJars = project.configurations.named("runtimeClasspath")
+        .map { it.files.filter { f -> f.name.endsWith(".jar") } }
+    doLast {
+        val jar = archiveFile.get().asFile
+        val servicePaths = listOf(
+            "META-INF/services/sk.ainet.backend.api.kernel.KernelProvider",
+            "META-INF/services/sk.ainet.backend.api.kernel.ViewKernelPack",
+        )
+        for (servicePath in servicePaths) {
+            val entries = linkedSetOf<String>()
+            for (cpJar in runtimeJars.get()) {
+                ZipFile(cpJar).use { zf ->
+                    val zipEntry = zf.getEntry(servicePath) ?: return@use
+                    zf.getInputStream(zipEntry).bufferedReader().useLines { lines ->
+                        lines.map { it.trim() }
+                            .filter { it.isNotEmpty() && !it.startsWith("#") }
+                            .forEach { entries.add(it) }
+                    }
+                }
+            }
+            if (entries.isEmpty()) continue
+            val tmpFile = temporaryDir.resolve(servicePath.substringAfterLast('/') + ".txt")
+            tmpFile.writeText(entries.joinToString("\n", postfix = "\n"))
+            ant.withGroovyBuilder {
+                "zip"("destfile" to jar.absolutePath, "update" to true) {
+                    "zipfileset"("file" to tmpFile.absolutePath, "fullpath" to servicePath)
+                }
+            }
+        }
+    }
 }
 
 repositories {
@@ -52,6 +87,10 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":standapp-ai-engine"))
 
+    // DataSourceException for the model-download error path.
+    implementation(project.dependencies.platform(libs.skainet.bom))
+    implementation(libs.skainet.data.source)
+
     implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.serialization.json)
@@ -60,7 +99,7 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    jvmArgs("--enable-preview", "--add-modules=jdk.incubator.vector")
+    jvmArgs(standappJvmArgs)
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -75,26 +114,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 tasks.withType<JavaExec>().configureEach {
-    jvmArgs(
-        "--enable-preview",
-        "--add-modules=jdk.incubator.vector",
-        "--enable-native-access=ALL-UNNAMED",
-    )
-    minHeapSize = "2g"
-    maxHeapSize = "16g"
-}
-
-// The application plugin's run task is created late; force-override its JVM
-// settings here so the KV-cache allocation does not OOM. -Xmx24g matches the
-// minimum the shadow JAR needs (see comment in `application { ... }`).
-tasks.named<JavaExec>("run").configure {
-    jvmArgs = listOf(
-        "--enable-preview",
-        "--add-modules=jdk.incubator.vector",
-        "--enable-native-access=ALL-UNNAMED",
-    )
-    minHeapSize = "2g"
-    maxHeapSize = "24g"
+    jvmArgs(standappJvmArgs)
+    minHeapSize = "1g"
+    maxHeapSize = "12g"
 }
 
 java {

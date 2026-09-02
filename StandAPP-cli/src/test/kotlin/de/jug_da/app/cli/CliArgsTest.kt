@@ -19,7 +19,10 @@ class CliArgsTest {
         assertEquals(OutputFormat.MD, args.format)
         assertNull(args.backend)
         assertEquals(512, args.maxTokens)
-        assertTrue(!args.score && !args.toolCalling && !args.help)
+        assertTrue(!args.score && !args.keepModels && !args.help)
+        assertEquals(CommitsMode.QWEN, args.commits)
+        assertNull(args.qwenModelPath)
+        assertNull(args.llamaModelPath)
     }
 
     @Test
@@ -30,7 +33,7 @@ class CliArgsTest {
                 "--since", "2026-07-01", "--until", "2026-07-11",
                 "--format", "json", "--backend", "rest_api", "--model", "/models/x.gguf",
                 "--output", "out.json", "--score", "--max-tokens", "1024",
-                "--temperature", "0.7", "--tool-calling",
+                "--temperature", "0.7", "--commits", "git", "--qwen-model", "/models/q.gguf", "--keep-models",
             )
         )
         assertEquals("/tmp/repo", args.repoDir)
@@ -40,12 +43,14 @@ class CliArgsTest {
         assertEquals(LocalDate(2026, 7, 11), args.until)
         assertEquals(OutputFormat.JSON, args.format)
         assertEquals(LLMBackendType.REST_API, args.backend)
-        assertEquals("/models/x.gguf", args.modelPath)
+        assertEquals("/models/x.gguf", args.llamaModelPath)
+        assertEquals("/models/q.gguf", args.qwenModelPath)
         assertEquals("out.json", args.output)
         assertTrue(args.score)
         assertEquals(1024, args.maxTokens)
         assertEquals(0.7f, args.temperature)
-        assertTrue(args.toolCalling)
+        assertEquals(CommitsMode.GIT, args.commits)
+        assertTrue(args.keepModels)
     }
 
     @Test
@@ -93,6 +98,17 @@ class CliArgsTest {
     @Test
     fun bad_backend_is_usage_error() {
         assertFailsWith<CliUsageException> { CliArgs.parse(arrayOf("--backend", "gpt9")) }
+    }
+
+    @Test
+    fun llama_model_alias_flags() {
+        assertEquals("/m.gguf", CliArgs.parse(arrayOf("--llama-model", "/m.gguf")).llamaModelPath)
+        assertEquals("/m.gguf", CliArgs.parse(arrayOf("-m", "/m.gguf")).llamaModelPath)
+    }
+
+    @Test
+    fun bad_commits_mode_is_usage_error() {
+        assertFailsWith<CliUsageException> { CliArgs.parse(arrayOf("--commits", "magic")) }
     }
 
     @Test

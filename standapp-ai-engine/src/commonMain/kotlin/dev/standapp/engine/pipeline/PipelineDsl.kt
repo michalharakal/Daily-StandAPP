@@ -91,7 +91,8 @@ class PreprocessBuilder {
         steps += { it.filter(predicate) }
     }
 
-    internal fun build(): (List<CommitInfo>) -> List<CommitInfo> =
+    /** Fold the declared steps into one function; public so other pipeline DSLs can reuse the vocabulary. */
+    fun build(): (List<CommitInfo>) -> List<CommitInfo> =
         { commits -> steps.fold(commits) { acc, step -> step(acc) } }
 }
 
@@ -105,9 +106,12 @@ class PromptSpec {
 
 @StandupDsl
 class PostprocessSpec {
-    internal var parseEnabled = false
-    internal var scoringEnabled = false
-    internal var maxAttempts = 1
+    var parseEnabled: Boolean = false
+        private set
+    var scoringEnabled: Boolean = false
+        private set
+    var maxAttempts: Int = 1
+        private set
 
     /** Parse raw output into [dev.standapp.engine.entity.StandupSummary] (lenient unless retryOnInvalid is set). */
     fun parseSummary() {
