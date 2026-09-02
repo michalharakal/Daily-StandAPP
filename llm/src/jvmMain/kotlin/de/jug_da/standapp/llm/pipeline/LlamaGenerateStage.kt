@@ -28,6 +28,13 @@ class LlamaGenerateStage(
     private val onToken: (String) -> Unit = {},
     private val random: Random = Random.Default,
     private val prefill: PrefillStrategy = PrefillStrategy.Batched(64),
+    /**
+     * Top-k cut applied whenever nucleus sampling is active. Upstream's
+     * `sampleFromLogits(topK = 0, topP < 1)` uses k = vocab size and its
+     * insertion loop goes quadratic over Llama's 128k vocabulary (~10 s per
+     * token measured), so top-p is always paired with a finite k here.
+     */
+    private val topK: Int = DEFAULT_TOP_K,
 ) : PipelineStage<PromptedBatch, RawOutput> {
 
     override val name: String = "llama"
@@ -90,7 +97,7 @@ class LlamaGenerateStage(
             maxTokens = budget,
             eosTokenIds = model.stopTokenIds,
             temperature = temperature,
-            topK = 0,
+            topK = if (topP < 1f) topK else 0,
             topP = topP,
             random = random,
             onToken = { id ->
@@ -114,7 +121,9 @@ class LlamaGenerateStage(
         return result
     }
 
-    private companion object {
-        val template = Llama3ChatTemplate()
+    companion object {
+        /** llama.cpp's default top-k. */
+        const val DEFAULT_TOP_K = 40
+        private val template = Llama3ChatTemplate()
     }
 }

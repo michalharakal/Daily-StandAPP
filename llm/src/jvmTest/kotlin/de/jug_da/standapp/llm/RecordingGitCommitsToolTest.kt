@@ -58,3 +58,19 @@ class RecordingGitCommitsToolTest {
         assertNull(tool.recorded)
     }
 }
+
+class RecordingGitCommitsToolRepeatTest {
+    @Test
+    fun repeated_identical_call_reuses_the_recorded_result() {
+        var fetches = 0
+        val now = Instant.parse("2026-09-02T12:00:00Z")
+        val tool = RecordingGitCommitsTool("/repo", { _, _, _, _ -> fetches++; emptyList() }, { now }, log = {})
+        val first = tool.execute(buildJsonObject { put("days", 30) })
+        val second = tool.execute(buildJsonObject { put("days", 30) })
+        assertEquals(first, second)
+        assertEquals(1, fetches)
+        // A different window is a new lookup.
+        tool.execute(buildJsonObject { put("days", 7) })
+        assertEquals(2, fetches)
+    }
+}

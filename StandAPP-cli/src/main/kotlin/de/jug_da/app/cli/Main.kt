@@ -65,15 +65,13 @@ internal fun run(args: Array<String>): Int {
         return EXIT_GIT
     }
 
-    // Streaming tokens must not pollute machine-readable stdout. The same
-    // goes for model-load chatter: when stdout carries the result, everything
-    // else is diverted to stderr for the whole generation phase.
+    // stdout carries only the result. Library banners, model-load chatter and
+    // [STAGE/...] lines go to stderr for the whole run: System.out is diverted
+    // and the real stream is kept for streamed tokens and the final emit.
     val streamTokens = cli.format == OutputFormat.MD && cli.output == null
-    val tokenSink: (String) -> Unit = if (streamTokens) STDOUT_SINK else { _ -> }
-    val redirectStdout = !streamTokens
-
     val realOut = System.out
-    if (redirectStdout) System.setOut(PrintStream(java.io.FileOutputStream(java.io.FileDescriptor.err), true))
+    System.setOut(PrintStream(java.io.FileOutputStream(java.io.FileDescriptor.err), true))
+    val tokenSink: (String) -> Unit = if (streamTokens) { token -> realOut.print(token); realOut.flush() } else { _ -> }
 
     val overrides = buildMap<ModelSpec, Path> {
         cli.qwenModelPath?.let { put(ModelCatalog.QWEN3_0_6B, Path.of(it)) }
@@ -88,9 +86,10 @@ internal fun run(args: Array<String>): Int {
     try {
         // STANDAPP_TINY_PROMPT=1 → bypass the pipeline and send a one-line
         // prompt to the summariser. Verifies download + inference without a repo.
+        // The reply is printed once at the end (no token streaming).
         if (System.getenv("STANDAPP_TINY_PROMPT") == "1") {
             val service: LLMService = when (backend) {
-                LLMBackendType.SKAINET -> LlamaChatLLMService(models, onToken = tokenSink)
+                LLMBackendType.SKAINET -> LlamaChatLLMService(models)
                 LLMBackendType.REST_API -> restService()
             }
             val reply = try {
@@ -144,7 +143,15 @@ internal fun run(args: Array<String>): Int {
             System.err.println("(model output needed ${result.attempts} attempts)")
         }
 
-        emit(OutputRenderer.render(result, cli.format), cli.output, realOut)
+        val rendered = OutputRenderer.render(result, cli.format)
+        if (streamTokens) {
+            // The summary was already streamed token by token; close the line and
+            // only print the rendered form when it differs (e.g. reconstructed sections).
+            realOut.println()
+            if (rendered != result.raw.trim()) realOut.println(rendered)
+        } else {
+            emit(rendered, cli.output, realOut)
+        }
 
         var exit = EXIT_OK
         result.result.scores?.let { scores ->
@@ -159,16 +166,11 @@ internal fun run(args: Array<String>): Int {
         return exit
     } finally {
         models.close()
-        if (redirectStdout) System.setOut(realOut)
+        System.setOut(realOut)
     }
 }
 
 private const val MAX_COMMITS = 60
-
-private val STDOUT_SINK: (String) -> Unit = { token ->
-    System.out.print(token)
-    System.out.flush()
-}
 
 private fun reportLlmError(e: Exception): Int {
     System.err.println("Error during generation: ${e.message}")

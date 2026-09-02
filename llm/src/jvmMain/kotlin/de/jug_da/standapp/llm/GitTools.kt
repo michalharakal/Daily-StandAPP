@@ -92,6 +92,14 @@ class RecordingGitCommitsTool(
         if (days <= 0) return "error: 'days' must be positive"
         val author = (arguments["author"] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
 
+        // Small models sometimes emit the same <tool_call> twice in one turn;
+        // the second identical call reuses the recorded result.
+        val previous = recorded
+        if (previous != null && recordedDays == days && recordedAuthor == author) {
+            log("[GitTool] $TOOL_NAME(days=$days, author=${author ?: "*"}) repeated; reusing ${previous.size} recorded commit(s)")
+            return acknowledgement(previous.size, days, author)
+        }
+
         log("[GitTool] $TOOL_NAME(repo=$repoDir, days=$days, author=${author ?: "*"})")
         return try {
             val now = clock()
@@ -101,8 +109,7 @@ class RecordingGitCommitsTool(
             recordedDays = days
             recordedAuthor = author
             log("[GitTool] result: ${commits.size} commit(s) recorded")
-            "ok: ${commits.size} commit(s) found in the last $days day(s)" +
-                (author?.let { " by $it" } ?: "")
+            acknowledgement(commits.size, days, author)
         } catch (t: Throwable) {
             // ToolRegistry.execute would swallow this into a string; keep the
             // cause so the stage can surface it as a git error.
@@ -110,6 +117,9 @@ class RecordingGitCommitsTool(
             "error: ${t.message}"
         }
     }
+
+    private fun acknowledgement(count: Int, days: Int, author: String?): String =
+        "ok: $count commit(s) found in the last $days day(s)" + (author?.let { " by $it" } ?: "")
 
     companion object {
         const val TOOL_NAME = "get_recent_commits"
