@@ -2,7 +2,7 @@
 # This Dockerfile creates a production-ready container with the MCP Server
 
 # Build stage
-FROM gradle:8.5-jdk21 AS builder
+FROM eclipse-temurin:25-jdk-jammy AS builder
 
 LABEL org.opencontainers.image.title="Daily Stand App MCP Server"
 LABEL org.opencontainers.image.description="Model Context Protocol server for Git analysis and AI-powered standup summaries"
@@ -32,7 +32,7 @@ RUN ./gradlew :mcp-server:jvmJar --no-daemon --parallel
 RUN ls -la mcp-server/build/libs/
 
 # Runtime stage
-FROM eclipse-temurin:21-jre-jammy AS runtime
+FROM eclipse-temurin:25-jre-jammy AS runtime
 
 # Install necessary packages
 RUN apt-get update && apt-get install -y \
@@ -44,17 +44,16 @@ RUN apt-get update && apt-get install -y \
 RUN groupadd -r mcpserver && useradd -r -g mcpserver mcpserver
 
 # Create directories
-RUN mkdir -p /app /app/config /app/logs /app/data /app/models \
+RUN mkdir -p /app /app/config /app/logs /app/data /app/models /app/tmp \
     && chown -R mcpserver:mcpserver /app
 
 # Set working directory
 WORKDIR /app
 
 # Copy the fat JAR from builder stage
-COPY --from=builder /app/mcp-server/build/libs/mcp-server-fat.jar /app/mcp-server.jar
+COPY --from=builder /app/mcp-server/build/libs/mcp-server-jvm.jar /app/mcp-server.jar
 
-# Create default configuration directory and sample config
-COPY --chown=mcpserver:mcpserver docker/mcp-server.json /app/config/
+# Entrypoint (configuration is mounted into /app/config at run time)
 COPY --chown=mcpserver:mcpserver docker/docker-entrypoint.sh /app/
 
 # Make entrypoint script executable
@@ -80,7 +79,12 @@ ENV MCP_LOG_FILE_ENABLED=true
 ENV MCP_LOG_FILE_PATH=/app/logs/mcp-server.log
 ENV MCP_PERFORMANCE_METRICS_ENABLED=true
 ENV MCP_PERFORMANCE_METRICS_PORT=9090
-ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:+UseStringDeduplication --enable-preview --add-modules jdk.incubator.vector -Xmx6g"
+# --enable-native-access + a writable, exec-capable tmpdir let the SKaiNET native
+# kernel library extract and load; without it the runtime silently falls back to
+# the slower Panama kernels.
+ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:+UseStringDeduplication --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Djava.io.tmpdir=/app/tmp -Xmx6g"
+# Models (Qwen3 0.6B + Llama 3.2 3B GGUF) are downloaded into this cache on first use.
+ENV STANDAPP_MODEL_CACHE_DIR=/app/models
 
 # Volumes for persistent data
 VOLUME ["/app/config", "/app/logs", "/app/data", "/app/models"]

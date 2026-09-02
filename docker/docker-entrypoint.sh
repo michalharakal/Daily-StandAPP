@@ -145,15 +145,21 @@ print_env_info() {
     log_info "  Log Level: ${MCP_LOG_LEVEL:-<default>}"
     log_info "  Metrics Enabled: ${MCP_PERFORMANCE_METRICS_ENABLED:-<default>}"
     
-    if [ -n "${MCP_LLM_MODEL_PATH:-}" ]; then
-        log_info "  LLM Model Path: $MCP_LLM_MODEL_PATH"
-        if [ -f "$MCP_LLM_MODEL_PATH" ]; then
-            local model_size=$(du -h "$MCP_LLM_MODEL_PATH" | cut -f1)
-            log_info "  LLM Model Size: $model_size"
-        else
-            log_warn "  LLM Model file not found: $MCP_LLM_MODEL_PATH"
-        fi
+    local cache_dir="${STANDAPP_MODEL_CACHE_DIR:-$MODELS_DIR}"
+    log_info "  Model cache: $cache_dir"
+    if [ ! -w "$cache_dir" ]; then
+        log_warn "  Model cache is not writable; first-run model download will fail (set STANDAPP_*_MODEL_PATH or fix permissions)"
     fi
+    for var in STANDAPP_QWEN_MODEL_PATH STANDAPP_LLAMA_MODEL_PATH MCP_LLM_MODEL_PATH; do
+        local value="${!var:-}"
+        if [ -n "$value" ]; then
+            if [ -f "$value" ]; then
+                log_info "  $var: $value ($(du -h "$value" | cut -f1))"
+            else
+                log_warn "  $var points to a missing file: $value"
+            fi
+        fi
+    done
 }
 
 # Start the MCP server

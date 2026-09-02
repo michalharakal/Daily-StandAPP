@@ -180,3 +180,59 @@ artifacts, engine models) reported before the long run; then
 `-Pdeliverance.enabled=true -Pqxotic.enabled=true`, `BENCH_WARMUP=1`,
 `BENCH_TIMEOUT_MS` raised appropriately. Deliverables: report, CSV, prose
 comparison.
+
+== DES-08 Dependency and build migration to 0.53.0
+
+_Satisfies: REQ-50, REQ-53, REQ-54_
+
+`gradle/libs.versions.toml` pins `sk.ainet:skainet-bom` and
+`sk.ainet.transformers:skainet-transformers-bom` at 0.53.0 and adds
+`skainet-backend-api` (kernel pack install), `skainet-data-source` (pipeline
+DSL + `hf://` resolver), `skainet-transformers-core` (the decoder loader moved
+there in 0.40) and `skainet-transformers-inference-qwen`. The kllama runtime is
+dropped: its Java facade rejects Qwen GGUFs, and the Llama stage uses the same
+DSL load chain the Qwen stage needs. `settings.gradle.kts` includes the
+transformers checkout only behind `-PuseLocalTransformers=true` and adds the
+foojay toolchain resolver so a JDK 21 host provisions JDK 25. The shadow JAR
+re-merges both `META-INF/services/sk.ainet.backend.api.kernel.*` files
+(upstream workaround) and shrinks to ~20 MB because no model is embedded.
+
+== DES-09 Pipeline-backed SKAINET backend
+
+_Satisfies: REQ-51, REQ-52, REQ-53_
+
+```
+StandupRequest → [commits] → require-commits → [transform]* → summarize[prompt → generate → parse] → [finish]*
+```
+
+* `model/` — `ModelCatalog` (the two GGUF specs), `ModelResolver`
+  (flag → env → `MCP_LLM_MODEL_PATH` (Llama only) → `hf://` download through
+  `JvmDataSourceResolver` with a long-timeout Ktor client and progress
+  logging), `LocalModel` (`DecoderGgufWeightLoader.loadToMapStreaming` →
+  `QwenNetworkLoader`/`LlamaNetworkLoader.fromWeights` → `OptimizedLLMRuntime`
+  DIRECT, packed weights, stop-token sets), `ModelProvider` (releasing =
+  load/use/close per stage, caching = resident).
+* `pipeline/` — `standupFlow(models) {}` builds a
+  `DataPipeline<StandupRequest, PipelineResult>`. `QwenCommitsStage` drives
+  `AgentLoop` with `QwenChatTemplate(enableThinking = false)`, one tool round,
+  greedy sampling and batched prefill; `RecordingGitCommitsTool` records the
+  structured commit list. `LlamaGenerateStage` renders through
+  `Llama3ChatTemplate` and calls `generateUntilStop` with the Llama 3 stop set
+  and top-p paired with a finite top-k (the upstream sampler is quadratic in the
+  vocabulary when `topK = 0`). `RetryingSummarizeStage` owns the prompt/parse
+  retry loop, reusing `PromptBuilder`, `SummaryParser` and `QualityScorer`.
+* `:standapp-ai-engine` stays pure; `PreprocessBuilder.build()` and the
+  `PostprocessSpec` flags become readable so the JVM stages reuse the vocabulary.
+* `LlamaChatLLMService` implements `LLMService` over the Llama stage for the
+  benchmark and `LLMSummarizer`; `LLMServiceFactory` keeps its signatures.
+
+== DES-10 Packaging, CI and containers
+
+_Satisfies: REQ-54_
+
+CLI JVM args: `--enable-preview --add-modules=jdk.incubator.vector
+--enable-native-access=ALL-UNNAMED -Xmx12g` (KV caches are capped at a
+4096-token window; weights stay memory-mapped). GitHub Actions and the
+Dockerfile use JDK 25; the container sets `java.io.tmpdir=/app/tmp` on an
+exec-capable tmpfs so the native kernel library can be extracted and loaded,
+and mounts the model cache writable for the first-run download.

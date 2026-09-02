@@ -21,8 +21,9 @@ services:
       - ./logs:/app/logs
       # Data directory for repositories
       - ./data:/app/data
-      # Models directory for LLM models
-      - ./models:/app/models:ro
+      # Model cache: Qwen3 0.6B + Llama 3.2 3B GGUFs are downloaded here on first
+      # use (~2.7 GB), so the volume must be writable.
+      - ./models:/app/models
       
     environment:
       # Server configuration
@@ -49,16 +50,18 @@ services:
       - MCP_GIT_MAX_COMMIT_HISTORY=100
       - MCP_GIT_CACHE_ENABLED=true
       
-      # LLM backend selection (required): SKAINET | REST_API | JLAMA
+      # LLM backend selection: SKAINET | REST_API
       - MCP_LLM_BACKEND=SKAINET
-      # SKaiNET backend: path to GGUF model file
-      - MCP_LLM_MODEL_PATH=/app/models/model.gguf
+      # SKaiNET backend: model cache (downloaded on first use) and optional local GGUF overrides
+      - STANDAPP_MODEL_CACHE_DIR=/app/models
+      # - STANDAPP_QWEN_MODEL_PATH=/app/models/Qwen3-0.6B-Q8_0.gguf
+      # - STANDAPP_LLAMA_MODEL_PATH=/app/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf
       # REST API backend: OpenAI-compatible endpoint
       - MCP_LLM_REST_BASE_URL=http://host.docker.internal:11434
       - MCP_LLM_REST_MODEL=llama3.2:3b
       
       # Java JVM options
-      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom
+      - JAVA_OPTS=-XX:+UseG1GC -XX:MaxRAMPercentage=75 -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Djava.io.tmpdir=/app/tmp
     
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
@@ -81,8 +84,11 @@ services:
     security_opt:
       - no-new-privileges:true
     read_only: false
+    # /app/tmp (java.io.tmpdir) must allow exec: the SKaiNET native kernel
+    # library is extracted there and dlopen'ed. /tmp itself may stay locked down.
     tmpfs:
       - /tmp:noexec,nosuid,size=100m
+      - /app/tmp:nosuid,size=64m
     
     # Labels for monitoring and management
     labels:

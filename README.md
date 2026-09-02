@@ -4,50 +4,86 @@
 
 ## Standapp CLI
 
-Generate a daily standup summary from a git repo. Commits flow through a
-typed pipeline declared as Kotlin DSL code
-(`dev.standapp.engine.pipeline.standupPipeline`):
-preprocess → prompt → infer → postprocess.
+Generate a daily standup summary from a git repo with two local models, wired
+together as a SKaiNET data pipeline (`de.jug_da.standapp.llm.pipeline.standupFlow`):
+
+```
+StandupRequest → qwen-commits → require-commits → preprocess → summarize[prompt → llama → parse] → result
+```
+
+1. **Qwen3 0.6B** (`Qwen3-0.6B-Q8_0.gguf`) reads the request and calls the
+   `get_recent_commits` tool. The tool records the structured commit list;
+   Qwen's prose is never used. If the model does not produce a valid call the
+   stage falls back to direct git access and says so on stderr.
+2. **Llama 3.2 3B Instruct** (`Llama-3.2-3B-Instruct-Q4_K_M.gguf`) writes the
+   summary from the engine's prompt templates; the output is parsed, scored and
+   retried on invalid JSON.
+
+Both GGUFs are downloaded on first run (~0.6 GB + ~2.0 GB) through SKaiNET's
+`hf://` data-source resolver into `~/.cache/standapp/models` and reused afterwards.
+Requires JDK 21+ to run Gradle; compilation uses a JDK 25 toolchain (auto-provisioned).
 
 ```bash
-# Default: markdown summary, streamed tokens, embedded Llama 3.2 1B.
+# Default: markdown summary, streamed tokens, Qwen tool call + Llama summary.
 ./gradlew :StandAPP-cli:run --args="--repo /path/to/repo --days 7"
 
 # Structured JSON (parsed + validated, retries once on invalid output),
 # quality report on stderr, summary written to a file:
 ./gradlew :StandAPP-cli:run --args="--repo . --days 7 --format json -o standup.json --score"
 
-# Explicit date window, plain-text output:
+# Explicit date window (direct git access, no tool call), plain-text output:
 ./gradlew :StandAPP-cli:run --args="--repo . --since 2026-07-01 --until 2026-07-11 --format text"
+
+# Self-contained fat JAR (~20 MB; models still come from the cache):
+./gradlew :StandAPP-cli:shadowJar
+java --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx12g \
+  -jar StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar --repo /path/to/repo --days 7 --score
 ```
 
 Key flags: `--format md|json|text`, `--since/--until` (win over `--days`),
-`--backend skainet|rest_api`, `--model <gguf>`, `--output <file>`, `--score`,
-`--max-tokens`, `--temperature`, `--tool-calling`. Run `--help` for the full
-list. Exit codes: `0` ok, `2` usage, `3` git error/no commits, `4` LLM error,
+`--backend skainet|rest_api`, `--commits qwen|git`, `--qwen-model <gguf>`,
+`--llama-model <gguf>` (alias `--model`), `--keep-models`, `--output <file>`,
+`--score`, `--max-tokens`, `--temperature`. Run `--help` for the full list.
+Exit codes: `0` ok, `2` usage, `3` git error/no commits, `4` LLM/model error,
 `5` failed quality checks or unparseable JSON. Machine-readable output stays
-clean: status and stage logs go to stderr.
+clean: status and `[STAGE/...]` logs go to stderr.
 
-### Tool-calling mode (opt-in)
+### Models and environment
 
-`--tool-calling` (or legacy `STANDAPP_TOOL_CALLING=1`) switches the SKAINET
-backend to a `JavaAgentLoop`-driven path. The model fetches commits itself by
-calling a `get_recent_commits` tool. Stage logs go to stderr; the streamed
-answer goes to stdout.
+| Variable | Purpose |
+|----------|---------|
+| `STANDAPP_QWEN_MODEL_PATH` | Local GGUF for the tool-calling stage (skips the download) |
+| `STANDAPP_LLAMA_MODEL_PATH` | Local GGUF for the summariser (`MCP_LLM_MODEL_PATH` is honoured as a legacy alias) |
+| `STANDAPP_MODEL_CACHE_DIR` | Download cache, default `~/.cache/standapp/models` |
+| `STANDAPP_OFFLINE=1` | Never touch the network; fail fast when the cache is cold |
+| `HF_TOKEN` | Optional Hugging Face token for the download |
+| `MCP_LLM_BACKEND=REST_API` | Use an OpenAI-compatible endpoint for the summary instead (`MCP_LLM_REST_BASE_URL`, `MCP_LLM_REST_MODEL`) |
+| `STANDAPP_TINY_PROMPT=1` | Send a one-line prompt to the summariser only (download + inference smoke test) |
 
-```bash
-./gradlew :StandAPP-cli:run \
-  --args="--repo /path/to/repo --days 7 --tool-calling" 2>stages.log
+Either override may also be an `hf://org/repo@rev/file.gguf` URI, resolved through the same cache.
+
+### Extending the pipeline
+
+Every step is a `sk.ainet.data.source.PipelineStage`, so the flow is glue you can
+extend from Kotlin without touching the built-ins:
+
+```kotlin
+val flow = standupFlow(models) {
+    commits = qwenToolCall(tools = listOf(GetOpenIssuesTool(repo)))   // extra tools for Qwen
+    preprocess { shortIds(7); firstMessageLine(120); limit(60) }
+    transform("drop-merges") { b -> b.copy(commits = b.commits.filterNot { it.message.startsWith("Merge") }) }
+    prompt { type = PromptType.JSON }
+    summarize(llama())                                                // or llmService(RestApiLLMService(...))
+    postprocess { parseSummary(); score(); retryOnInvalid(2) }
+    finish("archive") { r -> File("last.md").writeText(r.raw); r }
+}
+println(flow.describe())
+val result = flow.execute(StandupRequest(repoDir = ".", days = 7))
 ```
 
-`stages.log` will contain `[STAGE/INPUT]`, `[STAGE/RENDERED CHAT TEMPLATE
-(round 0)]`, `[STAGE/PREFILL DONE]`, `[STAGE/FINAL ANSWER]`, etc. — useful for
-debugging what the model is actually seeing and producing. See
-`docs/modules/architecture/pages/08-crosscutting-concepts.adoc` §8.7 for the
-full table.
-
-The 1B model can drive the loop on small commit windows but is unreliable on
-long ones — that is why this is opt-in, not default.
+Stage logs (`[STAGE/QWEN RENDERED PROMPT]`, `[STAGE/TOOL CALLS]`,
+`[STAGE/FALLBACK]`, `[STAGE/PREFILL DONE]`, `[STAGE/FINAL ANSWER]`, …) go to
+stderr — redirect with `2>stages.log` to inspect what each model saw and produced.
 
 ## MCP Server
 
@@ -61,7 +97,7 @@ long ones — that is why this is opt-in, not default.
 ls -la mcp-server/build/libs/mcp-server-jvm.jar
 ```
 
-Expected output: You should see the `mcp-server-fat.jar` file with recent timestamp.
+Expected output: You should see the `mcp-server-jvm.jar` file with a recent timestamp.
 
 ### Step 2: Start the MCP Server
 
@@ -85,7 +121,7 @@ The `:benchmark` module evaluates local LLM backends for standup summary generat
 - JDK 25+
 - At least one backend available:
   - **LM Studio** or **Ollama** running locally or on a remote machine, or
-  - **SKAINET** with a GGUF model file on disk
+  - **SKAINET** (Llama 3.2 3B Q4_K_M, downloaded on first use or pointed at via `MCP_LLM_MODEL_PATH`)
 - Optional benchmark-only alternative engines:
   - **Deliverance** — pure-Java JVM inference. Requires `./scripts/setup-bench-engines.sh` (clones the repo + `mvn install` into `~/.m2`), then build with `-Pdeliverance.enabled=true`. In-process; auto-downloads HuggingFace models.
   - **qxotic** — JVM-native LLM toolkit. Same setup script, then build with `-Pqxotic.enabled=true`. Subprocess-launched (the runnable inference lives in qxotic's `examples` module's `Llama32CliQ8_0` CLI; we shell out to it once per generate call). Slower than in-process — model is reloaded per call — but proves the abstraction holds across very different engine designs.
@@ -158,7 +194,7 @@ java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.
 #### 4. Run all backends
 
 ```bash
-MCP_LLM_MODEL_PATH=/path/to/model.gguf \
+STANDAPP_LLAMA_MODEL_PATH=/path/to/Llama-3.2-3B-Instruct-Q4_K_M.gguf \
 BENCH_LOCAL_URL=http://localhost:1234 \
 BENCH_LOCAL_MODEL=tinyllama-1.1b-chat-v1.0 \
 BENCH_CLOUD_URL=https://api.openai.com/v1 \
@@ -183,7 +219,7 @@ java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.
 | `BENCH_CLOUD_MODEL` | `gpt-4o-mini` | Model name for the cloud endpoint |
 | `BENCH_CLOUD_API_KEY` | `OPENAI_API_KEY` | Optional cloud Bearer token (falls back to `OPENAI_API_KEY`) |
 | `BENCH_OUTPUT_DIR` | `./benchmark-results` | Where reports are written |
-| `MCP_LLM_MODEL_PATH` | _(none)_ | Path to GGUF model file (required for SKAINET) |
+| `MCP_LLM_MODEL_PATH` | _(download)_ | Local GGUF for the SKAINET summariser (Llama 3.2 3B); downloaded into the model cache when unset |
 
 Example focused run (single case, single prompt, single run):
 
@@ -241,7 +277,7 @@ Pick the model that passes quality thresholds while meeting your operational con
 | Priority | Choose | When |
 |----------|--------|------|
 | Offline/privacy first | SKAINET | No network dependency, data stays on device |
-| Lowest latency | SKAINET (KLlama) | Kotlin-native inference, no HTTP overhead |
+| Lowest latency | SKAINET | Kotlin-native inference, no HTTP overhead |
 | Easiest setup | REST_API (Ollama) | Single `ollama pull` command, broad model catalog |
 | Best quality ceiling | REST_API (cloud) | Acceptable latency/cost trade-off, internet available |
 

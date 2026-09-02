@@ -1,7 +1,7 @@
 = Implementation Tasks
 :navtitle: Tasks
 
-Traceable task list for the July 2026 iteration. Each task references the
+Traceable task lists per iteration. Each task references the
 xref:design.adoc[design sections] and xref:requirements.adoc[requirements] it
 implements, and names its verification gate. Status values: `open`,
 `in progress`, `done`, `dropped`.
@@ -101,6 +101,110 @@ implements, and names its verification gate. Status values: `open`,
 | DES-07; REQ-30, REQ-32
 | `benchmark-report.md` + CSV delivered
 | done
+|===
+
+== September 2026 iteration: SKaiNET 0.53 two-model pipeline
+
+Goal: a working JVM CLI on the released SKaiNET / SKaiNET-transformers
+0.53.0, with Qwen3-0.6B calling `get_recent_commits` (function calling) and
+Llama-3.2-3B-Instruct (Q4_K_M) writing the summary, expressed as an extendable
+SKaiNET data pipeline (`standupFlow {}` over `sk.ainet.data.source.DataPipeline`).
+Legacy single-model paths (embedded 1B JAR resource, `--tool-calling`) are
+replaced. See xref:design.adoc[DES-08..DES-10] and xref:requirements.adoc[REQ-50..REQ-55].
+
+[cols="1,4,2,3,1", options="header"]
+|===
+| ID | Task | Traces to | Verification gate | Status
+
+| T-16
+| Version catalog → SKaiNET/transformers 0.53.0, Kotlin 2.4.10, Ktor 3.5.2;
+  add `skainet-backend-api`, `skainet-data-source`, `skainet-tx-core`,
+  `skainet-tx-inference-qwen`; drop `skainet-tx-runtime-kllama`
+| DES-08; REQ-50
+| `./gradlew help`; `:llm:dependencies --configuration jvmRuntimeClasspath`
+  lists only 0.53.0 `sk.ainet*` artifacts
+| done
+
+| T-17
+| `settings.gradle.kts`: composite build opt-in via `-PuseLocalTransformers=true`,
+  substitutions incl. `:llm-inference:qwen`; foojay toolchain resolver
+| DES-08; REQ-50, REQ-54
+| `:llm:compileKotlinJvm` with and without the property
+| done
+
+| T-18
+| `llm/build.gradle.kts` new dependency set; delete `prepareModel` + embedded
+  GGUF resource wiring, `.gitignore` rule, `scripts/download-model.py`
+| DES-08; REQ-50, REQ-53
+| `:llm:compileKotlinJvm` green; `git grep prepareModel` empty
+| done
+
+| T-19
+| Remove legacy runtime: `EmbeddedModelLoader`, `SKaiNetLLMService`,
+  `ToolCallingLLMService`, `createToolCallingForGit`, `--tool-calling`,
+  `STANDAPP_TOOL_CALLING`; delete orphaned android/native/wasm source sets
+| DES-09; REQ-53
+| `./gradlew assemble`; `git grep -E "EmbeddedModelLoader\|TOOL_CALLING\|download-model"` empty
+| done
+
+| T-20a
+| Engine visibility tweaks; `model/` package: `KernelSetup`, `ModelCatalog`,
+  `ModelResolver` (hf:// download + cache + env precedence), `LocalModel`,
+  `ModelProvider` (releasing/caching) + `ModelResolverTest`
+| DES-09; REQ-51, REQ-52
+| `:standapp-ai-engine:allTests`, `:llm:jvmTest`
+| done
+
+| T-20b
+| `pipeline/`: carrier types, git/require/preprocess/prompt/LLMService stages,
+  `RetryingSummarizeStage`, `standupFlow {}` DSL + `StandupFlowTest`
+  (stage order, retry, fallback, explicit window, finish hooks)
+| DES-09; REQ-51
+| `:llm:jvmTest`
+| done
+
+| T-20c
+| `RecordingGitCommitsTool` + `QwenCommitsStage` (AgentLoop, thinking off,
+  one tool round, direct-git fallback); `LlamaGenerateStage` +
+  `LlamaChatLLMService`; `LLMServiceFactory` rewrite
+| DES-09; REQ-51, REQ-52
+| `:llm:jvmTest`; e2e stderr shows `[STAGE/TOOL CALLS] get_recent_commits`
+| done
+
+| T-21
+| CLI: `--qwen-model`, `--llama-model`, `--commits qwen\|git`, `--keep-models`;
+  `Main` on `standupFlow`; JVM args + shadow service-file reconciliation
+| DES-05, DES-10
+| `:StandAPP-cli:test`; fat JAR lists Native provider + `FfmRowMajorKernelPackFactory`
+| done
+
+| T-22
+| `:mcp-server`, `:benchmark`, `cloud-api/*` compile against the new `:llm`
+| DES-09; REQ-53
+| `./gradlew :mcp-server:jvmJar :benchmark:jvmJar :cloud-api:agent:build`
+| done
+
+| T-23
+| CI/Docker: JDK 25 in `build.yml`; Dockerfile (temurin 25, correct jar name,
+  exec-capable `java.io.tmpdir`), compose env vars + writable model volume,
+  entrypoint validates the model cache
+| DES-10; REQ-54
+| `docker compose config`; GitHub Actions `assemble` green
+| in progress
+
+| T-24
+| Docs truth sweep: README, CLAUDE.md, arc42 (ADR-012; ADR-010/011 superseded),
+  prompt-engineering pages, planning REQ-50+/DES-08+, this table
+| REQ-55
+| Antora docs build; `git grep -- "--tool-calling"` in docs only in historical pages
+| in progress
+
+| T-25
+| End-to-end verification ladder recorded (exit codes, tok/s, model cache
+  listing, RSS); sampler top-k pairing fix from the first measurement
+| REQ-51, REQ-52
+| ladder log in xref:verification-2026-09.adoc[]; `--score` run exits 0 or 5, never 3/4
+| in progress
 |===
 
 == Follow-on: upstream program

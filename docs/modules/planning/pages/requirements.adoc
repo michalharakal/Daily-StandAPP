@@ -177,3 +177,57 @@ explicit types over generality; no new CLI argument-parsing dependency.
 | New logic (parser, pipeline, CLI argument parsing) is covered by unit tests
 runnable without a model download.
 |===
+
+== September 2026 iteration: SKaiNET 0.53 two-model pipeline
+
+Requirements for the second iteration (started 2026-09-02): latest SKaiNET
+releases, function calling with a small model, and the standup flow expressed
+as a SKaiNET data pipeline. Referenced by xref:design.adoc[DES-08..DES-10] and
+xref:tasks.adoc[T-16..T-25].
+
+[cols="1,5a", options="header"]
+|===
+| ID | Requirement
+
+| REQ-50
+| SKaiNET core and SKaiNET-transformers are upgraded to the latest published
+release, 0.53.0 (Maven Central), consumed through their BOMs. Kotlin follows
+the upstream toolchain (2.4.10), Ktor the data-source module (3.5.2). A local
+`../SKaiNET-transformers` checkout is opt-in (`-PuseLocalTransformers=true`),
+never implicit, so a plain checkout and CI resolve the same dependency graph.
+
+| REQ-51
+| Two local models in sequence: Qwen3-0.6B (Q8_0) turns the request into a
+`get_recent_commits` function call whose structured result feeds
+Llama-3.2-3B-Instruct (Q4_K_M) for summarisation. The flow is declared as a
+SKaiNET data pipeline (`sk.ainet.data.source.DataPipeline`) through an
+extendable app-level DSL: every step is a `PipelineStage`, custom transforms,
+tools and generation stages can be plugged in without modifying the built-ins.
+If the tool model produces no valid call the pipeline falls back to direct git
+access and reports it — the CLI always delivers a summary.
+
+| REQ-52
+| Models are not bundled. Both GGUFs are resolved on first run through the
+SKaiNET `hf://` data-source resolver into a local cache
+(`STANDAPP_MODEL_CACHE_DIR`, default `~/.cache/standapp/models`) and reused
+afterwards; local files can be supplied via CLI flags or
+`STANDAPP_QWEN_MODEL_PATH` / `STANDAPP_LLAMA_MODEL_PATH` (`MCP_LLM_MODEL_PATH`
+stays a legacy alias for the summariser). `STANDAPP_OFFLINE=1` forbids network
+access. Privacy stays intact: after the download no network call is made.
+
+| REQ-53
+| The single-model legacy paths are replaced, not kept alongside: embedded
+Llama-1B JAR resource, `prepareModel`/`download-model.py`, `EmbeddedModelLoader`,
+`SKaiNetLLMService`, `ToolCallingLLMService`, `--tool-calling`. `REST_API`,
+`:mcp-server`, `:benchmark` and `cloud-api/*` keep compiling; `LLMService`
+remains the plain prompt-in/text-out contract for them.
+
+| REQ-54
+| CI and Docker build with the JDK 25 toolchain the modules request; the
+container's temp directory allows the native SKaiNET kernel library to load.
+
+| REQ-55
+| README, CLAUDE.md, arc42 and prompt-engineering docs describe the two-model
+pipeline; superseded decisions are marked as such; the task table in
+xref:tasks.adoc[] tracks progress with verification gates.
+|===
