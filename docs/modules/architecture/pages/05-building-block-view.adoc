@@ -235,7 +235,7 @@ graph TB
 |Renders system + user prompts from the engine's `PromptBuilder` for the request's `PromptType` (`SUMMARY` or `JSON`).
 
 |`LlamaGenerateStage`
-|`PromptedBatch → RawOutput` on Llama-3.2-3B-Instruct. Renders through `Llama3ChatTemplate`, checks the prompt fits the 4096-token window, then `generateUntilStop` with the Llama 3 stop set, batched prefill, the CLI temperature (default 0.1), top-p 0.9 paired with top-k 40. Streams tokens to `onToken`; emits the `[STAGE/INPUT|PREFILL|COMPLETE|FINAL ANSWER]` logs.
+|`PromptedBatch → RawOutput` on Llama-3.2-3B-Instruct. Renders through `Llama3ChatTemplate`, checks the prompt fits the 4096-token window, then `generateUntilStop` with the Llama 3 stop set, batched prefill, the CLI temperature (default 0.1), top-p 0.9 paired with top-k 40. Streams tokens to `onToken`; emits the `[STAGE/INPUT\|PREFILL\|COMPLETE\|FINAL ANSWER]` logs.
 
 |`LLMServiceGenerateStage`
 |`PromptedBatch → RawOutput` through any `LLMService` — the REST backend and test fakes.

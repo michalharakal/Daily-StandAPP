@@ -107,6 +107,17 @@ internal fun run(args: Array<String>): Int {
             // firstMessageLine keeps prefill sane on real repos: multi-paragraph
             // commit bodies multiply prompt tokens without adding signal.
             preprocess { shortIds(7); firstMessageLine(120); limit(MAX_COMMITS) }
+            if (cli.format == OutputFormat.JSON) {
+                // A 3B model spends roughly 40 tokens per commit on the JSON schema;
+                // warn before a long generation that will be cut off and fail parsing.
+                transform("json-budget-hint") { batch ->
+                    val needed = batch.commits.size * JSON_TOKENS_PER_COMMIT + JSON_TOKENS_OVERHEAD
+                    if (needed > cli.maxTokens) {
+                        System.err.println("[STAGE/WARN] JSON for ${batch.commits.size} commit(s) needs about $needed tokens but --max-tokens is ${cli.maxTokens}; consider --max-tokens ${((needed + 255) / 256) * 256} or a smaller window")
+                    }
+                    batch
+                }
+            }
             prompt { type = if (cli.format == OutputFormat.JSON) PromptType.JSON else PromptType.SUMMARY }
             summarize(
                 when (backend) {
@@ -171,6 +182,8 @@ internal fun run(args: Array<String>): Int {
 }
 
 private const val MAX_COMMITS = 60
+private const val JSON_TOKENS_PER_COMMIT = 40
+private const val JSON_TOKENS_OVERHEAD = 64
 
 private fun reportLlmError(e: Exception): Int {
     System.err.println("Error during generation: ${e.message}")

@@ -190,21 +190,21 @@ replaced. See xref:design.adoc[DES-08..DES-10] and xref:requirements.adoc[REQ-50
   entrypoint validates the model cache
 | DES-10; REQ-54
 | `docker compose config`; GitHub Actions `assemble` green
-| in progress
+| done
 
 | T-24
 | Docs truth sweep: README, CLAUDE.md, arc42 (ADR-012; ADR-010/011 superseded),
   prompt-engineering pages, planning REQ-50+/DES-08+, this table
 | REQ-55
 | Antora docs build; `git grep -- "--tool-calling"` in docs only in historical pages
-| in progress
+| done
 
 | T-25
 | End-to-end verification ladder recorded (exit codes, tok/s, model cache
   listing, RSS); sampler top-k pairing fix from the first measurement
 | REQ-51, REQ-52
 | ladder log in xref:verification-2026-09.adoc[]; `--score` run exits 0 or 5, never 3/4
-| in progress
+| done
 |===
 
 == Follow-on: upstream program
