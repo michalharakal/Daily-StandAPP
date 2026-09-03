@@ -73,9 +73,10 @@ internal fun run(args: Array<String>): Int {
     System.setOut(PrintStream(java.io.FileOutputStream(java.io.FileDescriptor.err), true))
     val tokenSink: (String) -> Unit = if (streamTokens) { token -> realOut.print(token); realOut.flush() } else { _ -> }
 
+    val summarySpec = ModelCatalog.summaryModel(cli.summaryModel) ?: ModelCatalog.LLAMA_3_2_3B
     val overrides = buildMap<ModelSpec, Path> {
         cli.qwenModelPath?.let { put(ModelCatalog.QWEN3_0_6B, Path.of(it)) }
-        cli.llamaModelPath?.let { put(ModelCatalog.LLAMA_3_2_3B, Path.of(it)) }
+        cli.llamaModelPath?.let { put(summarySpec, Path.of(it)) }
     }
     val models: ModelProvider = if (cli.keepModels) {
         ModelProvider.caching(ModelResolver(), overrides)
@@ -89,7 +90,7 @@ internal fun run(args: Array<String>): Int {
         // The reply is printed once at the end (no token streaming).
         if (System.getenv("STANDAPP_TINY_PROMPT") == "1") {
             val service: LLMService = when (backend) {
-                LLMBackendType.SKAINET -> LlamaChatLLMService(models)
+                LLMBackendType.SKAINET -> LlamaChatLLMService(models, spec = summarySpec)
                 LLMBackendType.REST_API -> restService()
             }
             val reply = try {
@@ -121,7 +122,7 @@ internal fun run(args: Array<String>): Int {
             prompt { type = if (cli.format == OutputFormat.JSON) PromptType.JSON else PromptType.SUMMARY }
             summarize(
                 when (backend) {
-                    LLMBackendType.SKAINET -> llama()
+                    LLMBackendType.SKAINET -> llama(spec = summarySpec)
                     LLMBackendType.REST_API -> llmService(restService(), name = "rest-api")
                 }
             )
@@ -246,6 +247,7 @@ private fun printUsage(out: PrintStream) {
               --commits MODE      qwen (default: tool call) | git (direct JGit access)
               --qwen-model PATH   Local GGUF for the tool-calling stage
           -m, --llama-model PATH  Local GGUF for the summariser (alias: --model)
+              --summary-model M   3b (default, Llama-3.2-3B Q4_K_M) | 1b (Llama-3.2-1B Q8_0, ~2-3x faster)
               --keep-models       Keep both models loaded instead of releasing after each stage
           -o, --output FILE       Write the summary to FILE instead of stdout
               --score             Print a quality report to stderr (failed checks exit 5)
@@ -261,6 +263,7 @@ private fun printUsage(out: PrintStream) {
           MCP_LLM_BACKEND, MCP_LLM_REST_BASE_URL, MCP_LLM_REST_MODEL, MCP_LLM_REST_API_KEY,
           STANDAPP_QWEN_MODEL_PATH, STANDAPP_LLAMA_MODEL_PATH (or MCP_LLM_MODEL_PATH),
           STANDAPP_MODEL_CACHE_DIR (default ~/.cache/standapp/models), STANDAPP_OFFLINE=1,
+          STANDAPP_PREFILL=batched:64|autoregressive (engine prefill strategy),
           HF_TOKEN (optional Hugging Face token), STANDAPP_TINY_PROMPT=1 (inference smoke test)
 
         Examples:

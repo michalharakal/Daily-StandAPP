@@ -4,6 +4,7 @@ import de.jug_da.standapp.llm.model.LocalModel
 import de.jug_da.standapp.llm.model.ModelCatalog
 import de.jug_da.standapp.llm.model.ModelProvider
 import de.jug_da.standapp.llm.model.ModelSpec
+import de.jug_da.standapp.llm.model.PrefillSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import sk.ainet.apps.kllama.chat.ChatMessage
@@ -27,7 +28,7 @@ class LlamaGenerateStage(
     private val spec: ModelSpec = ModelCatalog.LLAMA_3_2_3B,
     private val onToken: (String) -> Unit = {},
     private val random: Random = Random.Default,
-    private val prefill: PrefillStrategy = PrefillStrategy.Batched(64),
+    private val prefill: PrefillStrategy = PrefillSettings.fromEnv(),
     /**
      * Top-k cut applied whenever nucleus sampling is active. Upstream's
      * `sampleFromLogits(topK = 0, topP < 1)` uses k = vocab size and its
@@ -84,7 +85,7 @@ class LlamaGenerateStage(
         if (budget < maxTokens) {
             StageLog.stage("WARN", "maxTokens clamped $maxTokens -> $budget to fit the $window-token window")
         }
-        StageLog.stage("INPUT", "model=${model.spec.id} promptTokens=${promptTokens.size} maxTokens=$budget temp=$temperature topP=$topP attempt=$attempt")
+        StageLog.stage("INPUT", "model=${model.spec.id} promptTokens=${promptTokens.size} maxTokens=$budget temp=$temperature topP=$topP prefill=$prefill attempt=$attempt")
         StageLog.block("SYSTEM PROMPT", system)
         StageLog.block("USER PROMPT", user)
 

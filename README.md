@@ -41,9 +41,9 @@ java --enable-preview --add-modules jdk.incubator.vector --enable-native-access=
 ```
 
 Key flags: `--format md|json|text`, `--since/--until` (win over `--days`),
-`--backend skainet|rest_api`, `--commits qwen|git`, `--qwen-model <gguf>`,
-`--llama-model <gguf>` (alias `--model`), `--keep-models`, `--output <file>`,
-`--score`, `--max-tokens`, `--temperature`. Run `--help` for the full list.
+`--backend skainet|rest_api`, `--commits qwen|git`, `--summary-model 3b|1b`,
+`--qwen-model <gguf>`, `--llama-model <gguf>` (alias `--model`), `--keep-models`,
+`--output <file>`, `--score`, `--max-tokens`, `--temperature`. Run `--help` for the full list.
 Exit codes: `0` ok, `2` usage, `3` git error/no commits, `4` LLM/model error,
 `5` failed quality checks or unparseable JSON. Machine-readable output stays
 clean: status and `[STAGE/...]` logs go to stderr.
@@ -61,6 +61,21 @@ clean: status and `[STAGE/...]` logs go to stderr.
 | `STANDAPP_TINY_PROMPT=1` | Send a one-line prompt to the summariser only (download + inference smoke test) |
 
 Either override may also be an `hf://org/repo@rev/file.gguf` URI, resolved through the same cache.
+
+### Speed
+
+On a 6-core laptop the 3B summariser costs about 0.35 s per prompt token and
+0.3–0.5 s per generated token (SKaiNET 0.53: memory-bound gemv per token plus
+scalar attention; see the verification log in `docs/modules/planning`). What helps:
+
+- **Small windows**: `--days 1..3`. Prompt tokens dominate; a 5-commit prompt
+  is ~550 tokens, a 26-commit prompt ~2,100.
+- **`--summary-model 1b`**: Llama-3.2-1B Q8_0 instead of 3B Q4_K_M, roughly
+  2–3× faster at lower summary quality.
+- **`--commits git`** skips the Qwen tool round (~40 s) when the function-calling
+  demo is not needed.
+- `STANDAPP_PREFILL=autoregressive|batched:N` selects the engine prefill
+  strategy; measured as a wash on 0.53, kept for experiments.
 
 ### Extending the pipeline
 

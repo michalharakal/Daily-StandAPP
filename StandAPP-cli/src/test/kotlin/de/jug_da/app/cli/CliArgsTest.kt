@@ -107,6 +107,13 @@ class CliArgsTest {
     }
 
     @Test
+    fun summary_model_preset() {
+        assertEquals("3b", CliArgs.parse(emptyArray()).summaryModel)
+        assertEquals("1b", CliArgs.parse(arrayOf("--summary-model", "1B")).summaryModel)
+        assertFailsWith<CliUsageException> { CliArgs.parse(arrayOf("--summary-model", "7b")) }
+    }
+
+    @Test
     fun bad_commits_mode_is_usage_error() {
         assertFailsWith<CliUsageException> { CliArgs.parse(arrayOf("--commits", "magic")) }
     }

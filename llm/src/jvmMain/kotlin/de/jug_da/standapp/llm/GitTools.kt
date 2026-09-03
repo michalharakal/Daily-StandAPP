@@ -64,8 +64,7 @@ class RecordingGitCommitsTool(
 
     override val definition: ToolDefinition = ToolDefinition(
         name = TOOL_NAME,
-        description = "List the git commits of the repository from the last N days. " +
-            "Returns the number of commits found; the commit details are handed to the summariser.",
+        description = "List the repository's git commits from the last N days.",
         parameters = Json.parseToJsonElement(
             """
             {
@@ -73,11 +72,11 @@ class RecordingGitCommitsTool(
               "properties": {
                 "days": {
                   "type": "integer",
-                  "description": "Number of days to look back from now (positive integer, e.g. 7)."
+                  "description": "Days to look back (positive integer)."
                 },
                 "author": {
                   "type": "string",
-                  "description": "Optional author name filter. Omit for all authors."
+                  "description": "Optional author name filter."
                 }
               },
               "required": ["days"]

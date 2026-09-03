@@ -94,6 +94,84 @@ Llama prompt 2,072 tokens, 100-token summary. Wall clock 31 min, RSS 14.4 GB.
 * T-24: `docs/build-docs.sh` (Antora in Docker) exits 0 with no asciidoctor
   errors after escaping a stray `|` in a building-block table cell.
 
+== Performance analysis (2026-09-03)
+
+JFR profile (`-XX:StartFlightRecording settings=profile`) of a 2-day default
+run — Qwen tool round 40 s, Llama-3.2-3B prompt 547 tokens (5 commits),
+prefill 193 s, 105 tokens decoded in 58 s, wall 4:58, RSS 5.6 GB, 3.5 cores
+busy on average:
+
+[cols="3,1,4", options="header"]
+|===
+| Where the time goes | Share | Why
+
+| `FfmRowMajorMatmulKernel` → native `skainet_q4k_matmul_rm` (gemv)
+| ≈ 50 %
+| One native call *per prompt row and per layer*: every token re-streams the
+whole 2 GB of packed weights through memory. Memory-bandwidth bound; the native
+kernel threads output rows but is capped at `SKAINET_MATMUL_THREADS = 4`
+(6 physical cores here).
+
+| `DefaultCpuOpsBase.scaledDotProductAttention` (batched prefill) and
+`MultiHeadAttention.fusedDecodeAttention` (decode)
+| ≈ 40 %
+| Scalar, single-threaded Kotlin loops. Both paths `copyToFloatArray()` the
+used K/V prefix on every token and layer; the batched path additionally tiles
+K/V to the query head count (`repeatKVHeads`) and permutes.
+
+| `ScopedTensorDataFactory.init/slab`, `permute`, `flatIndex/computeStrides`, GC
+| ≈ 10 %
+| Per-token tensor allocation churn (36 k allocation samples, 83 old-gen GCs
+in 5 min).
+|===
+
+Prefill strategy makes no difference (same 547-token prompt, `--max-tokens 32`):
+
+[cols="2,1,1,1", options="header"]
+|===
+| `STANDAPP_PREFILL` | Prefill | CPU time | Wall
+| `autoregressive` | 203 s | 904 s | 3:43
+| `batched:16` | 209 s | 837 s | 3:48
+| `batched:64` (default) | 190 s | 723 s | 3:29
+|===
+
+Consequences for this app:
+
+* **Prompt tokens are the lever.** ≈ 0.35 s per prompt token on the 3B: the
+  5-commit prompt is 547 tokens of which ≈ 350 are the summary template.
+  Short windows (`--days 1..3`), `limit(n)` and a leaner template pay off
+  linearly.
+* **Model size is the other lever.** `--summary-model 1b`
+  (Llama-3.2-1B Q8_0) cuts weights ×2.6 and attention work ×2.5 — see the
+  measurement below.
+* The Qwen round is fixed cost (≈ 330-token rendered prompt at ≈ 0.1 s/token);
+  the system prompt and tool description were shortened, `--commits git`
+  skips it entirely.
+* Not a lever: prefill strategy, `--keep-models` (loads cost 2 s), heap size.
+
+Measured after the changes (same repo, `--days 2`, 5 commits, 547-token prompt):
+
+[cols="3,1,1,1,1", options="header"]
+|===
+| Configuration | Qwen round | Llama prefill | Llama decode | Wall
+| 3B Q4_K_M, original prompts | 40 s | 193 s | 105 tok in 58 s (1.8 tok/s) | 4:58
+| 3B Q4_K_M, trimmed Qwen prompt | 37 s (prefill 23 s) | ≈ 190 s | ≈ 1.8 tok/s | ≈ 4:45
+| `--summary-model 1b` (Llama-3.2-1B Q8_0), trimmed Qwen prompt | 37 s | 57 s | 124 tok in 17 s (7.4 tok/s) | 2:40 (+1 min first-run download); quality 3/3
+|===
+
+Upstream (SKaiNET / SKaiNET-transformers) wins, in order of impact:
+
+. **Batched prefill GEMM for packed weights** — process a chunk of rows per
+  weight pass instead of one gemv per row (the row loop in
+  `FfmRowMajorMatmulKernel.run`). Prefill would stop costing as much as decode.
+. **Vectorised, multi-threaded attention** — Panama `FloatVector` dot products
+  across heads, and read the KV buffers in place instead of copying the used
+  prefix every token/layer (`fusedDecodeAttention`, `scaledDotProductAttention`).
+. **Thread cap** — `SKAINET_MATMUL_THREADS` is a compile-time 4; make it
+  runtime-configurable / `availableProcessors`-based.
+. **Allocation churn** — reuse per-step activations (`ScopedTensorDataFactory`)
+  and avoid the permute/unsqueeze chain on the batched path.
+
 == Findings fed back into the code
 
 . Top-p must be paired with a finite top-k on this SKaiNET version (see step 4).

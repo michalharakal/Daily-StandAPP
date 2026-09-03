@@ -29,6 +29,8 @@ data class CliArgs(
     val llamaModelPath: String? = null,
     /** Qwen tool call (default) or direct git access for the commit list. */
     val commits: CommitsMode = CommitsMode.QWEN,
+    /** Summariser preset: `3b` (default, Llama-3.2-3B Q4_K_M) or `1b` (Llama-3.2-1B Q8_0, ~2–3× faster). */
+    val summaryModel: String = "3b",
     /** Keep both models resident instead of releasing each after its stage. */
     val keepModels: Boolean = false,
     /** Write the rendered summary to this file instead of stdout. */
@@ -94,6 +96,11 @@ data class CliArgs(
                         val mode = CommitsMode.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
                             ?: throw CliUsageException("--commits expects qwen|git, got '$raw'")
                         result = result.copy(commits = mode)
+                    }
+                    "--summary-model" -> {
+                        val raw = value(arg)
+                        if (raw.lowercase() !in setOf("3b", "1b")) throw CliUsageException("--summary-model expects 3b|1b, got '$raw'")
+                        result = result.copy(summaryModel = raw.lowercase())
                     }
                     "--keep-models" -> result = result.copy(keepModels = true)
                     "--output", "-o" -> result = result.copy(output = value(arg))

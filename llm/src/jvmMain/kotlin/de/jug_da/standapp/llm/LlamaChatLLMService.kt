@@ -3,6 +3,7 @@ package de.jug_da.standapp.llm
 import de.jug_da.standapp.llm.model.ModelCatalog
 import de.jug_da.standapp.llm.model.ModelProvider
 import de.jug_da.standapp.llm.model.ModelResolver
+import de.jug_da.standapp.llm.model.ModelSpec
 import de.jug_da.standapp.llm.pipeline.LlamaGenerateStage
 import java.nio.file.Path
 
@@ -16,9 +17,10 @@ class LlamaChatLLMService(
     private val models: ModelProvider,
     private val systemPrompt: String = LLMService.SYSTEM_PROMPT,
     onToken: (String) -> Unit = {},
+    spec: ModelSpec = ModelCatalog.LLAMA_3_2_3B,
 ) : LLMService, AutoCloseable {
 
-    private val stage = LlamaGenerateStage(models, ModelCatalog.LLAMA_3_2_3B, onToken)
+    private val stage = LlamaGenerateStage(models, spec, onToken)
 
     override suspend fun generate(prompt: String, maxTokens: Int, temperature: Float, topP: Float): String =
         stage.generate(systemPrompt, prompt, maxTokens, temperature, topP).text

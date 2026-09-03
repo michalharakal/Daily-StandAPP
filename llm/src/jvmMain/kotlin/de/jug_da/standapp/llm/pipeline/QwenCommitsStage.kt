@@ -6,6 +6,7 @@ import de.jug_da.standapp.llm.model.LocalModel
 import de.jug_da.standapp.llm.model.ModelCatalog
 import de.jug_da.standapp.llm.model.ModelProvider
 import de.jug_da.standapp.llm.model.ModelSpec
+import de.jug_da.standapp.llm.model.PrefillSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import sk.ainet.apps.kllama.chat.AgentConfig
@@ -17,7 +18,6 @@ import sk.ainet.apps.kllama.chat.QwenChatTemplate
 import sk.ainet.apps.kllama.chat.Tool
 import sk.ainet.apps.kllama.chat.ToolCall
 import sk.ainet.apps.kllama.chat.ToolRegistry
-import sk.ainet.apps.llm.PrefillStrategy
 import sk.ainet.data.source.PipelineStage
 import kotlin.time.Clock
 
@@ -102,7 +102,7 @@ class QwenCommitsStage(
                 maxToolRounds = 1,
                 maxTokensPerRound = maxTokens,
                 temperature = 0.0f,
-                prefillStrategy = PrefillStrategy.Batched(64),
+                prefillStrategy = PrefillSettings.fromEnv(),
             ),
             decode = { model.tokenizer.decode(it) },
         )
@@ -148,19 +148,19 @@ class QwenCommitsStage(
     }
 
     private fun userPrompt(request: StandupRequest): String = buildString {
-        append("Fetch the git commits from the last ${request.days} day(s)")
+        append("Get the commits of the last ${request.days} day(s)")
         request.author?.let { append(" by author \"$it\"") }
-        append(" using ${RecordingGitCommitsTool.TOOL_NAME}. Pass days=${request.days} as a number")
-        request.author?.let { append(" and author=\"$it\"") }
+        append(": call ${RecordingGitCommitsTool.TOOL_NAME} with days=${request.days}")
+        request.author?.let { append(", author=\"$it\"") }
         append('.')
     }
 
     companion object {
         const val DEFAULT_MAX_TOKENS = 192
 
+        /** Short on purpose: every prompt token costs ~0.1 s of prefill on the 0.6B. */
         const val DEFAULT_SYSTEM_PROMPT: String =
-            "You are a git assistant. You must call the ${RecordingGitCommitsTool.TOOL_NAME} tool to look up " +
-                "commits; never answer from memory. Call the tool exactly once with the days (integer) " +
-                "and, only if the user names one, the author from the request."
+            "Call ${RecordingGitCommitsTool.TOOL_NAME} exactly once with days as an integer " +
+                "(and author only if the user names one). Never answer from memory."
     }
 }
