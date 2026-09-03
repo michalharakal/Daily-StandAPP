@@ -66,6 +66,7 @@ Daily-StandAPP
 | `MCP_LLM_BACKEND` | Backend selection: SKAINET, REST_API |
 | `STANDAPP_QWEN_MODEL_PATH` / `STANDAPP_LLAMA_MODEL_PATH` | Local GGUFs (skip download); `MCP_LLM_MODEL_PATH` = legacy alias for the Llama one |
 | `STANDAPP_MODEL_CACHE_DIR` | Download cache (default `~/.cache/standapp/models`); `STANDAPP_OFFLINE=1` forbids network |
+| `STANDAPP_SCHEDULE` / `STANDAPP_KV_CACHE` | Attention/SDPA schedule (`hardware`, `sequential` or a task count) and KV cache (`append`, `positional`); SKEEP-005 branches only |
 | `MCP_LLM_REST_BASE_URL` | REST endpoint URL |
 | `MCP_LLM_REST_MODEL` | Model name for REST endpoint |
 | `BENCH_*` | Benchmark configuration (see README.md for full list) |

@@ -76,6 +76,11 @@ scalar attention; see the verification log in `docs/modules/planning`). What hel
   demo is not needed.
 - `STANDAPP_PREFILL=autoregressive|batched:N` selects the engine prefill
   strategy; measured as a wash on 0.53, kept for experiments.
+- `STANDAPP_SCHEDULE=hardware|sequential|<n>` (default `hardware`) maps attention
+  heads and SDPA rows onto that many coroutine tasks; `STANDAPP_KV_CACHE=positional`
+  reads K/V in place instead of copying the prefix per token. Both need the
+  SKEEP-005 branches (`-PuseLocalTransformers=true -PuseLocalSkainet=true`) until
+  SKaiNET 0.54.0; measured decode 1.9 → 3.0 tok/s on the 3B.
 
 ### Extending the pipeline
 

@@ -9,9 +9,12 @@ import sk.ainet.apps.llm.OptimizedLLMRuntime
 import sk.ainet.apps.llm.Tokenizer
 import sk.ainet.apps.llm.tokenizer.TokenizerFactory
 import sk.ainet.context.DirectCpuExecutionContext
+import sk.ainet.context.schedule.Schedule
+import sk.ainet.exec.schedule.CoroutineSchedule
 import sk.ainet.io.JvmRandomAccessSource
 import sk.ainet.io.gguf.StreamingGGUFReader
 import sk.ainet.lang.nn.dsl.decoder.DecoderGgufWeightLoader
+import sk.ainet.lang.nn.dsl.decoder.DecoderKVCacheKind
 import sk.ainet.lang.nn.dsl.decoder.GgufDecoderMetadata
 import sk.ainet.lang.tensor.data.MemorySegmentTensorDataFactory
 import sk.ainet.lang.types.FP32
@@ -84,15 +87,17 @@ class LocalModel private constructor(
             val started = System.nanoTime()
             log("[MODEL LOAD] ${spec.id}: arch=$architecture family=${chatMetadata.family} path=$path")
             val tensorFactory = MemorySegmentTensorDataFactory()
-            val ctx = DirectCpuExecutionContext(tensorDataFactory = tensorFactory)
+            val schedule = ScheduleSettings.scheduleFromEnv()
+            val kvCacheKind = ScheduleSettings.kvCacheKindFromEnv()
+            val ctx = DirectCpuExecutionContext(tensorDataFactory = tensorFactory, schedule = schedule)
             val loader = DecoderGgufWeightLoader(
                 randomAccessProvider = { JvmRandomAccessSource.open(path.toString()) },
                 acceptedArchitectures = spec.family.acceptedArchitectures,
             )
             val weights = loader.loadToMapStreaming<FP32, Float>(ctx)
             val module = when (spec.family) {
-                ModelFamily.QWEN -> QwenNetworkLoader.fromWeights(weights)
-                ModelFamily.LLAMA -> LlamaNetworkLoader.fromWeights(weights)
+                ModelFamily.QWEN -> QwenNetworkLoader.fromWeights(weights, kvCacheKind = kvCacheKind)
+                ModelFamily.LLAMA -> LlamaNetworkLoader.fromWeights(weights, kvCacheKind = kvCacheKind)
             }
             val slabFloats = SlabSettings.fromEnv()
             val runtime = OptimizedLLMRuntime(
@@ -116,9 +121,37 @@ class LocalModel private constructor(
             log(
                 "[MODEL LOAD] ${spec.id}: done in ${ms}ms — layers=${weights.metadata.blockCount} " +
                     "ctx=${weights.metadata.contextLength} (window ${minOf(weights.metadata.contextLength, MAX_INFERENCE_LEN)}) " +
-                    "vocab=${weights.metadata.vocabSize} bos=${weights.metadata.bosTokenId} stop=$stops slabFloats=$slabFloats"
+                    "vocab=${weights.metadata.vocabSize} bos=${weights.metadata.bosTokenId} stop=$stops slabFloats=$slabFloats " +
+                    "schedule=${schedule.name} kvCache=$kvCacheKind"
             )
             LocalModel(spec, path, runtime, tokenizer, chatMetadata, weights.metadata, stops, primaryEos, tensorFactory)
         }
     }
+}
+
+/**
+ * SKEEP-005 acceptance switches (SKaiNET-transformers `feature/attention-schedule`):
+ *
+ * - `STANDAPP_SCHEDULE` = `hardware` (default: one coroutine task per core, attention heads and
+ *   SDPA rows in parallel) | `sequential` (everything on the caller thread) | `<n>` (n tasks).
+ * - `STANDAPP_KV_CACHE` = `append` (default) | `positional` (pre-sized buffers, copy-free K/V views).
+ *
+ * Both are deployment properties of the execution context, never of the network definition;
+ * the summary text must be identical for every combination.
+ */
+object ScheduleSettings {
+    fun scheduleFromEnv(raw: String? = System.getenv("STANDAPP_SCHEDULE")): Schedule =
+        when (val v = raw?.trim()?.lowercase().orEmpty()) {
+            "", "hardware", "parallel" -> CoroutineSchedule.hardware()
+            "sequential", "1" -> Schedule.Sequential
+            else -> CoroutineSchedule(parallelism = v.toIntOrNull()
+                ?: throw IllegalArgumentException("STANDAPP_SCHEDULE must be hardware|sequential|<n>, got '$raw'"))
+        }
+
+    fun kvCacheKindFromEnv(raw: String? = System.getenv("STANDAPP_KV_CACHE")): DecoderKVCacheKind =
+        when (raw?.trim()?.lowercase().orEmpty()) {
+            "", "append" -> DecoderKVCacheKind.APPEND
+            "positional" -> DecoderKVCacheKind.POSITIONAL
+            else -> throw IllegalArgumentException("STANDAPP_KV_CACHE must be append|positional, got '$raw'")
+        }
 }
