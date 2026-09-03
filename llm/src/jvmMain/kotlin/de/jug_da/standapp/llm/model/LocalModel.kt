@@ -43,6 +43,12 @@ class LocalModel private constructor(
     private val tensorFactory: MemorySegmentTensorDataFactory,
 ) : AutoCloseable {
 
+    /** `usedFloats/overflowBytes` of the last forward step's activation slab, for `[STAGE/SCOPE]` logs. */
+    fun scopeReport(): String {
+        val scope = runtime.forwardScopeMetrics ?: return "scope=off"
+        return "slabUsed=${scope.usedFloats}/${scope.slabFloats} floats overflow=${scope.overflowBytes / (1L shl 20)} MB"
+    }
+
     /** Longest prompt + generation the runtime's KV cache accommodates. */
     val inferenceWindow: Int get() = minOf(ggufMetadata.contextLength, MAX_INFERENCE_LEN)
 
@@ -60,7 +66,7 @@ class LocalModel private constructor(
             log: (String) -> Unit = System.err::println,
         ): LocalModel = withContext(Dispatchers.Default) {
             require(path.exists()) { "${spec.id}: model file does not exist: $path" }
-            KernelSetup.ensureInstalled()
+            KernelSetup.ensureInstalled(log)
 
             val chatMetadata = JvmRandomAccessSource.open(path.toString()).use { source ->
                 StreamingGGUFReader.open(source).use { reader ->
@@ -88,12 +94,14 @@ class LocalModel private constructor(
                 ModelFamily.QWEN -> QwenNetworkLoader.fromWeights(weights)
                 ModelFamily.LLAMA -> LlamaNetworkLoader.fromWeights(weights)
             }
+            val slabFloats = SlabSettings.fromEnv()
             val runtime = OptimizedLLMRuntime(
                 model = module,
                 ctx = ctx,
                 mode = OptimizedLLMMode.DIRECT,
                 dtype = FP32::class,
                 bos = weights.metadata.bosTokenId,
+                forwardSlabFloats = slabFloats,
             )
 
             val turnEnders = when (spec.family) {
@@ -108,7 +116,7 @@ class LocalModel private constructor(
             log(
                 "[MODEL LOAD] ${spec.id}: done in ${ms}ms — layers=${weights.metadata.blockCount} " +
                     "ctx=${weights.metadata.contextLength} (window ${minOf(weights.metadata.contextLength, MAX_INFERENCE_LEN)}) " +
-                    "vocab=${weights.metadata.vocabSize} bos=${weights.metadata.bosTokenId} stop=$stops"
+                    "vocab=${weights.metadata.vocabSize} bos=${weights.metadata.bosTokenId} stop=$stops slabFloats=$slabFloats"
             )
             LocalModel(spec, path, runtime, tokenizer, chatMetadata, weights.metadata, stops, primaryEos, tensorFactory)
         }

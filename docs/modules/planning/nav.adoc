@@ -3,6 +3,7 @@
 * xref:design.adoc[Design]
 * xref:tasks.adoc[Tasks]
 * xref:verification-2026-09.adoc[Verification 2026-09]
+* xref:skainet-0-53-engine-notes.adoc[SKaiNET 0.53 engine notes]
 
 .Upstream program
 * xref:prd-skainet.adoc[PRD — SKaiNET core]

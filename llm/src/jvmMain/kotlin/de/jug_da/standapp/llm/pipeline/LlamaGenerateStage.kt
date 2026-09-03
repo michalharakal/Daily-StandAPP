@@ -104,7 +104,10 @@ class LlamaGenerateStage(
             onToken = { id ->
                 if (first) {
                     StageLog.stage("PREFILL DONE", "first token after ${(System.nanoTime() - started) / 1_000_000}ms")
+                    StageLog.stage("SCOPE", "after prefill: ${model.scopeReport()}")
                     first = false
+                } else if (produced == 1) {
+                    StageLog.stage("SCOPE", "decode step: ${model.scopeReport()}")
                 }
                 produced++
                 onToken(model.tokenizer.decode(id))

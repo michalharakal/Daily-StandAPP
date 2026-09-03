@@ -87,3 +87,15 @@ object PrefillSettings {
         }
     }
 }
+
+/**
+ * Per-step activation slab for `OptimizedLLMRuntime` (`forwardSlabFloats`), read
+ * from `STANDAPP_SLAB_FLOATS` (default: upstream 8 M floats = 32 MB). A prefill
+ * chunk that outgrows the slab overflows to tracked heap storage — correct but
+ * allocation-heavy; `[STAGE/SCOPE]` logs report `usedFloats` / `overflowBytes`.
+ */
+object SlabSettings {
+    const val UPSTREAM_DEFAULT = 8 * 1024 * 1024
+    fun fromEnv(env: (String) -> String? = System::getenv): Int =
+        env("STANDAPP_SLAB_FLOATS")?.trim()?.toIntOrNull()?.takeIf { it >= 0 } ?: UPSTREAM_DEFAULT
+}

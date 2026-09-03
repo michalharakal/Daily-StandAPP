@@ -1,0 +1,155 @@
+= SKaiNET 0.37 → 0.53: memory layout, quantisation, kernels
+:navtitle: SKaiNET 0.53 engine notes
+
+What the SKaiNET core and SKaiNET-transformers releases between the app's old
+pin (0.36.x) and 0.53.0 brought in the three areas that decide inference speed
+and footprint, checked against the code and against this app's JFR profile
+(xref:verification-2026-09.adoc[verification log]). Line references are to the
+0.53.0 checkouts of both repositories.
+
+== Timeline
+
+[cols="1,3,3,3", options="header"]
+|===
+| Release | Memory layout | Quantisation | Kernels / runtime
+
+| 0.38.0 (07-31)
+| Zero-copy `[out,in]`→`[in,out]` views (`NarrowFloatInputMajorTensorData`)
+| FP16/BF16 **keep-native** on GGUF and SafeTensors (`DTypePolicy` honoured on GGUF for the first time); rank-2 packed reshape moves no bytes
+| native `skainet_fp16_matmul` joins BF16; both are real `(m,n,k)` GEMMs. i7-9750H: BF16 1.8–1.9×, FP16 1.5–1.7× over FP32 SGEMM
+
+| 0.39.0 / 0.39.1 (08-11)
+| Android streaming GGUF (no hard OOM); `token_embd` stays packed on JVM eager (`RowDequantSource`)
+| all 7 GGML formats map to real `TensorEncoding`s; Q4_0/Q5_0/Q5_1 load packed
+| `skainet-backend-jni-cpu` (Android NEON, priority 100): SmolLM2 Q8_0 ~3.8 → ~24 tok/s (6.4×); FP32 fast paths + cached `DirectCpuExecutionContext.ops` removed 83 % of on-device decode overhead
+
+| 0.40.0 / 0.40.1 (08-12)
+| off-heap/mmap on Android (`MmapFloatTensorData`, `MappedGgufWeights`); GGUF dequant peak >12 GB → ~1.05× dense
+| **transpose hotfix**: `ops.transpose()` on packed weights was a shape relabel → real block-grid permutation for all 7 formats (silently wrong numbers before)
+| native Q5_0/Q5_1; Apple arm64 `FEAT_DotProd` dispatch
+
+| 0.49.0 (08-26, ~100 PRs)
+| **The SKEEP-003 memory model**: `Storage` (Heap/OffHeap/Mapped/Device, ownership), `Scope`/`ForwardScope` slabs, `Format`, `Layout` + `BlockOrder` (ROW_MAJOR vs INPUT_BLOCK_MAJOR), `TensorView.narrow/prepack/materialize`, `TraceSink`, `MemoryPlan`/`skainet-plan`, `WeightForm`, `AllocationResolver`
+| `BlockOrder` declared end-to-end (#1124); ternary track (`TQ1_0`/`TQ2_0`/`BITNET_B1_58`/`BITNET_PLANES`), I8-absmax activation requant for ternary only
+| `KernelKey`/`KernelDispatch` (exact-key registry over every operand)
+
+| 0.50.0 (08-28)
+| **packed weights served from the mapping** (`BufferPackedTensorData` over `MappedBufferStorage`); `MemoryPlan` charges mapped weights to page cache
+| all 7 formats zero-copy from mmap
+| **`_rm` row-major C kernels** + **threaded packed matmul** (`skainet_row_threads.c`): Qwen2.5-1.5B Q4_K_M 153 → 61 ms/step, 566 KB weight heap, 0.4 s load; silent fallback trap measured 48,771 → 33 ms/step
+
+| 0.51.0 / 0.52.0 (08-29 / 09-01)
+| `Storage.copyInto/copyFrom`; dense FP32 served from mapped/off-heap without dequant
+| off-heap I2_S staging; `TernaryF32GemvNative` true zero-copy
+| **`ViewKernelPack` SPI + `KernelDispatch.ensureInstalled()` self-healing**; `defaultSink` + loud once-warning on reference fallback; `PanamaVectorMatmulKernel.gemvRows()` 16.7× at m=1; ~2.3× decode+prefill on a Gemma 4 port
+
+| 0.53.0 (09-02)
+| ≥2 GiB array-free constants; graph constants alias live weights. Transformers: every GGUF loader is a thin engine wrapper, **MAPPED keep-packed default**, `token_embd` as `PackedRowDequantTensorData`, per-step `ForwardScope` on DIRECT (zero new heap bytes per token, #343)
+| `QuantPolicy` → `WeightForm`; `MemSegWeightConverter`, `LlamaQuantLayout`, `BlockQuantPacking` deleted (−7 k lines); BitNet 0.25 B/weight
+| `skainet-decode` harness (#395): TTFT, prefill/decode tok/s, effective bandwidth, kernel-vs-adapter share, page-fault rate. qwen2.5-1.5B under `-Xmx512m` (~176 MB planned heap); SmolLM2 ~3.6 → ~50 tok/s from packed embeddings
+|===
+
+== Memory layout (what a weight is at runtime)
+
+* A weight is a `TensorView` over a `Storage` with a `Layout`. For packed
+  formats the layout strides step *blocks*, which is what lets a Q4_K weight be
+  sliced or transposed without touching bytes.
+* `WeightForm(encoding = KeepAsStored, order = AS_STORED, shape, residency)`:
+  `residency = MAPPED` keeps the GGUF pages file-backed (page cache, not heap);
+  `HEAP` stages them. `WeightByteOrder.KERNEL_FEED` (input-block-major) is
+  never requested by the resolver by default (`canProduceKernelFeedOrder = false`).
+* `BlockOrder.ROW_MAJOR` is GGUF file order and what the `ffm-rowmajor-*`
+  kernels read **zero-copy from the mapping**. `INPUT_BLOCK_MAJOR` + `prepack()`
+  is what the older `native-ffm-*` / Panama packed kernels need — but prepack
+  requires heap storage and those kernels copy the whole weight into a fresh
+  arena per call (`NativeQ4KMatmulKernel.kt:71-74`). *On x86_64 JVM, prepacking
+  is lateral-to-negative*; the mapped row-major path is the right one.
+* `ForwardScope` slab (default 8 M floats = 32 MB, `OptimizedLLMRuntime.forwardSlabFloats`):
+  steady-state decode allocates nothing; a prefill chunk that outgrows it
+  overflows to tracked heap ("a performance report, never an error").
+  `runtime.forwardScopeMetrics` exposes `usedFloats` / `overflowBytes`.
+* KV cache in transformer-core: `PositionalKVCache` pre-allocates
+  `[nKVHeads, maxSeqLen, headDim]` FP32 ×2 and `sliceView`-**copies the used
+  prefix on every read**. The engine's planner (`KvCacheMode`) defaults to
+  BF16 while the runtime store defaults to dense FP32 — plan-vs-actual is off by 2×.
+* Diagnostics: `SKAINET_MEMORY_DEBUG=1` / `MemoryDebug.report()`,
+  `skainet-plan` (header-only plan before load), `PlanVsActual`.
+
+== Quantisation
+
+* Encodings: Q4_0, Q4_K, Q5_0, Q5_1, Q5_K, Q6_K, Q8_0 (all served packed from
+  mmap since 0.50), FP16/BF16 keep-native (0.38), ternary/BitNet (0.49–0.53),
+  TurboQuant KV encodings (planner only today).
+* **Activations are FP32 everywhere.** The only activation quantisation is the
+  I8-absmax adapter the ternary kernels ask for; the Q4_K native kernel
+  quantises its single input row to Q8 internally, once per call.
+* Embeddings stay packed and dequantise only the gathered rows
+  (`PackedRowDequantTensorData`, `Embedding.forwardRowDequant`) — the source of
+  the SmolLM2 3.6 → 50 tok/s jump in 0.53.
+* Q4_K_M files carry Q6_K tensors too; both go through the same path. The
+  generated JVM support matrix lists Q6_K as `panama-vector` although a native
+  `matmulQ6K` exists — worth checking which one binds.
+
+== Kernels
+
+Two registries: `KernelRegistry` (dtype + provider priority: scalar 0, Panama
+Vector 50, native FFM/JNI 100) used by the legacy `DefaultCpuOps*` fast paths,
+and `KernelDispatch` (exact `KernelKey` over every operand) used by the view
+path. A healthy JVM bootstrap registers **17+ view kernels**: 7 `ffm-rowmajor-*`,
+7 `native-ffm-*`, 2 FP32, 1 reference (19 with the ternary packs). The app logs
+this at model load. Calling `KernelPacks.install()` before provider discovery
+(the pre-0.52 recipe) leaves only the 7 row-major packs + reference registered;
+`KernelDispatch.ensureInstalled()` first gives the full table. For mapped GGUF
+weights it makes no measurable difference — the row-major packs serve them either way.
+
+[cols="2,1,3", options="header"]
+|===
+| Kernel | Shape | Notes
+| `skainet_{q4k,q6k,q5k,q8_0,q4_0,q5_0,q5_1}_matmul[_rm]` | **gemv** (one activation row) | native C; threaded over output rows via `skainet_row_threads.c`: **4 threads compile-time** (`SKAINET_MATMUL_THREADS`), engages at `output_dim ≥ 512`, grain 64, spin-then-park pool created once. **No runtime knob.**
+| `skainet_fp32_matmul`, `skainet_bf16_matmul`, `skainet_fp16_matmul` | **GEMM `(m,n,k)`** | the only multi-row kernels; BF16/FP16 tile at `m>1`
+| `PanamaVector*MatmulKernel` (Q4_K, Q8_0, Q4_0, Q5_x, Q6_K, FP32, BF16/FP16) | gemv (rows via `parallelChunks` on `Dispatchers.Default`, min output 256) | priority 50, used where the native lib is absent
+| `scaledDotProductAttention` (`DefaultCpuOps.kt:3668`) / `fusedDecodeAttention` (`MultiHeadAttention.kt:499`) | scalar Kotlin | **no vectorised or threaded attention kernel exists**; both copy Q/K/V to `FloatArray` per call; the batched path additionally tiles K/V for GQA (`repeatKVHeads` concat) and permutes
+|===
+
+Consequences, verified in this app's profile (Llama-3.2-3B Q4_K_M, 547-token prompt):
+
+* **Prefill is `N` gemv passes over the weight** — `FfmRowMajorKernels.kt:96`
+  loops rows and calls the native gemv per row. Every prompt token re-streams
+  the whole 2 GB. Prefill ≈ decode speed (measured: batched 64 190 s vs
+  autoregressive 203 s — the 3–10× quoted upstream for `PrefillStrategy.Batched`
+  is graph-dispatch amortisation, not weight reuse). Only dense FP32 weights
+  (`DECODER_DEQUANTIZE_ALL`) hit the tiled, m-parallel SGEMM — at 4× the memory.
+* **Attention ≈ 40 % of samples** and single-threaded; cost grows with context
+  because the used K/V prefix is copied per layer per token.
+* **`OptimizedLLMMode.DIRECT` is the fastest path shipped.** OPTIMIZED is
+  shape-`[1]` only (no batched prefill), skips the `ForwardScope`, has its main
+  fusion pass disabled and is wrapped in `catch(Exception)` in upstream's own
+  benchmark; HYBRID has no consumer; the IREE/Minerva lane is export-only
+  (~1740 ms/token on the SL2610 board).
+* `-Dskainet.strict.kernels=true` turns silent fallbacks into
+  `NoSuchKernelException` — the most useful switch in the stack (the app's
+  sampler stall was *not* a kernel fallback and passed strict mode).
+
+== What this app uses (checklist)
+
+* ✅ `DecoderGgufWeightLoader` default `WeightForm` (MAPPED, keep-packed, row-major) → `ffm-rowmajor-*` zero-copy.
+* ✅ `KernelPacks.install(); FfmRowMajorKernelPack.install()` before the first forward (0.52's `ensureInstalled()` would also self-heal); kernel count logged.
+* ✅ `OptimizedLLMMode.DIRECT`, `PrefillStrategy.Batched(64)` (opt-in upstream; a wash here), `MemorySegmentTensorDataFactory` closed with the model.
+* ✅ FP32 activations, contiguous heap `FloatArray` (packed kernels decline anything else).
+* 🔧 `STANDAPP_SLAB_FLOATS` exposes `forwardSlabFloats`; `[STAGE/SCOPE]` logs overflow after prefill and on the first decode step.
+  Measured on the 3B: a 64-token prefill chunk overflows ≈ 1.4 GB even with a 256 MB slab, and a decode
+  step at 622 tokens of context overflows 111 MB — exactly the per-token copy of the full K/V prefix
+  (622 × 8 kv-heads × 128 × 4 B × 2 × 28 layers). A larger slab absorbs the overflow but does not change
+  the time (221.9 s vs 221.6 s prefill): the copy itself is the cost, not the allocation.
+* ⏳ Not used: `skainet-decode` harness (`GenerationMetrics` with kernel/adapter share and page-fault rate), `MemoryPlans.plan` before load, `PhaseProfile.reset()/report()` (always-on accumulator, single-threaded, covers `attn.fused_copy` vs `attn.fused_compute`).
+
+== Upstream gaps that bound this app
+
+. Packed-weight prefill GEMM (rows per weight pass) — the largest structural gap.
+. Vectorised, multi-threaded attention reading the KV buffers in place.
+. Runtime-configurable matmul thread count (compile-time 4 today).
+. `repeatKVHeads` concat and permute chain on the batched path; per-matmul `Arena.ofConfined()`.
+. Planner/runtime KV-cache default mismatch (BF16 vs FP32).
+
+Reference to beat, quoted upstream: llama.cpp b10621 CPU-only on Gemma 4 E2B
+Q4_K_M — 144 prefill / 79 decode tok/s (`Gemma4SpeedProfile.kt:19-21`).

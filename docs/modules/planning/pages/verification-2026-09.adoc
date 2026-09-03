@@ -135,6 +135,19 @@ Prefill strategy makes no difference (same 547-token prompt, `--max-tokens 32`):
 | `batched:64` (default) | 190 s | 723 s | 3:29
 |===
 
+Activation slab (`STANDAPP_SLAB_FLOATS`, same repo, 622-token prompt, `--max-tokens 32`):
+
+[cols="2,1,1,1,1", options="header"]
+|===
+| Slab | Prefill | Overflow after prefill | Overflow per decode step | Wall
+| 8 M floats (32 MB, upstream default) | 221.9 s | 1,472 MB | 111 MB | 4:02
+| 64 M floats (256 MB) | 221.6 s | 1,248 MB | 0 MB | 4:01
+|===
+
+The decode overflow equals the per-token copy of the whole K/V prefix
+(`fusedDecodeAttention` / `PositionalKVCache.sliceView`), so decode cost grows
+linearly with context; the slab only moves the allocation, not the work.
+
 Consequences for this app:
 
 * **Prompt tokens are the lever.** ≈ 0.35 s per prompt token on the 3B: the
