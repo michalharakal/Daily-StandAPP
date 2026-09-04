@@ -185,6 +185,42 @@ Upstream (SKaiNET / SKaiNET-transformers) wins, in order of impact:
 . **Allocation churn** — reuse per-step activations (`ScopedTensorDataFactory`)
   and avoid the permute/unsqueeze chain on the batched path.
 
+== Schedule acceptance (2026-09-03, SKaiNET SKEEP-005)
+
+The second upstream lever above — multi-threaded attention that reads the KV
+buffers in place — was implemented on the engine branch
+`SKaiNET/feature/skeep-005-schedules` (a `Schedule` on the execution context,
+Halide-style algorithm/schedule split) and the transformers branch
+`SKaiNET-transformers/feature/attention-schedule` (one task per attention head
+or GQA group, copy-free `PositionalKVCache` views). This app is the acceptance
+target: `LocalModel.load` reads `STANDAPP_SCHEDULE` (`hardware` default,
+`sequential`, or a task count) and `STANDAPP_KV_CACHE` (`append` default,
+`positional`); the network definitions are untouched. Built with
+`-PuseLocalTransformers=true -PuseLocalSkainet=true`.
+
+Same repo, `--days 2` (5 commits, 697-token summary prompt), default sampling
+(temperature 0.1 — the summary text legitimately varies between runs):
+
+[cols="3,1,1,1,1,1", options="header"]
+|===
+| Configuration | Qwen round | Llama prefill | Llama decode | Decode slab overflow | Wall
+
+| `sequential` / `append` (= 0.53.0 behaviour) | 33.3 s | 242.6 s | 80 tok in 41.1 s (1.9 tok/s) | 128 MB per step | 5:25
+| `hardware` (12 tasks) / `append` | 28.9 s | 210.5 s | 99 tok in 40.1 s (2.5 tok/s) | 128 MB per step | 4:48
+| `hardware` (12 tasks) / `positional` | 25.7 s | 211.4 s | 79 tok in 26.2 s (3.0 tok/s) | 0 MB | 4:32
+|===
+
+* Decode speed 1.9 → 3.0 tok/s (×1.6); the per-step K/V copy that filled the
+  slab overflow is gone with the positional cache.
+* Prefill 243 → 211 s (−13 %): the attention share parallelises, the
+  row-major gemv (≈ 50 % of a token, still 4 threads) does not — that is the
+  next upstream lever.
+* The Qwen tool round gains ≈ 7 s for the same reason.
+* Text equality: with `--temperature 0` the two extreme configurations
+  produce byte-identical summaries (see the greedy rows recorded below).
+
+include::partial$schedule-greedy.adoc[]
+
 == Findings fed back into the code
 
 . Top-p must be paired with a finite top-k on this SKaiNET version (see step 4).
