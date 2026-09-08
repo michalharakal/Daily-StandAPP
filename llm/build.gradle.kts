@@ -41,7 +41,7 @@ kotlin {
         }
         jvmMain {
             dependencies {
-                // SKaiNET core + transformers, both BOM-managed (0.53.0).
+                // SKaiNET core + transformers, both BOM-managed (0.54.0 / 0.54.1).
                 implementation(project.dependencies.platform(libs.skainet.bom))
                 implementation(project.dependencies.platform(libs.skainet.tx.bom))
 

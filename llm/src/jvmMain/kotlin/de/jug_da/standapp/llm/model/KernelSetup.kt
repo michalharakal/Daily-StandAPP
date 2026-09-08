@@ -3,7 +3,6 @@ package de.jug_da.standapp.llm.model
 import sk.ainet.backend.api.kernel.KernelDispatch
 import sk.ainet.backend.api.kernel.KernelPacks
 import sk.ainet.exec.kernel.FfmRowMajorKernelPack
-import sk.ainet.lang.memory.ExperimentalMemoryApi
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -20,7 +19,6 @@ object KernelSetup {
     /** A healthy JVM bootstrap registers at least 17 view kernels (7 ffm-rowmajor, 7 native-ffm packed, 2 fp32, 1 reference; 19 with the ternary packs). */
     const val EXPECTED_JVM_KERNELS = 17
 
-    @OptIn(ExperimentalMemoryApi::class)
     fun ensureInstalled(log: (String) -> Unit = System.err::println) {
         if (!installed.compareAndSet(false, true)) return
         // 0.52+: discovers providers (ServiceLoader), then KernelPacks.install(), then the
