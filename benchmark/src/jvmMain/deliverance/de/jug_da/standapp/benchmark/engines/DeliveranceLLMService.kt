@@ -1,6 +1,7 @@
 package de.jug_da.standapp.benchmark.engines
 
-import com.codahale.metrics.MetricRegistry
+// 0.0.16: Deliverance moved from Codahale metrics 4 to Dropwizard metrics 5.
+import io.dropwizard.metrics5.MetricRegistry
 import de.jug_da.standapp.llm.LLMService
 import io.teknek.deliverance.DType
 import io.teknek.deliverance.generator.GeneratorParameters

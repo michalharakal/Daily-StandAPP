@@ -31,7 +31,7 @@ include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-ap
 //
 //     ./gradlew ... -PuseLocalTransformers=true
 //
-// By default the published sk.ainet.transformers:* 0.54.1 artifacts from Maven
+// By default the published sk.ainet.transformers:* 0.57.1 artifacts from Maven
 // Central are used, so a plain checkout and CI resolve the same graph.
 //
 // Substitutions are EXPLICIT: the upstream artifactIds (skainet-transformers-*)

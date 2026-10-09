@@ -5,8 +5,9 @@
 # artifacts are already present in ~/.m2/repository.
 #
 # Engines installed:
-#   - Deliverance (https://github.com/edwardcapriolo/deliverance)
 #   - qxotic      (https://github.com/qxoticai/qxotic)
+# Deliverance (https://github.com/edwardcapriolo/deliverance) is on Maven
+# Central since 0.0.12 and is resolved by Gradle directly.
 #
 # After running this, the benchmark module can be built with:
 #   ./gradlew :benchmark:jvmRun -Pdeliverance.enabled=true -Pqxotic.enabled=true
@@ -67,26 +68,20 @@ install_engine() {
     echo "✓ ${name} installed"
 }
 
-# Deliverance builds with maven.compiler.release=25 — refuse early with a
+# The engines build with maven.compiler.release=25 — refuse early with a
 # clear message instead of failing halfway through the reactor.
 JAVA_MAJOR="$(java -version 2>&1 | sed -n 's/.*version "\([0-9]*\).*/\1/p' | head -1)"
 if (( JAVA_MAJOR < 25 )); then
-    echo "✗ JDK 25+ required to build Deliverance (java on PATH is ${JAVA_MAJOR})."
+    echo "✗ JDK 25+ required to build the bench engines (java on PATH is ${JAVA_MAJOR})."
     echo "  Point JAVA_HOME/PATH at a JDK 25 before running this script."
     exit 1
 fi
 
 # Deliverance — pure-Java JVM inference. Apache 2.0.
-# DELIVERANCE_VERSION must match `deliverance` in gradle/libs.versions.toml;
-# the post-install artifact check above trips loudly when upstream bumps it.
-# Only core+safetensors (and their -am dependencies math/tensor) are needed —
-# skips the unrelated web/sketches/plugin modules of the reactor.
-DELIVERANCE_VERSION="0.0.11-SNAPSHOT"
-install_engine \
-    "deliverance" \
-    "https://github.com/edwardcapriolo/deliverance.git" \
-    "io/teknek/deliverance/core/${DELIVERANCE_VERSION}/core-${DELIVERANCE_VERSION}.jar" \
-    -pl core,safetensors -am
+# Since 0.0.12 Deliverance is released to Maven Central (io.teknek.deliverance:*),
+# so it is resolved like any other dependency and no longer built here. The
+# version lives in gradle/libs.versions.toml (`deliverance`).
+echo "✓ deliverance is resolved from Maven Central — nothing to install"
 
 # qxotic — JVM-native LLM inference toolkit. Apache 2.0.
 # Different shape from Deliverance: qxotic's "library" surface (jota, gguf,

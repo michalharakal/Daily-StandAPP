@@ -14,8 +14,9 @@ plugins {
 // When a property is set:
 //   - the corresponding source set under src/jvmMain/<engine>/ is included
 //   - the engine's coordinates are added as implementation deps
-//   - mavenLocal() is added to repositories (alternatives don't publish to
-//     Maven Central; see scripts/setup-bench-engines.sh)
+//   - mavenLocal() is added to repositories (qxotic does not publish to
+//     Maven Central; see scripts/setup-bench-engines.sh). Deliverance is on
+//     Maven Central since 0.0.12 and needs no local install.
 //
 // When unset (CI default), nothing changes and the alternative engines are
 // not on the classpath. BenchmarkEngineRegistry's reflection lookup returns

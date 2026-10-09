@@ -143,7 +143,7 @@ The `:benchmark` module evaluates local LLM backends for standup summary generat
   - **LM Studio** or **Ollama** running locally or on a remote machine, or
   - **SKAINET** (Llama 3.2 3B Q4_K_M, downloaded on first use or pointed at via `MCP_LLM_MODEL_PATH`)
 - Optional benchmark-only alternative engines:
-  - **Deliverance** — pure-Java JVM inference. Requires `./scripts/setup-bench-engines.sh` (clones the repo + `mvn install` into `~/.m2`), then build with `-Pdeliverance.enabled=true`. In-process; auto-downloads HuggingFace models.
+  - **Deliverance** — pure-Java JVM inference, resolved from Maven Central (no local install needed). Build with `-Pdeliverance.enabled=true`. In-process; auto-downloads HuggingFace models (set `HF_TOKEN` for gated repos).
   - **qxotic** — JVM-native LLM toolkit. Same setup script, then build with `-Pqxotic.enabled=true`. Subprocess-launched (the runnable inference lives in qxotic's `examples` module's `Llama32CliQ8_0` CLI; we shell out to it once per generate call). Slower than in-process — model is reloaded per call — but proves the abstraction holds across very different engine designs.
 
 ### Unit Tests
@@ -227,7 +227,9 @@ java --add-modules jdk.incubator.vector -jar benchmark/build/libs/benchmark-jvm.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `BENCH_DIR` | `./bench` | Directory containing `case-XX.json` test files |
-| `BENCH_BACKENDS` | all | Comma-separated list: `SKAINET`, `REST_API` |
+| `BENCH_BACKENDS` | all | Comma-separated list: `SKAINET`, `REST_API`, `DELIVERANCE`, `QXOTIC` |
+| `BENCH_DELIVERANCE_MODEL` | _(none)_ | HuggingFace `owner/name` for the Deliverance lane (needs `-Pdeliverance.enabled=true`) |
+| `BENCH_TIMEOUT_MS` | `30000` | Per-run generation budget (advisory for in-process engines) |
 | `BENCH_RUNS` | `5` | Number of measured runs per case (for determinism scoring) |
 | `BENCH_WARMUP` | `0` | Discarded warm-up runs before measurement (cold-start JIT/class-load bias) |
 | `BENCH_CASES` | all | Comma-separated case IDs, e.g. `case-01,case-08` |

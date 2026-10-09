@@ -74,8 +74,8 @@ Daily-StandAPP
 ## Key Dependencies
 
 - **Kotlin** 2.4.10, **Ktor** 3.5.2, **Kotlinx** Coroutines/Serialization/DateTime/IO
-- **SKaiNET** 0.54.0 + **SKaiNET-transformers** 0.54.1 (Kotlin-native LLM inference, GGUF models, agent loop, data pipeline; BOM-managed; local checkout via `-PuseLocalTransformers=true`)
+- **SKaiNET** 0.57.0 + **SKaiNET-transformers** 0.57.1 (Kotlin-native LLM inference, GGUF models, agent loop, data pipeline; BOM-managed; local checkout via `-PuseLocalTransformers=true`)
 - **Eclipse JGit** 7.7.0 (Git repository access)
 - **MCP Kotlin SDK** 0.8.3 (Model Context Protocol)
-- **Koog** 1.0.0 (cloud-api:agent only), **Deliverance** 0.0.11-SNAPSHOT (benchmark-only, mavenLocal)
+- **Koog** 1.0.0 (cloud-api:agent only), **Deliverance** 0.0.16 (benchmark-only, Maven Central)
 - **Models**: Qwen3-0.6B Q8_0 (tool calling, greedy, thinking off) and Llama-3.2-3B-Instruct Q4_K_M (summary); parameters temperature=0.1, topP=0.9, maxTokens=512
