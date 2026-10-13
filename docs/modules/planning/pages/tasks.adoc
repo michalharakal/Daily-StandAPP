@@ -219,7 +219,7 @@ replaced. See xref:design.adoc[DES-08..DES-10] and xref:requirements.adoc[REQ-50
   `LayaCheckpointSpec`/resolver (per-file `hf://`), CLI `--triage laya` / `--laya-model`
 | REQ-51; JavaLand 2027 CfP (Variante A)
 | `DecisionTriageStageTest` (scripted adapter); real run on this repo recorded in the README;
-  composite build against transformers `feature/laya-adapter` until the modules are released
+  on SKaiNET-transformers 0.59.0 (`decisions` + `laya` modules); composite build stays an opt-in
 | done (experimental)
 |===
 

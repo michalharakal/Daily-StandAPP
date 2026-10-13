@@ -90,8 +90,10 @@ dependencies {
     implementation(project(":data"))
     implementation(project(":standapp-ai-engine"))
 
-    // DataSourceException for the model-download error path.
+    // DataSourceException for the model-download error path; the transformers BOM pins the
+    // decisions-api coordinate that :llm exposes as an api dependency.
     implementation(project.dependencies.platform(libs.skainet.bom))
+    implementation(project.dependencies.platform(libs.skainet.tx.bom))
     implementation(libs.skainet.data.source)
 
     implementation(libs.kotlinx.datetime)

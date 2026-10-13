@@ -58,7 +58,7 @@ Daily-StandAPP
 - **Kotlin Multiplatform expect/actual**: Common interfaces in `commonMain`, JVM implementations in `jvmMain` (`domain` additionally targets wasmJs)
 - **LLM backend selection**: Factory pattern via `LLMServiceFactory`. Backend chosen by `MCP_LLM_BACKEND` env var (SKAINET, REST_API)
 - **Pipeline DSL**: `standupFlow { commits = qwenToolCall(); preprocess {}; prompt {}; summarize(llama()); postprocess {} }` — every stage is a SKaiNET `PipelineStage`; add `transform(name) {}` / `finish(name) {}` for custom steps
-- **Typed decisions**: `decide("triage", laya()) { choice(); score(); probability(); policy {} }` (a `sk.ainet.decisions.dsl` schema; `DEFAULT_TRIAGE_POLICY` without `policy {}`) + `dropIrrelevant()` + `annotateTriage()` run the questions per commit (`CommitBatch.triage`, read with `choice/score/boolean(id)`); needs the composite build against a transformers `develop` checkout (`-PuseLocalTransformers=true -PlocalTransformersPath=../SKaiNET-transformers-laya`) until 0.59.0 is on Maven Central
+- **Typed decisions**: `decide("triage", laya()) { choice(); score(); probability(); policy {} }` (a `sk.ainet.decisions.dsl` schema; `DEFAULT_TRIAGE_POLICY` without `policy {}`) + `dropIrrelevant()` + `annotateTriage()` run the questions per commit (`CommitBatch.triage`, read with `choice/score/boolean(id)`); ships with SKaiNET-transformers 0.59.0 (the composite build `-PuseLocalTransformers=true -PlocalTransformersPath=<checkout>` stays an opt-in)
 - **Serialization**: kotlinx.serialization with `@Serializable` and `@SerialName` annotations for OpenAI-compatible JSON
 - **Package prefix**: `de.jug_da.*`
 
@@ -78,7 +78,7 @@ Daily-StandAPP
 ## Key Dependencies
 
 - **Kotlin** 2.4.10, **Ktor** 3.5.2, **Kotlinx** Coroutines/Serialization/DateTime/IO
-- **SKaiNET** 0.58.0 + **SKaiNET-transformers** 0.58.0 (Kotlin-native LLM inference, GGUF models, agent loop, data pipeline; BOM-managed; local checkout via `-PuseLocalTransformers=true`)
+- **SKaiNET** 0.58.0 + **SKaiNET-transformers** 0.59.0 (Kotlin-native LLM inference, GGUF models, agent loop, data pipeline; BOM-managed; local checkout via `-PuseLocalTransformers=true`)
 - **Eclipse JGit** 7.7.0 (Git repository access)
 - **MCP Kotlin SDK** 0.8.3 (Model Context Protocol)
 - **Koog** 1.0.0 (cloud-api:agent only), **Deliverance** 0.0.16 (benchmark-only, Maven Central)

@@ -114,9 +114,9 @@ java -jar StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar --repo . --days 
 
 The checkpoint (650 MB, `hf://convaiinnovations/laya` `multilingual/`) downloads into the model
 cache on first use; `--laya-model DIR` or `STANDAPP_LAYA_MODEL_PATH` point at a local copy.
-Until SKaiNET-transformers 0.59.0 ships the `decisions` and `laya` modules, this stage needs the
-composite build against a transformers `develop` checkout:
-`-PuseLocalTransformers=true -PlocalTransformersPath=../SKaiNET-transformers-laya`.
+The `decisions` and `laya` modules ship with SKaiNET-transformers 0.59.0, which the version catalog
+pins; the composite build (`-PuseLocalTransformers=true -PlocalTransformersPath=<checkout>`) stays an
+opt-in for working against a transformers checkout.
 
 Measured on this repository (6-core laptop, eager FP32 CPU path, Laya multilingual base
 checkpoint, 2026-10-13): model load 9.2 s; four questions per commit take 19–28 s (median
