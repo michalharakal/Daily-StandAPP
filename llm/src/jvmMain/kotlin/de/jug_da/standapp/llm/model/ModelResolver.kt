@@ -85,6 +85,18 @@ class ModelResolver(
         return path
     }
 
+    /** Resolve any `hf://` / `https://` URI through the cache; [label] only names the log lines. */
+    suspend fun resolveUri(label: String, uri: String): Path {
+        val offline = env("STANDAPP_OFFLINE") == "1"
+        val policy = if (offline) CachePolicy.Offline else CachePolicy.Use
+        log("[MODEL] $label: resolving $uri (cache=$cacheDir, policy=$policy)")
+        val artifact = resolver.resolve(DataSourceRequest(uri = uri, cachePolicy = policy))
+        val local = artifact.localPath
+            ?: throw DataSourceException("$label: resolver returned no local path for $uri")
+        log("[MODEL] $label: ${if (artifact.cacheHit) "cache hit" else "downloaded"} -> $local")
+        return Path.of(local)
+    }
+
     private suspend fun download(spec: ModelSpec, uri: String): Path {
         val offline = env("STANDAPP_OFFLINE") == "1"
         val policy = if (offline) CachePolicy.Offline else CachePolicy.Use

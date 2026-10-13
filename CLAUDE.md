@@ -31,9 +31,11 @@ Daily-StandAPP
 ├── data          # Git repository access (JGit on JVM, expect/actual pattern)
 ├── domain        # Shared domain models (GitInfo, etc.)
 ├── llm           # LLM inference: SKaiNET two-model pipeline + REST_API backend
-│                   model/    ModelCatalog, ModelResolver (hf:// download + cache), LocalModel, ModelProvider
+│                   model/    ModelCatalog, ModelResolver (hf:// download + cache), LocalModel, ModelProvider,
+│                             LayaCheckpoint (Laya directory spec, per-file hf:// resolver, FP32 loader)
 │                   pipeline/ standupFlow DSL over sk.ainet.data.source.DataPipeline:
-│                             QwenCommitsStage (tool call) → preprocess → RetryingSummarizeStage (LlamaGenerateStage)
+│                             QwenCommitsStage (tool call) → preprocess → [DecisionTriageStage (Laya) → relevant → annotate]
+│                             → RetryingSummarizeStage (LlamaGenerateStage)
 │                   Key: LLMService interface, LLMServiceFactory, LlamaChatLLMService, RecordingGitCommitsTool
 ├── standapp-ai-engine  # Pure prompt/parse/score logic (dev.standapp.engine.*)
 │                   PromptBuilder, CommitFormatter, QualityScorer, StandupSummary
@@ -56,6 +58,7 @@ Daily-StandAPP
 - **Kotlin Multiplatform expect/actual**: Common interfaces in `commonMain`, JVM implementations in `jvmMain` (`domain` additionally targets wasmJs)
 - **LLM backend selection**: Factory pattern via `LLMServiceFactory`. Backend chosen by `MCP_LLM_BACKEND` env var (SKAINET, REST_API)
 - **Pipeline DSL**: `standupFlow { commits = qwenToolCall(); preprocess {}; prompt {}; summarize(llama()); postprocess {} }` — every stage is a SKaiNET `PipelineStage`; add `transform(name) {}` / `finish(name) {}` for custom steps
+- **Typed decisions**: `decide("triage", laya()) { choice(); score(); noul() }` + `dropIrrelevant()` + `annotateTriage()` run `sk.ainet.decisions` questions per commit (`CommitBatch.triage`); needs the composite build against the transformers `feature/laya-adapter` branch (`-PuseLocalTransformers=true -PlocalTransformersPath=../SKaiNET-transformers-laya`) until the modules are on Maven Central
 - **Serialization**: kotlinx.serialization with `@Serializable` and `@SerialName` annotations for OpenAI-compatible JSON
 - **Package prefix**: `de.jug_da.*`
 
@@ -65,6 +68,7 @@ Daily-StandAPP
 |----------|---------|
 | `MCP_LLM_BACKEND` | Backend selection: SKAINET, REST_API |
 | `STANDAPP_QWEN_MODEL_PATH` / `STANDAPP_LLAMA_MODEL_PATH` | Local GGUFs (skip download); `MCP_LLM_MODEL_PATH` = legacy alias for the Llama one |
+| `STANDAPP_LAYA_MODEL_PATH` | Local Laya checkpoint directory for `--triage laya` (skips the download) |
 | `STANDAPP_MODEL_CACHE_DIR` | Download cache (default `~/.cache/standapp/models`); `STANDAPP_OFFLINE=1` forbids network |
 | `STANDAPP_SCHEDULE` / `STANDAPP_KV_CACHE` | Attention/SDPA schedule (`hardware`, `sequential` or a task count) and KV cache (`append`, `positional`); SKEEP-005 branches only |
 | `MCP_LLM_REST_BASE_URL` | REST endpoint URL |
@@ -78,4 +82,4 @@ Daily-StandAPP
 - **Eclipse JGit** 7.7.0 (Git repository access)
 - **MCP Kotlin SDK** 0.8.3 (Model Context Protocol)
 - **Koog** 1.0.0 (cloud-api:agent only), **Deliverance** 0.0.16 (benchmark-only, Maven Central)
-- **Models**: Qwen3-0.6B Q8_0 (tool calling, greedy, thinking off) and Llama-3.2-3B-Instruct Q4_K_M (summary); parameters temperature=0.1, topP=0.9, maxTokens=512
+- **Models**: Qwen3-0.6B Q8_0 (tool calling, greedy, thinking off) and Llama-3.2-3B-Instruct Q4_K_M (summary); parameters temperature=0.1, topP=0.9, maxTokens=512; optional Laya multilingual (typed commit triage, `--triage laya`)

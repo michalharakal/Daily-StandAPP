@@ -70,6 +70,12 @@ skainet-tx-core = { module = "sk.ainet.transformers:skainet-transformers-core" }
 skainet-tx-agent = { module = "sk.ainet.transformers:skainet-transformers-agent" }
 skainet-tx-inference-llama = { module = "sk.ainet.transformers:skainet-transformers-inference-llama" }
 skainet-tx-inference-qwen = { module = "sk.ainet.transformers:skainet-transformers-inference-qwen" }
+# Typed decisions (choice / score / boolean probability) and the Laya adapter. Not on Maven
+# Central before transformers 0.59.0: build with -PuseLocalTransformers=true against the
+# `feature/laya-adapter` checkout (see settings.gradle.kts).
+skainet-tx-inference-laya = { module = "sk.ainet.transformers:skainet-transformers-inference-laya" }
+skainet-tx-decisions-api = { module = "sk.ainet.transformers:skainet-transformers-decisions-api" }
+skainet-tx-decisions-runtime = { module = "sk.ainet.transformers:skainet-transformers-decisions-runtime" }
 
 
 [plugins]

@@ -62,6 +62,12 @@ kotlin {
                 implementation(libs.skainet.tx.inference.qwen)
                 implementation(libs.skainet.tx.inference.llama)
 
+                // Typed decisions: the shared request/outcome contract, the runtime that applies
+                // the acceptance policy, and Laya (mmBERT encoder + decision heads) as the adapter.
+                implementation(libs.skainet.tx.decisions.api)
+                implementation(libs.skainet.tx.decisions.runtime)
+                implementation(libs.skainet.tx.inference.laya)
+
                 // JGit-backed git tool + engine prompt/parse types.
                 implementation(project(":data"))
                 implementation(project(":standapp-ai-engine"))
