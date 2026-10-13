@@ -43,7 +43,11 @@ kotlin {
             dependencies {
                 // SKaiNET core + transformers, both BOM-managed (0.58.0 / 0.58.0).
                 implementation(project.dependencies.platform(libs.skainet.bom))
-                implementation(project.dependencies.platform(libs.skainet.tx.bom))
+                // api, not implementation: :llm exposes decisions-api on its api configuration, so every consumer
+
+                // (CLI, benchmark, …) needs the transformers BOM's version constraints on its own classpath.
+
+                api(project.dependencies.platform(libs.skainet.tx.bom))
 
                 // Engine: DSL + execution contexts, kernel SPI, GGUF I/O, hf:// downloads.
                 implementation(libs.skainet.lang.core)
