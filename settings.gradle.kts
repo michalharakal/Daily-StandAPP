@@ -16,6 +16,12 @@ plugins {
 
 dependencyResolutionManagement {
     repositories {
+        // Opt-in: `-PskainetMavenLocal=true` resolves the SKaiNET artifacts from ~/.m2 first,
+        // for a locally published engine or transformers build (publishToMavenLocal) that
+        // Maven Central does not carry yet. CI never sets it.
+        if (providers.gradleProperty("skainetMavenLocal").orNull == "true") {
+            mavenLocal { content { includeGroupByRegex("sk\\.ainet(\\..*)?") } }
+        }
         mavenCentral()
     }
 }
@@ -31,7 +37,7 @@ include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-ap
 //
 //     ./gradlew ... -PuseLocalTransformers=true
 //
-// By default the published sk.ainet.transformers:* 0.57.1 artifacts from Maven
+// By default the published sk.ainet.transformers:* 0.58.0 artifacts from Maven
 // Central are used, so a plain checkout and CI resolve the same graph.
 //
 // Substitutions are EXPLICIT: the upstream artifactIds (skainet-transformers-*)

@@ -80,9 +80,8 @@ tasks.shadowJar {
     }
 }
 
-repositories {
-    mavenCentral()
-}
+// Repositories come from settings.gradle.kts (dependencyResolutionManagement), so the
+// opt-in `-PskainetMavenLocal=true` lane applies to the CLI classpath as well.
 
 dependencies {
     testImplementation(kotlin("test"))

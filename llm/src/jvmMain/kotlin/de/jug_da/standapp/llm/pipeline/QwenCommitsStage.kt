@@ -104,7 +104,7 @@ class QwenCommitsStage(
                 temperature = 0.0f,
                 prefillStrategy = PrefillSettings.fromEnv(),
             ),
-            decode = { model.tokenizer.decode(it) },
+            decode = { model.tokenizer.decodeToken(it) },
         )
         val messages = mutableListOf(
             ChatMessage(ChatRole.SYSTEM, systemPrompt),

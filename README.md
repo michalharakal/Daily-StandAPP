@@ -62,6 +62,9 @@ clean: status and `[STAGE/...]` logs go to stderr.
 
 Either override may also be an `hf://org/repo@rev/file.gguf` URI, resolved through the same cache.
 
+Build flag `-PskainetMavenLocal=true` resolves the `sk.ainet` artifacts from `~/.m2` first, for an
+engine or transformers build published locally (`publishToMavenLocal`) that Maven Central does not carry yet.
+
 ### Speed
 
 On a 6-core laptop the 3B summariser costs about 0.35 s per prompt token and

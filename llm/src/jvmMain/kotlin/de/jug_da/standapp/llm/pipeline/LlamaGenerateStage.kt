@@ -110,9 +110,9 @@ class LlamaGenerateStage(
                     StageLog.stage("SCOPE", "decode step: ${model.scopeReport()}")
                 }
                 produced++
-                onToken(model.tokenizer.decode(id))
+                onToken(model.tokenizer.decodeToken(id))
             },
-            decode = { model.tokenizer.decode(it) },
+            decode = { model.tokenizer.decodeToken(it) },
             onPrefill = { done, total ->
                 if (done == total || done % 512 == 0) StageLog.stage("PREFILL", "$done/$total")
             },
