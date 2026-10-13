@@ -9,24 +9,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import sk.ainet.data.source.PipelineStage
 import sk.ainet.decisions.AcceptancePolicy
-import sk.ainet.decisions.BooleanAcceptance
-import sk.ainet.decisions.BooleanCriteria
-import sk.ainet.decisions.BooleanProbabilityQuestion
-import sk.ainet.decisions.ChoiceAcceptance
-import sk.ainet.decisions.ChoiceOption
-import sk.ainet.decisions.ChoiceQuestion
 import sk.ainet.decisions.Decision
 import sk.ainet.decisions.DecisionAdapter
-import sk.ainet.decisions.DecisionQuestion
-import sk.ainet.decisions.DecisionRequest
 import sk.ainet.decisions.DecisionResult
 import sk.ainet.decisions.ModelSelector
-import sk.ainet.decisions.Prediction
 import sk.ainet.decisions.QuestionOutcome
-import sk.ainet.decisions.ScoreAcceptance
-import sk.ainet.decisions.ScoreLevel
-import sk.ainet.decisions.ScoreQuestion
+import sk.ainet.decisions.dsl.DecisionSchema
+import sk.ainet.decisions.dsl.acceptancePolicy
+import sk.ainet.decisions.outcomeOrNull
 import sk.ainet.decisions.runtime.DecisionRuntime
+import sk.ainet.decisions.summary
 import sk.ainet.models.laya.LayaDecisionAdapter
 import java.nio.file.Path
 
@@ -54,65 +46,32 @@ fun layaDecisionModel(
 }
 
 /**
- * The questions one `decide { }` stage asks about every commit, plus the acceptance policy
- * that turns the model's candidates into accepted decisions or abstentions.
+ * Stand-up defaults for a schema that declares no policy of its own: a choice needs 0.2 entropy
+ * confidence and a 0.1 margin to the runner-up, a score needs 0.35 mass on its top level, a
+ * boolean is decided outside (0.4, 0.6). Inclusive thresholds; a candidate below them abstains.
  */
-@StandupFlowDsl
-class TriageQuestions {
-    internal val questions = mutableListOf<DecisionQuestion>()
-
-    /** Inclusive thresholds; a candidate below them abstains instead of being silently accepted. */
-    var policy: AcceptancePolicy = DEFAULT_POLICY
-
-    /** One option out of [options] (`id` to model-facing description); keep it to six or fewer. */
-    fun choice(id: String, instructions: String, options: Map<String, String>) {
-        questions += ChoiceQuestion(id, instructions, options.map { (key, description) -> ChoiceOption(key, description) })
-    }
-
-    /** One option out of [options], each its own description. */
-    fun choice(id: String, instructions: String, vararg options: String) =
-        choice(id, instructions, options.associateWith { it })
-
-    /** An ordinal scale; [levels] are the descriptions from lowest to highest. */
-    fun score(id: String, instructions: String, levels: List<String>) {
-        questions += ScoreQuestion(id, instructions, levels.map { ScoreLevel(it) })
-    }
-
-    /** P(statement is true), with the two criteria the model scores against. */
-    fun noul(id: String, statement: String, whenFalse: String = "no", whenTrue: String = "yes") {
-        questions += BooleanProbabilityQuestion(id, statement, BooleanCriteria(whenFalse, whenTrue))
-    }
-
-    companion object {
-        /**
-         * Stand-up defaults: a choice needs 0.2 entropy confidence and a 0.1 margin to the runner-up,
-         * a score needs 0.35 mass on its top level, a boolean is decided outside (0.4, 0.6).
-         */
-        val DEFAULT_POLICY = AcceptancePolicy(
-            "standapp-triage",
-            "1",
-            ChoiceAcceptance(0.2, 0.1),
-            ScoreAcceptance.MinTopProbability(0.35),
-            BooleanAcceptance(0.4, 0.6),
-        )
-    }
+val DEFAULT_TRIAGE_POLICY: AcceptancePolicy = acceptancePolicy("standapp-triage", "1") {
+    choice { minConfidence = 0.2; minMargin = 0.1 }
+    score { minTopProbability(0.35) }
+    boolean { abstainBetween(0.4, 0.6) }
 }
 
 /**
- * Asks a decision model the same typed questions about every commit of the batch and stores
- * the [DecisionResult] per commit id in [CommitBatch.triage]. The adapter is loaded when the
+ * Asks a decision model the [schema]'s questions about every commit of the batch and stores
+ * the [DecisionResult] per commit id in [CommitBatch.triage]. The schema's policy applies,
+ * [DEFAULT_TRIAGE_POLICY] when it has none. The adapter is loaded when the
  * batch arrives and released when the stage is done, like the releasing [ModelProvider].
  */
 class DecisionTriageStage(
     override val name: String,
     private val model: DecisionModelSource,
-    private val questions: List<DecisionQuestion>,
-    private val policy: AcceptancePolicy,
+    private val schema: DecisionSchema,
     private val state: (CommitInfo) -> String = ::commitState,
 ) : PipelineStage<CommitBatch, CommitBatch> {
 
+    private val policy: AcceptancePolicy = schema.policy ?: DEFAULT_TRIAGE_POLICY
+
     override suspend fun process(input: CommitBatch): CommitBatch {
-        require(questions.isNotEmpty()) { "$name: no questions declared" }
         val started = System.nanoTime()
         val runtime = DecisionRuntime(listOf(model.adapter()))
         val loaded = (System.nanoTime() - started) / 1_000_000
@@ -120,11 +79,8 @@ class DecisionTriageStage(
         try {
             runtime.openSession(ModelSelector.Installed(model.modelId)).use { session ->
                 for (commit in input.commits) {
-                    val request = DecisionRequest.builder("commit-${commit.id}")
-                        .state(state(commit))
-                        .model(model.modelId)
-                        .apply { questions.forEach { question(it) } }
-                        .build()
+                    // The stage's model wins over whatever the schema names: the adapter is loaded here.
+                    val request = schema.request("commit-${commit.id}", state(commit), ModelSelector.Installed(model.modelId))
                     val result = withContext(Dispatchers.Default) { session.decide(request, policy) }
                     results[commit.id] = result
                     StageLog.stage("TRIAGE", "${commit.id} ${result.summary()} (${result.provenance.durationMillis} ms)")
@@ -137,7 +93,7 @@ class DecisionTriageStage(
         val outcomes = results.values.flatMap { it.outcomes }
         StageLog.stage(
             "TRIAGE",
-            "${results.size} commit(s) x ${questions.size} question(s) on ${model.modelId}: " +
+            "${results.size} commit(s) x ${schema.questions.size} question(s) on ${model.modelId}: " +
                 "accepted=${outcomes.count { it is QuestionOutcome.Accepted }} " +
                 "abstained=${outcomes.count { it is QuestionOutcome.Abstained }} " +
                 "failed=${outcomes.count { it is QuestionOutcome.Failed }}; " +
@@ -154,30 +110,12 @@ class DecisionTriageStage(
 }
 
 // ---- reading triage results --------------------------------------------------
-
-/** `kind=bugfix risk=2/5 standup=yes adr=?` — one token per question, `?` for an abstention. */
-fun DecisionResult.summary(): String = outcomes.joinToString(" ") { "${it.questionId}=${it.shortValue()}" }
-
-fun QuestionOutcome.shortValue(): String = when (this) {
-    is QuestionOutcome.Accepted -> when (val d = decision) {
-        is Decision.Choice -> d.optionId
-        is Decision.Score -> "${d.level + 1}/${d.prediction.distribution.size}"
-        is Decision.Boolean -> if (d.value) "yes" else "no"
-    }
-    is QuestionOutcome.Abstained -> "?"
-    is QuestionOutcome.Failed -> "!"
-}
+// `DecisionResult.summary()`, `choice/score/boolean(id)`, `probabilityTrue(id)` and
+// `QuestionOutcome.candidate` come from `sk.ainet.decisions`; only the batch lookup is ours.
 
 /** The outcome of [questionId] for [commitId], or null when the commit was not triaged. */
 fun CommitBatch.outcome(commitId: String, questionId: String): QuestionOutcome? =
-    triage[commitId]?.outcomes?.firstOrNull { it.questionId == questionId }
-
-/** P(true) of a boolean question, from the accepted decision or the abstained candidate. */
-fun QuestionOutcome.probabilityTrue(): Double? = when (this) {
-    is QuestionOutcome.Accepted -> (decision.prediction as? Prediction.BooleanProbability)?.probabilityTrue
-    is QuestionOutcome.Abstained -> (candidate as? Prediction.BooleanProbability)?.probabilityTrue
-    is QuestionOutcome.Failed -> null
-}
+    triage[commitId]?.outcomeOrNull(questionId)
 
 /**
  * Drops the commits whose boolean [questionId] was accepted as `false`. Abstentions, failures
@@ -200,7 +138,7 @@ fun CommitBatch.dropIrrelevant(questionId: String): CommitBatch {
     return copy(commits = kept)
 }
 
-/** Prefixes every triaged commit message with its decisions, e.g. `[kind=bugfix risk=2/5 standup=yes adr=?] …`. */
+/** Prefixes every triaged commit message with its decisions, e.g. `[kind=bugfix risk=1 standup=true adr=?] …` (`?` abstained, `!` failed, score levels 0-based). */
 fun CommitBatch.annotateTriage(): CommitBatch = copy(
     commits = commits.map { commit ->
         val result = triage[commit.id] ?: return@map commit

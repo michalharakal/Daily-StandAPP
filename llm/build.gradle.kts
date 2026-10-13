@@ -64,7 +64,7 @@ kotlin {
 
                 // Typed decisions: the shared request/outcome contract, the runtime that applies
                 // the acceptance policy, and Laya (mmBERT encoder + decision heads) as the adapter.
-                implementation(libs.skainet.tx.decisions.api)
+                api(libs.skainet.tx.decisions.api)   // the decide { } block is a decisions-dsl scope, visible to callers
                 implementation(libs.skainet.tx.decisions.runtime)
                 implementation(libs.skainet.tx.inference.laya)
 

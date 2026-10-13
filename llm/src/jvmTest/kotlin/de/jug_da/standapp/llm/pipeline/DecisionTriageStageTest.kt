@@ -25,6 +25,9 @@ import sk.ainet.decisions.Primitive
 import sk.ainet.decisions.QuestionOutcome
 import sk.ainet.decisions.QuestionTrace
 import sk.ainet.decisions.ScoreQuestion
+import sk.ainet.decisions.boolean
+import sk.ainet.decisions.probabilityTrue
+import sk.ainet.decisions.dsl.decisionSchema
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -131,9 +134,9 @@ class DecisionTriageStageTest {
         preprocess { shortIds(7) }
         decide("triage", decisionModel("scripted") { adapter }) {
             choice("kind", "What kind of change is this commit?", "feature", "bugfix", "refactor", "docs", "test", "chore")
-            score("risk", "How risky is this change?", listOf("trivial", "low", "moderate", "high", "critical"))
-            noul("standup", "Is this commit worth mentioning in the stand-up?")
-            noul("adr", "Does this commit carry an architecture decision?")
+            score("risk", "How risky is this change?", "trivial", "low", "moderate", "high", "critical")
+            probability("standup", "Is this commit worth mentioning in the stand-up?")
+            probability("adr", "Does this commit carry an architecture decision?")
         }
         dropIrrelevant("standup")
         annotateTriage()
@@ -160,7 +163,7 @@ class DecisionTriageStageTest {
         assertTrue(adapter.closed, "the adapter is released after the batch")
 
         val prompt = service.prompts.single()
-        assertTrue("[kind=bugfix risk=2/5 standup=yes adr=?] Fix broken CI pipeline" in prompt, prompt)
+        assertTrue("[kind=bugfix risk=1 standup=true adr=?] Fix broken CI pipeline" in prompt, prompt)
         assertTrue("[kind=? risk=? standup=? adr=?] Pin JVM toolchain" in prompt, "abstentions stay, marked ?: $prompt")
         assertFalse("Merge branch" in prompt, "standup=no leaves the prompt: $prompt")
     }
@@ -172,18 +175,42 @@ class DecisionTriageStageTest {
         val flow = standupFlow(noModels) {
             commits = gitCommits(FixedSource(gitInfos))
             decide("triage", decisionModel("scripted") { adapter }) {
-                noul("standup", "Worth the stand-up?")
+                probability("standup", "Worth the stand-up?")
             }
             transform("capture") { seen = it; it }
             summarize(llmService(FakeService("## Yesterday\n- x\n## Today\n- y\n## Blockers\n- None"), name = "fake-llm"))
         }
         flow.execute(StandupRequest(repoDir = "/repo", days = 1))
         val batch = seen ?: error("transform did not run")
-        assertEquals(0.9, batch.outcome("a001b02c3d4e5f6", "standup")?.probabilityTrue())
+        assertEquals(true, batch.triage.getValue("a001b02c3d4e5f6").boolean("standup"))
+        assertEquals(0.9, batch.triage.getValue("a001b02c3d4e5f6").probabilityTrue("standup"))
         assertTrue(batch.outcome("c003d04e5f6a7b8", "standup") is QuestionOutcome.Abstained)
-        assertEquals(0.5, batch.outcome("c003d04e5f6a7b8", "standup")?.probabilityTrue())
+        assertEquals(null, batch.triage.getValue("c003d04e5f6a7b8").boolean("standup"))
+        assertEquals(0.5, batch.triage.getValue("c003d04e5f6a7b8").probabilityTrue("standup"))
         assertEquals(2, batch.dropIrrelevant("standup").commits.size)
         val onlyMerges = batch.copy(commits = batch.commits.filter { it.message.startsWith("Merge") })
         assertEquals(1, onlyMerges.dropIrrelevant("standup").commits.size, "a batch is never emptied by the filter")
+    }
+
+    @Test
+    fun a_shared_schema_brings_its_own_policy() = runTest {
+        // Stricter than the default: a boolean needs P(true) >= 0.95 to be accepted as true.
+        val strict = decisionSchema("strict-triage") {
+            probability("standup", "Worth the stand-up?")
+            policy(version = "test") { boolean { abstainBetween(0.05, 0.95) } }
+        }
+        var seen: CommitBatch? = null
+        val flow = standupFlow(noModels) {
+            commits = gitCommits(FixedSource(gitInfos))
+            decide("triage", decisionModel("scripted") { ScriptedAdapter() }, strict)
+            transform("capture") { seen = it; it }
+            summarize(llmService(FakeService("## Yesterday\n- x\n## Today\n- y\n## Blockers\n- None"), name = "fake-llm"))
+        }
+        flow.execute(StandupRequest(repoDir = "/repo", days = 1))
+        val batch = seen ?: error("transform did not run")
+        val fix = batch.triage.getValue("a001b02c3d4e5f6")
+        assertEquals("strict-triage", fix.provenance.policyId)
+        assertEquals(null, fix.boolean("standup"), "0.9 is below the strict 0.95 threshold")
+        assertEquals(3, batch.dropIrrelevant("standup").commits.size, "nothing accepted as no, nothing dropped")
     }
 }

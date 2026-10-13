@@ -214,7 +214,7 @@ replaced. See xref:design.adoc[DES-08..DES-10] and xref:requirements.adoc[REQ-50
 | done
 
 | T-27
-| Typed commit triage before the summary: `decide { choice/score/noul }` stage on
+| Typed commit triage before the summary: `decide { choice/score/probability }` stage (a `decisionSchema`) on
   `sk.ainet.decisions` with Laya as the adapter, `dropIrrelevant`, `annotateTriage`,
   `LayaCheckpointSpec`/resolver (per-file `hf://`), CLI `--triage laya` / `--laya-model`
 | REQ-51; JavaLand 2027 CfP (Variante A)

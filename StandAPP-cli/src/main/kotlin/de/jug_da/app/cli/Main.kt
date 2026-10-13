@@ -114,9 +114,9 @@ internal fun run(args: Array<String>): Int {
                 // leave the prompt; abstentions stay and are visible as "?" in the annotation.
                 decide("triage", laya(cli.layaModelPath?.let(Path::of))) {
                     choice("kind", "What kind of change is this commit?", "feature", "bugfix", "refactor", "docs", "test", "chore")
-                    score("risk", "How risky is this change for the team?", listOf("trivial", "low", "moderate", "high", "critical or breaking"))
-                    noul("standup", "Is this commit worth mentioning in the team's daily stand-up?")
-                    noul("adr", "Does this commit contain or imply an architecture decision?")
+                    score("risk", "How risky is this change for the team?", "trivial", "low", "moderate", "high", "critical or breaking")
+                    probability("standup", "Is this commit worth mentioning in the team's daily stand-up?")
+                    probability("adr", "Does this commit contain or imply an architecture decision?")
                 }
                 dropIrrelevant("standup")
                 annotateTriage()

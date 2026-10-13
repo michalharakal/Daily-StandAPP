@@ -15,6 +15,9 @@ import sk.ainet.data.source.PipelineStage
 import sk.ainet.data.source.dataPipeline
 import sk.ainet.data.source.stage
 import sk.ainet.decisions.DecisionAdapter
+import sk.ainet.decisions.dsl.DecisionSchema
+import sk.ainet.decisions.dsl.DecisionSchemaScope
+import sk.ainet.decisions.dsl.decisionSchema
 import java.nio.file.Path
 import kotlin.random.Random
 
@@ -30,7 +33,7 @@ annotation class StandupFlowDsl
  *     preprocess { shortIds(7); firstMessageLine(120) }
  *     decide("triage", laya()) {                     // typed decisions before any text
  *         choice("kind", "What kind of change is this?", "feature", "bugfix", "refactor", "docs", "test", "chore")
- *         noul("standup", "Is this commit worth mentioning in the daily stand-up?")
+ *         probability("standup", "Is this commit worth mentioning in the daily stand-up?")
  *     }
  *     dropIrrelevant("standup"); annotateTriage()
  *     transform("drop-merges") { b -> b.copy(commits = b.commits.filterNot { it.message.startsWith("Merge") }) }
@@ -109,14 +112,20 @@ class StandupFlowBuilder internal constructor(val models: ModelProvider) {
     }
 
     /**
-     * Typed decisions per commit before any text is generated: `choice` / `score` / `noul`
-     * questions answered by [model], accepted or abstained under the stage's policy, stored in
-     * [CommitBatch.triage]. Follow with [dropIrrelevant] and [annotateTriage], or read the
-     * outcomes in your own `transform`.
+     * Typed decisions per commit before any text is generated: a `sk.ainet.decisions.dsl`
+     * schema (`choice` / `score` / `probability` questions, optional `policy { }`) answered by
+     * [model], accepted or abstained under the schema's policy ([DEFAULT_TRIAGE_POLICY] when it
+     * declares none), stored in [CommitBatch.triage]. Follow with [dropIrrelevant] and
+     * [annotateTriage], or read the outcomes in your own `transform`.
      */
-    fun decide(name: String = "triage", model: DecisionModelSource, block: TriageQuestions.() -> Unit) {
-        val spec = TriageQuestions().apply(block)
-        transforms += DecisionTriageStage(name, model, spec.questions.toList(), spec.policy)
+    fun decide(name: String = "triage", model: DecisionModelSource, block: DecisionSchemaScope.() -> Unit) {
+        val source = model
+        decide(name, model, decisionSchema(name) { model(source.modelId); block() })
+    }
+
+    /** The same with a schema declared elsewhere, e.g. shared between the CLI and a server. */
+    fun decide(name: String = "triage", model: DecisionModelSource, schema: DecisionSchema) {
+        transforms += DecisionTriageStage(name, model, schema)
     }
 
     /** Remove the commits a [decide] stage marked `questionId = no`; abstentions stay. */

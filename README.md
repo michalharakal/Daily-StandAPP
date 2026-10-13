@@ -104,7 +104,8 @@ only sees what survived:
 Every answer is accepted or **abstained** under an acceptance policy (confidence, margin and
 probability thresholds). Abstentions are never dropped silently: the commit stays and its tag
 shows `?`; a filter that would remove every commit removes none. Decisions are prefixed to the
-commit message (`[kind=bugfix risk=2/5 standup=yes adr=?] Fix broken CI pipeline`), so the
+commit message (`[kind=bugfix risk=1 standup=true adr=?] Fix broken CI pipeline`; score levels
+are 0-based, `?` abstained, `!` failed), so the
 summariser can group by them; `[STAGE/TRIAGE]` lines on stderr show every decision and the timings.
 
 ```bash
@@ -113,8 +114,8 @@ java -jar StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar --repo . --days 
 
 The checkpoint (650 MB, `hf://convaiinnovations/laya` `multilingual/`) downloads into the model
 cache on first use; `--laya-model DIR` or `STANDAPP_LAYA_MODEL_PATH` point at a local copy.
-Until SKaiNET-transformers ships the `decisions` and `laya` modules, this stage needs the
-composite build against the `feature/laya-adapter` branch:
+Until SKaiNET-transformers 0.59.0 ships the `decisions` and `laya` modules, this stage needs the
+composite build against a transformers `develop` checkout:
 `-PuseLocalTransformers=true -PlocalTransformersPath=../SKaiNET-transformers-laya`.
 
 Measured on this repository (6-core laptop, eager FP32 CPU path, Laya multilingual base
@@ -125,18 +126,29 @@ summariser (Llama 3.2 1B, 44 s). The base checkpoint is a starting point its pub
 to be specialised, so it is conservative about stand-up relevance; today the stage's value is
 the typed, auditable path and the measurement, not the labels.
 
-In the DSL the stage is three verbs:
+In the DSL the stage is three verbs; the block is a `sk.ainet.decisions.dsl` schema, so the
+same questions can be declared once and shared:
 
 ```kotlin
 decide("triage", laya()) {
     choice("kind", "What kind of change is this commit?", "feature", "bugfix", "refactor", "docs", "test", "chore")
-    score("risk", "How risky is this change for the team?", listOf("trivial", "low", "moderate", "high", "critical or breaking"))
-    noul("standup", "Is this commit worth mentioning in the team's daily stand-up?")
-    noul("adr", "Does this commit contain or imply an architecture decision?")
+    score("risk", "How risky is this change for the team?", "trivial", "low", "moderate", "high", "critical or breaking")
+    probability("standup", "Is this commit worth mentioning in the team's daily stand-up?")
+    probability("adr", "Does this commit contain or imply an architecture decision?")
+    policy(version = "1") {                     // optional; the stage's default applies without it
+        choice { minConfidence = 0.2; minMargin = 0.1 }
+        score { minTopProbability(0.35) }
+        boolean { abstainBetween(0.4, 0.6) }
+    }
 }
 dropIrrelevant("standup")   // accepted "no" leaves; abstentions stay
 annotateTriage()            // "[kind=… risk=… standup=… adr=…] message"
+
+// or: val triage = decisionSchema("triage") { … };  decide("triage", laya(), triage)
 ```
+
+Results are read with the library accessors: `batch.triage[id]?.choice("kind")`,
+`.score("risk")`, `.boolean("standup")` (null when abstained or failed), `.probabilityTrue("standup")`.
 
 Any `sk.ainet.decisions.DecisionAdapter` can stand in for Laya through
 `decisionModel(id) { adapter }`; the unit tests use a scripted one.

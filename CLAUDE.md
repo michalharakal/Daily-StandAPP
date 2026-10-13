@@ -58,7 +58,7 @@ Daily-StandAPP
 - **Kotlin Multiplatform expect/actual**: Common interfaces in `commonMain`, JVM implementations in `jvmMain` (`domain` additionally targets wasmJs)
 - **LLM backend selection**: Factory pattern via `LLMServiceFactory`. Backend chosen by `MCP_LLM_BACKEND` env var (SKAINET, REST_API)
 - **Pipeline DSL**: `standupFlow { commits = qwenToolCall(); preprocess {}; prompt {}; summarize(llama()); postprocess {} }` — every stage is a SKaiNET `PipelineStage`; add `transform(name) {}` / `finish(name) {}` for custom steps
-- **Typed decisions**: `decide("triage", laya()) { choice(); score(); noul() }` + `dropIrrelevant()` + `annotateTriage()` run `sk.ainet.decisions` questions per commit (`CommitBatch.triage`); needs the composite build against the transformers `feature/laya-adapter` branch (`-PuseLocalTransformers=true -PlocalTransformersPath=../SKaiNET-transformers-laya`) until the modules are on Maven Central
+- **Typed decisions**: `decide("triage", laya()) { choice(); score(); probability(); policy {} }` (a `sk.ainet.decisions.dsl` schema; `DEFAULT_TRIAGE_POLICY` without `policy {}`) + `dropIrrelevant()` + `annotateTriage()` run the questions per commit (`CommitBatch.triage`, read with `choice/score/boolean(id)`); needs the composite build against a transformers `develop` checkout (`-PuseLocalTransformers=true -PlocalTransformersPath=../SKaiNET-transformers-laya`) until 0.59.0 is on Maven Central
 - **Serialization**: kotlinx.serialization with `@Serializable` and `@SerialName` annotations for OpenAI-compatible JSON
 - **Package prefix**: `de.jug_da.*`
 
