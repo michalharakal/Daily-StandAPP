@@ -43,6 +43,7 @@ java --enable-preview --add-modules jdk.incubator.vector --enable-native-access=
 Key flags: `--format md|json|text`, `--since/--until` (win over `--days`),
 `--backend skainet|rest_api`, `--commits qwen|git`, `--summary-model 3b|1b`,
 `--qwen-model <gguf>`, `--llama-model <gguf>` (alias `--model`), `--keep-models`,
+`--triage off|laya`, `--laya-model <dir>`,
 `--output <file>`, `--score`, `--max-tokens`, `--temperature`. Run `--help` for the full list.
 Exit codes: `0` ok, `2` usage, `3` git error/no commits, `4` LLM/model error,
 `5` failed quality checks or unparseable JSON. Machine-readable output stays
@@ -59,6 +60,7 @@ clean: status and `[STAGE/...]` logs go to stderr.
 | `HF_TOKEN` | Optional Hugging Face token for the download |
 | `MCP_LLM_BACKEND=REST_API` | Use an OpenAI-compatible endpoint for the summary instead (`MCP_LLM_REST_BASE_URL`, `MCP_LLM_REST_MODEL`) |
 | `STANDAPP_TINY_PROMPT=1` | Send a one-line prompt to the summariser only (download + inference smoke test) |
+| `STANDAPP_LAYA_MODEL_PATH` | Local Laya checkpoint directory for `--triage laya` (skips the download) |
 
 Either override may also be an `hf://org/repo@rev/file.gguf` URI, resolved through the same cache.
 
@@ -84,6 +86,72 @@ scalar attention; see the verification log in `docs/modules/planning`). What hel
   reads K/V in place instead of copying the prefix per token. Both need the
   SKEEP-005 branches (`-PuseLocalTransformers=true -PuseLocalSkainet=true`) until
   SKaiNET 0.54.0; measured decode 1.9 → 3.0 tok/s on the 3B.
+
+### Commit triage with Laya (experimental)
+
+`--triage laya` adds a decision stage in front of the summariser. Laya (Convai Innovations,
+Apache 2.0) is a decision model, not a text generator: it answers typed questions about a state
+with a probability distribution. The stage asks four questions per commit and the summariser
+only sees what survived:
+
+| Question | Primitive | Used for |
+|---|---|---|
+| `kind` | choice: feature, bugfix, refactor, docs, test, chore | grouping |
+| `risk` | score 1–5 (trivial … critical or breaking) | risk callouts |
+| `standup` | boolean probability | commits decided "no" leave the prompt |
+| `adr` | boolean probability | architecture-decision candidates |
+
+Every answer is accepted or **abstained** under an acceptance policy (confidence, margin and
+probability thresholds). Abstentions are never dropped silently: the commit stays and its tag
+shows `?`; a filter that would remove every commit removes none. Decisions are prefixed to the
+commit message (`[kind=bugfix risk=1 standup=true adr=?] Fix broken CI pipeline`; score levels
+are 0-based, `?` abstained, `!` failed), so the
+summariser can group by them; `[STAGE/TRIAGE]` lines on stderr show every decision and the timings.
+
+```bash
+java -jar StandAPP-cli/build/libs/standapp-1.0-SNAPSHOT-all.jar --repo . --days 14 --commits git --triage laya
+```
+
+The checkpoint (650 MB, `hf://convaiinnovations/laya` `multilingual/`) downloads into the model
+cache on first use; `--laya-model DIR` or `STANDAPP_LAYA_MODEL_PATH` point at a local copy.
+The `decisions` and `laya` modules ship with SKaiNET-transformers 0.60.0, which the version catalog
+pins; the composite build (`-PuseLocalTransformers=true -PlocalTransformersPath=<checkout>`) stays an
+opt-in for working against a transformers checkout.
+
+Measured on this repository (6-core laptop, eager FP32 CPU path, Laya multilingual base
+checkpoint, 2026-10-13): model load 9.2 s; four questions per commit take 19–28 s (median
+21.8 s, about 5.4 s per question); 34 commits of a 120-day window triaged in 12.6 min, 125
+decisions accepted and 11 abstained, 31 commits decided `standup=no` and 3 left for the
+summariser (Llama 3.2 1B, 44 s). The base checkpoint is a starting point its publisher expects
+to be specialised, so it is conservative about stand-up relevance; today the stage's value is
+the typed, auditable path and the measurement, not the labels.
+
+In the DSL the stage is three verbs; the block is a `sk.ainet.decisions.dsl` schema, so the
+same questions can be declared once and shared:
+
+```kotlin
+decide("triage", laya()) {
+    choice("kind", "What kind of change is this commit?", "feature", "bugfix", "refactor", "docs", "test", "chore")
+    score("risk", "How risky is this change for the team?", "trivial", "low", "moderate", "high", "critical or breaking")
+    probability("standup", "Is this commit worth mentioning in the team's daily stand-up?")
+    probability("adr", "Does this commit contain or imply an architecture decision?")
+    policy(version = "1") {                     // optional; the stage's default applies without it
+        choice { minConfidence = 0.2; minMargin = 0.1 }
+        score { minTopProbability(0.35) }
+        boolean { abstainBetween(0.4, 0.6) }
+    }
+}
+dropIrrelevant("standup")   // accepted "no" leaves; abstentions stay
+annotateTriage()            // "[kind=… risk=… standup=… adr=…] message"
+
+// or: val triage = decisionSchema("triage") { … };  decide("triage", laya(), triage)
+```
+
+Results are read with the library accessors: `batch.triage[id]?.choice("kind")`,
+`.score("risk")`, `.boolean("standup")` (null when abstained or failed), `.probabilityTrue("standup")`.
+
+Any `sk.ainet.decisions.DecisionAdapter` can stand in for Laya through
+`decisionModel(id) { adapter }`; the unit tests use a scripted one.
 
 ### Extending the pipeline
 

@@ -37,20 +37,26 @@ include(":cloud-api:model", ":cloud-api:server", ":cloud-api:client", ":cloud-ap
 //
 //     ./gradlew ... -PuseLocalTransformers=true
 //
-// By default the published sk.ainet.transformers:* 0.58.0 artifacts from Maven
+// By default the published sk.ainet.transformers:* 0.60.0 artifacts from Maven
 // Central are used, so a plain checkout and CI resolve the same graph.
 //
 // Substitutions are EXPLICIT: the upstream artifactIds (skainet-transformers-*)
 // come from per-module POM_ARTIFACT_ID properties, which Gradle's automatic
 // composite substitution does not reliably map to project paths — without
 // these rules the coordinates silently resolve from Maven Central.
-val localSkaiNetTransformers = file("../SKaiNET-transformers")
+// `-PlocalTransformersPath=../SKaiNET-transformers-laya` points the composite at another
+// checkout or worktree (the Laya triage stage needs the `feature/laya-adapter` branch until
+// transformers ships the laya and decisions modules on Maven Central).
+val localSkaiNetTransformers = file(providers.gradleProperty("localTransformersPath").orNull ?: "../SKaiNET-transformers")
 if (providers.gradleProperty("useLocalTransformers").orNull == "true") {
     check(localSkaiNetTransformers.isDirectory) {
         "useLocalTransformers=true but ${localSkaiNetTransformers.absolutePath} is not a directory"
     }
     includeBuild(localSkaiNetTransformers) {
         dependencySubstitution {
+            // The BOM too, so the composite needs no published transformers version at all.
+            substitute(module("sk.ainet.transformers:skainet-transformers-bom"))
+                .using(project(":llm-bom"))
             substitute(module("sk.ainet.transformers:skainet-transformers-core"))
                 .using(project(":llm-core"))
             substitute(module("sk.ainet.transformers:skainet-transformers-agent"))
@@ -59,6 +65,12 @@ if (providers.gradleProperty("useLocalTransformers").orNull == "true") {
                 .using(project(":llm-inference:llama"))
             substitute(module("sk.ainet.transformers:skainet-transformers-inference-qwen"))
                 .using(project(":llm-inference:qwen"))
+            substitute(module("sk.ainet.transformers:skainet-transformers-inference-laya"))
+                .using(project(":llm-inference:laya"))
+            substitute(module("sk.ainet.transformers:skainet-transformers-decisions-api"))
+                .using(project(":decisions:decisions-api"))
+            substitute(module("sk.ainet.transformers:skainet-transformers-decisions-runtime"))
+                .using(project(":decisions:decisions-runtime"))
         }
     }
 }

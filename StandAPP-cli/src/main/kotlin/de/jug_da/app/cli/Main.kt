@@ -58,7 +58,7 @@ internal fun run(args: Array<String>): Int {
         backend == LLMBackendType.REST_API || cli.since != null -> CommitsMode.GIT
         else -> cli.commits
     }
-    System.err.println("Daily StandAPP — repo=${cli.repoDir} backend=$backend commits=$commitsMode format=${cli.format}")
+    System.err.println("Daily StandAPP — repo=${cli.repoDir} backend=$backend commits=$commitsMode triage=${cli.triage} format=${cli.format}")
 
     if (!File(cli.repoDir, ".git").exists()) {
         System.err.println("Error: '${cli.repoDir}' is not a git repository (no .git directory).")
@@ -108,6 +108,19 @@ internal fun run(args: Array<String>): Int {
             // firstMessageLine keeps prefill sane on real repos: multi-paragraph
             // commit bodies multiply prompt tokens without adding signal.
             preprocess { shortIds(7); firstMessageLine(120); limit(MAX_COMMITS) }
+            if (cli.triage == TriageMode.LAYA) {
+                // Typed decisions before any text: kind, risk, stand-up relevance and whether the
+                // commit carries an architecture decision. Commits decided "not for the stand-up"
+                // leave the prompt; abstentions stay and are visible as "?" in the annotation.
+                decide("triage", laya(cli.layaModelPath?.let(Path::of))) {
+                    choice("kind", "What kind of change is this commit?", "feature", "bugfix", "refactor", "docs", "test", "chore")
+                    score("risk", "How risky is this change for the team?", "trivial", "low", "moderate", "high", "critical or breaking")
+                    probability("standup", "Is this commit worth mentioning in the team's daily stand-up?")
+                    probability("adr", "Does this commit contain or imply an architecture decision?")
+                }
+                dropIrrelevant("standup")
+                annotateTriage()
+            }
             if (cli.format == OutputFormat.JSON) {
                 // A 3B model spends roughly 40 tokens per commit on the JSON schema;
                 // warn before a long generation that will be cut off and fail parsing.
@@ -245,6 +258,9 @@ private fun printUsage(out: PrintStream) {
           -f, --format FMT        Output format: md (default) | json | text
           -b, --backend NAME      LLM backend: skainet | rest_api (overrides MCP_LLM_BACKEND)
               --commits MODE      qwen (default: tool call) | git (direct JGit access)
+              --triage MODE       off (default) | laya: typed triage of every commit (kind, risk,
+                                  stand-up relevance, ADR candidate) before the summary
+              --laya-model DIR    Local Laya checkpoint directory (else STANDAPP_LAYA_MODEL_PATH or download)
               --qwen-model PATH   Local GGUF for the tool-calling stage
           -m, --llama-model PATH  Local GGUF for the summariser (alias: --model)
               --summary-model M   3b (default, Llama-3.2-3B Q4_K_M) | 1b (Llama-3.2-1B Q8_0, ~2-3x faster)
@@ -264,7 +280,8 @@ private fun printUsage(out: PrintStream) {
           STANDAPP_QWEN_MODEL_PATH, STANDAPP_LLAMA_MODEL_PATH (or MCP_LLM_MODEL_PATH),
           STANDAPP_MODEL_CACHE_DIR (default ~/.cache/standapp/models), STANDAPP_OFFLINE=1,
           STANDAPP_PREFILL=batched:64|autoregressive (engine prefill strategy),
-          HF_TOKEN (optional Hugging Face token), STANDAPP_TINY_PROMPT=1 (inference smoke test)
+          HF_TOKEN (optional Hugging Face token), STANDAPP_TINY_PROMPT=1 (inference smoke test),
+          STANDAPP_LAYA_MODEL_PATH (Laya checkpoint directory for --triage laya)
 
         Examples:
           standapp --repo /path/to/repo --days 7 --score

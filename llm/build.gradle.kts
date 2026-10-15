@@ -41,9 +41,13 @@ kotlin {
         }
         jvmMain {
             dependencies {
-                // SKaiNET core + transformers, both BOM-managed (0.58.0 / 0.58.0).
+                // SKaiNET core + transformers, both BOM-managed (0.59.0 / 0.60.0).
                 implementation(project.dependencies.platform(libs.skainet.bom))
-                implementation(project.dependencies.platform(libs.skainet.tx.bom))
+                // api, not implementation: :llm exposes decisions-api on its api configuration, so every consumer
+
+                // (CLI, benchmark, …) needs the transformers BOM's version constraints on its own classpath.
+
+                api(project.dependencies.platform(libs.skainet.tx.bom))
 
                 // Engine: DSL + execution contexts, kernel SPI, GGUF I/O, hf:// downloads.
                 implementation(libs.skainet.lang.core)
@@ -61,6 +65,12 @@ kotlin {
                 implementation(libs.skainet.tx.agent)
                 implementation(libs.skainet.tx.inference.qwen)
                 implementation(libs.skainet.tx.inference.llama)
+
+                // Typed decisions: the shared request/outcome contract, the runtime that applies
+                // the acceptance policy, and Laya (mmBERT encoder + decision heads) as the adapter.
+                api(libs.skainet.tx.decisions.api)   // the decide { } block is a decisions-dsl scope, visible to callers
+                implementation(libs.skainet.tx.decisions.runtime)
+                implementation(libs.skainet.tx.inference.laya)
 
                 // JGit-backed git tool + engine prompt/parse types.
                 implementation(project(":data"))

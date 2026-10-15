@@ -9,6 +9,9 @@ enum class OutputFormat { MD, JSON, TEXT }
 /** How the commit list is obtained. */
 enum class CommitsMode { QWEN, GIT }
 
+/** Typed commit triage before the summary: off, or Laya (local decision model). */
+enum class TriageMode { OFF, LAYA }
+
 /** Bad command line — message goes to stderr, process exits with code 2. */
 class CliUsageException(message: String) : Exception(message)
 
@@ -29,6 +32,10 @@ data class CliArgs(
     val llamaModelPath: String? = null,
     /** Qwen tool call (default) or direct git access for the commit list. */
     val commits: CommitsMode = CommitsMode.QWEN,
+    /** `--triage laya` runs the Laya decision stage on every commit. */
+    val triage: TriageMode = TriageMode.OFF,
+    /** `--laya-model DIR`: local checkpoint directory instead of the download. */
+    val layaModelPath: String? = null,
     /** Summariser preset: `3b` (default, Llama-3.2-3B Q4_K_M) or `1b` (Llama-3.2-1B Q8_0, ~2–3× faster). */
     val summaryModel: String = "3b",
     /** Keep both models resident instead of releasing each after its stage. */
@@ -97,6 +104,13 @@ data class CliArgs(
                             ?: throw CliUsageException("--commits expects qwen|git, got '$raw'")
                         result = result.copy(commits = mode)
                     }
+                    "--triage" -> {
+                        val raw = value(arg)
+                        val mode = TriageMode.entries.firstOrNull { it.name.equals(raw, ignoreCase = true) }
+                            ?: throw CliUsageException("--triage expects off|laya, got '$raw'")
+                        result = result.copy(triage = mode)
+                    }
+                    "--laya-model" -> result = result.copy(layaModelPath = value(arg))
                     "--summary-model" -> {
                         val raw = value(arg)
                         if (raw.lowercase() !in setOf("3b", "1b")) throw CliUsageException("--summary-model expects 3b|1b, got '$raw'")

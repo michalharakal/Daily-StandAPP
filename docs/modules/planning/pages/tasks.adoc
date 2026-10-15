@@ -205,6 +205,22 @@ replaced. See xref:design.adoc[DES-08..DES-10] and xref:requirements.adoc[REQ-50
 | REQ-51, REQ-52
 | ladder log in xref:verification-2026-09.adoc[]; `--score` run exits 0 or 5, never 3/4
 | done
+
+| T-26
+| SKaiNET 0.58.0 / transformers 0.58.0 (tokenizers through the engine's input front ends),
+  `decodeToken`, opt-in `-PskainetMavenLocal=true` lane
+| REQ-51
+| `assemble` + all module tests (81) green against the 0.58.0 artifacts
+| done
+
+| T-27
+| Typed commit triage before the summary: `decide { choice/score/probability }` stage (a `decisionSchema`) on
+  `sk.ainet.decisions` with Laya as the adapter, `dropIrrelevant`, `annotateTriage`,
+  `LayaCheckpointSpec`/resolver (per-file `hf://`), CLI `--triage laya` / `--laya-model`
+| REQ-51; JavaLand 2027 CfP (Variante A)
+| `DecisionTriageStageTest` (scripted adapter); real run on this repo recorded in the README;
+  on SKaiNET-transformers 0.59.0 (`decisions` + `laya` modules); composite build stays an opt-in
+| done (experimental)
 |===
 
 == Follow-on: upstream program

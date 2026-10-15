@@ -41,6 +41,8 @@ data class CommitBatch(
     val request: StandupRequest,
     val commits: List<CommitInfo>,
     val source: CommitSource,
+    /** Typed decisions per commit id, filled by a `decide { }` stage; empty when no triage ran. */
+    val triage: Map<String, sk.ainet.decisions.DecisionResult> = emptyMap(),
 )
 
 data class PromptPair(val system: String, val user: String)
