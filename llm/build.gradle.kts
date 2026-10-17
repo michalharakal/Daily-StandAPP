@@ -41,7 +41,7 @@ kotlin {
         }
         jvmMain {
             dependencies {
-                // SKaiNET core + transformers, both BOM-managed (0.60.0 / 0.61.0).
+                // SKaiNET core + transformers, both BOM-managed (0.61.0 / 0.62.1).
                 implementation(project.dependencies.platform(libs.skainet.bom))
                 // api, not implementation: :llm exposes decisions-api on its api configuration, so every consumer
 
